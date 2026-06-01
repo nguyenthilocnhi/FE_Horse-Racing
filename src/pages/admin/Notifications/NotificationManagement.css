@@ -1,0 +1,24 @@
+.notification-form-card {
+  margin-bottom: 20px;
+}
+
+.notification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.notification-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.notification-form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.notification-page strong {
+  color: #fff;
+}

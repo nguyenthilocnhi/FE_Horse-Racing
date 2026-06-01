@@ -1,0 +1,129 @@
+.dashboard-page {}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.dashboard-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 220px;
+  padding-top: 20px;
+}
+
+.dashboard-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 10px;
+}
+
+.dashboard-chart-bar {
+  width: 100%;
+  max-width: 48px;
+  margin-top: auto;
+  background: linear-gradient(to top, #8b7355, #d4af37);
+  border-radius: 6px 6px 0 0;
+  min-height: 8px;
+  transition: height 0.5s ease;
+}
+
+.dashboard-chart-col span {
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.06em;
+}
+
+.dashboard-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0 !important;
+}
+
+.dashboard-activity-item {
+  display: flex;
+  gap: 14px;
+  padding: 16px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-activity-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: #666;
+}
+
+.dashboard-activity-item--success .dashboard-activity-dot { background: #4ade80; }
+.dashboard-activity-item--info .dashboard-activity-dot { background: #60a5fa; }
+.dashboard-activity-item--warning .dashboard-activity-dot { background: #d4af37; }
+
+.dashboard-activity-item strong {
+  display: block;
+  font-size: 13px;
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.dashboard-activity-item p {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+.dashboard-quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+}
+
+.dashboard-pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dashboard-pending-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-pending-item span:first-child {
+  flex: 1;
+  font-size: 13px;
+  color: #aaa;
+}
+
+.dashboard-pending-item strong {
+  font-size: 1.2rem;
+  color: #d4af37;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-quick-grid {
+    grid-template-columns: 1fr;
+  }
+}

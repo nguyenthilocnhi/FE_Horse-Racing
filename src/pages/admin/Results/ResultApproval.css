@@ -1,0 +1,55 @@
+.result-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.result-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.result-id {
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.06em;
+}
+
+.result-card-head h3 {
+  margin: 4px 0 0;
+  font-size: 1.05rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+.result-card-body {
+  padding: 20px 22px;
+}
+
+.result-meta {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.result-meta label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+.result-meta span {
+  font-size: 13px;
+  color: #ccc;
+}
+
+.result-winner {
+  color: #d4af37 !important;
+  font-weight: 600;
+}

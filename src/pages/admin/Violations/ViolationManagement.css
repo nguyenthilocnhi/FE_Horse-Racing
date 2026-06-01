@@ -1,0 +1,33 @@
+.violation-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.violation-layout:has(.violation-detail) {
+  grid-template-columns: 1fr 340px;
+}
+
+.violation-dl dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #555;
+  margin-top: 12px;
+}
+
+.violation-dl dd {
+  margin: 4px 0 0;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.violation-detail .admin-btn--gold {
+  margin-top: 20px;
+}
+
+@media (max-width: 1024px) {
+  .violation-layout:has(.violation-detail) {
+    grid-template-columns: 1fr;
+  }
+}

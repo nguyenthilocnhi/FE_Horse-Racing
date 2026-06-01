@@ -1,0 +1,59 @@
+.reports-export-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.reports-stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 20px;
+}
+
+.reports-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 200px;
+}
+
+.reports-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 8px;
+}
+
+.reports-chart-bar {
+  width: 100%;
+  max-width: 40px;
+  margin-top: auto;
+  background: linear-gradient(to top, #8b7355, #d4af37);
+  border-radius: 4px 4px 0 0;
+  min-height: 6px;
+}
+
+.reports-chart-col span {
+  font-size: 11px;
+  color: #666;
+}
+
+.reports-revenue {
+  color: #d4af37 !important;
+  font-weight: 500;
+}
+
+@media (max-width: 1100px) {
+  .reports-grid,
+  .reports-stat-row {
+    grid-template-columns: 1fr;
+  }
+}

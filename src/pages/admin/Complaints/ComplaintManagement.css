@@ -1,0 +1,51 @@
+.complaint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.complaint-card {
+  transition: border-color 0.2s;
+}
+
+.complaint-card--active {
+  border-color: rgba(212, 175, 55, 0.3);
+}
+
+.complaint-card-main {
+  padding: 20px 22px;
+  cursor: pointer;
+}
+
+.complaint-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.complaint-card-top span {
+  font-size: 11px;
+  color: #666;
+}
+
+.complaint-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+.complaint-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.complaint-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 22px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding-top: 14px;
+}

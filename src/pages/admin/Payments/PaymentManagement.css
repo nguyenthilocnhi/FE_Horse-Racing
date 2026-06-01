@@ -1,0 +1,23 @@
+.payment-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.payment-txn {
+  font-family: monospace;
+  font-size: 12px !important;
+  color: #888 !important;
+}
+
+.payment-amount {
+  color: #d4af37 !important;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .payment-summary {
+    grid-template-columns: 1fr;
+  }
+}

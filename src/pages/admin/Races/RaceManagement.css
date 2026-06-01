@@ -1,0 +1,79 @@
+.race-form-card {
+  margin-bottom: 24px;
+}
+
+.race-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.race-form .admin-btn {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.race-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.race-card-item {
+  padding: 22px;
+}
+
+.race-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.race-card-id {
+  font-size: 11px;
+  color: #666;
+  letter-spacing: 0.08em;
+}
+
+.race-card-item h3 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+.race-card-tournament {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #d4af37;
+}
+
+.race-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.race-card-horses {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(212, 175, 55, 0.06);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.race-card-horses strong {
+  font-size: 1.5rem;
+  color: #d4af37;
+}
+
+.race-card-horses span {
+  font-size: 12px;
+  color: #888;
+}

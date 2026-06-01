@@ -1,0 +1,54 @@
+.referee-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.referee-assign-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.referee-assign-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.referee-assign-item--conflict {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.referee-assign-item strong {
+  display: block;
+  color: #fff;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.referee-assign-item span {
+  font-size: 11px;
+  color: #666;
+}
+
+.referee-assign-ref {
+  font-size: 13px;
+  color: #d4af37;
+}
+
+@media (max-width: 1100px) {
+  .referee-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .referee-assign-item {
+    grid-template-columns: 1fr;
+  }
+}
