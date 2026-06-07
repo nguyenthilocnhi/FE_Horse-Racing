@@ -19,10 +19,11 @@ const DEFAULT_HORSES = [
 ]
 
 export default function HorseList() {
-  const { searchQuery, isAddModalOpen, setIsAddModalOpen } = useOutletContext()
+  const context = useOutletContext() || {}
+  const searchQuery = context.searchQuery || ''
   
   // Load initial list from localStorage or seed defaults
-  const [horses, setHorses] = useState(() => {
+  const [horses] = useState(() => {
     const stored = localStorage.getItem('mock_horses')
     if (stored) {
       try {
@@ -31,46 +32,24 @@ export default function HorseList() {
         console.error('Lỗi phân tích localStorage:', e)
       }
     }
-    localStorage.setItem('mock_horses', JSON.stringify(DEFAULT_HORSES))
     return DEFAULT_HORSES
   })
 
   // Selected horse for details sidebar
   const [selectedHorse, setSelectedHorse] = useState(null)
   
-  // Modal configurations
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingHorse, setEditingHorse] = useState(null)
-  const [formData, setFormData] = useState({ name: '', age: '', breed: '', owner: '', status: 'active' })
-
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
-
-  // Listen to quick action button click in header
-  useEffect(() => {
-    if (isAddModalOpen) {
-      setEditingHorse(null)
-      setFormData({ name: '', age: '', breed: '', owner: '', status: 'active' })
-      setModalOpen(true)
-      setIsAddModalOpen(false) // reset state in layout
-    }
-  }, [isAddModalOpen, setIsAddModalOpen])
+  const itemsPerPage = 8
 
   // Reset pagination to page 1 on search filter change
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery])
 
-  // Helper to persist list
-  const saveHorses = (updatedList) => {
-    setHorses(updatedList)
-    localStorage.setItem('mock_horses', JSON.stringify(updatedList))
-  }
-
   // Filter list by search query
   const filtered = horses.filter((horse) => {
-    const query = searchQuery?.toLowerCase() || ''
+    const query = searchQuery.toLowerCase()
     return (
       horse.name.toLowerCase().includes(query) ||
       horse.breed.toLowerCase().includes(query) ||
@@ -85,84 +64,16 @@ export default function HorseList() {
     currentPage * itemsPerPage
   )
 
-  // Actions
-  const handleOpenAdd = () => {
-    setEditingHorse(null)
-    setFormData({ name: '', age: '', breed: '', owner: '', status: 'active' })
-    setModalOpen(true)
-  }
-
-  const handleEdit = (horse) => {
-    setEditingHorse(horse)
-    setFormData({
-      name: horse.name,
-      age: horse.age,
-      breed: horse.breed,
-      owner: horse.owner,
-      status: horse.status
-    })
-    setModalOpen(true)
-  }
-
-  const handleDelete = (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa ngựa đua này không?')) {
-      const updated = horses.filter(h => h.id !== id)
-      saveHorses(updated)
-      if (selectedHorse && selectedHorse.id === id) {
-        setSelectedHorse(null)
-      }
-    }
-  }
-
-  const handleSave = (e) => {
-    e.preventDefault()
-    
-    if (editingHorse) {
-      // Edit mode
-      const updated = horses.map(h => 
-        h.id === editingHorse.id 
-          ? { ...h, ...formData, age: parseInt(formData.age) || 0 } 
-          : h
-      )
-      saveHorses(updated)
-      if (selectedHorse && selectedHorse.id === editingHorse.id) {
-        setSelectedHorse({ ...selectedHorse, ...formData, age: parseInt(formData.age) || 0 })
-      }
-    } else {
-      // Add mode
-      const newHorse = {
-        id: Date.now(),
-        ...formData,
-        age: parseInt(formData.age) || 0,
-        wins: 0,
-        races: 0,
-        points: 0
-      }
-      saveHorses([newHorse, ...horses])
-    }
-    
-    setModalOpen(false)
-  }
-
   return (
     <div className="horse-mgmt-page">
-      {/* Top Header Row for Page Context */}
       <div className="admin-page-head">
         <div>
-          <h1 className="admin-page-title">Horse Management</h1>
-          <p className="admin-page-sub">Danh sách ngựa đua và thông số phong độ thi đấu</p>
+          <h1 className="admin-page-title">Danh sách Ngựa đua</h1>
+          <p className="admin-page-sub">Danh sách thông tin, giống loài và chỉ số phong độ của các chú ngựa đua</p>
         </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn--gold"
-          onClick={handleOpenAdd}
-        >
-          + Add New Horse
-        </button>
       </div>
 
-      {/* Main Grid: Left is Table List, Right is Details Sidebar Panel if selected */}
-      <div className="horse-mgmt-layout">
+      <div className="horse-mgmt-layout" style={{ display: 'grid', gridTemplateColumns: selectedHorse ? '1fr 340px' : '1fr', gap: '20px' }}>
         <div className="admin-card user-mgmt-table-card">
           <div className="admin-table-wrap">
             <table className="admin-table">
@@ -196,20 +107,6 @@ export default function HorseList() {
                           >
                             Chi tiết
                           </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--outline admin-btn--sm"
-                            onClick={() => handleEdit(horse)}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--danger admin-btn--sm"
-                            onClick={() => handleDelete(horse.id)}
-                          >
-                            Xóa
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -225,7 +122,6 @@ export default function HorseList() {
             </table>
           </div>
 
-          {/* Table Pagination Controls */}
           {totalPages > 1 && (
             <div
               className="admin-pagination"
@@ -271,9 +167,8 @@ export default function HorseList() {
           )}
         </div>
 
-        {/* Selected Horse Details Side Panel (Slides/shows on the right side) */}
         {selectedHorse && (
-          <div className="admin-card user-detail-panel" style={{ width: '100%' }}>
+          <div className="admin-card user-detail-panel">
             <div className="admin-card-head">
               <h3>Chi tiết Ngựa</h3>
               <button
@@ -311,148 +206,10 @@ export default function HorseList() {
                   {selectedHorse.wins || 0} thắng / {selectedHorse.races || 0} trận
                 </dd>
               </dl>
-              
-              <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--outline admin-btn--sm"
-                  style={{ flex: 1 }}
-                  onClick={() => handleEdit(selectedHorse)}
-                >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--danger admin-btn--sm"
-                  style={{ flex: 1 }}
-                  onClick={() => handleDelete(selectedHorse.id)}
-                >
-                  Xóa
-                </button>
-              </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Add / Edit Horse Modal */}
-      {modalOpen && (
-        <div
-          className="modal-overlay"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            zIndex: 1000
-          }}
-        >
-          <div
-            className="admin-card"
-            style={{
-              width: '100%',
-              maxWidth: '520px',
-              border: '1px solid rgba(212, 175, 55, 0.15)',
-              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.65)'
-            }}
-          >
-            <div className="admin-card-head">
-              <h3>{editingHorse ? `Sửa thông tin: ${editingHorse.name}` : 'Thêm ngựa đua mới'}</h3>
-              <button
-                type="button"
-                className="admin-btn admin-btn--ghost admin-btn--sm"
-                onClick={() => setModalOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <form onSubmit={handleSave} className="admin-card-body form-layout">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tên Ngựa</label>
-                <input
-                  required
-                  className="admin-input"
-                  placeholder="Nhập tên ngựa đua..."
-                  value={formData.name}
-                  onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tuổi</label>
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    max="30"
-                    className="admin-input"
-                    placeholder="Tuổi..."
-                    value={formData.age}
-                    onChange={(e) => setFormData(f => ({ ...f, age: e.target.value }))}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Giống loài</label>
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="Ví dụ: Thoroughbred..."
-                    value={formData.breed}
-                    onChange={(e) => setFormData(f => ({ ...f, breed: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chủ sở hữu</label>
-                <input
-                  required
-                  className="admin-input"
-                  placeholder="Ví dụ: Stable Alpha..."
-                  value={formData.owner}
-                  onChange={(e) => setFormData(f => ({ ...f, owner: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trạng thái</label>
-                <select
-                  className="admin-select"
-                  value={formData.status}
-                  onChange={(e) => setFormData(f => ({ ...f, status: e.target.value }))}
-                  style={{ width: '100%' }}
-                >
-                  <option value="active">Hoạt động (Active)</option>
-                  <option value="retired">Giải nghệ (Retired)</option>
-                  <option value="injured">Chấn thương (Injured)</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--ghost"
-                  onClick={() => setModalOpen(false)}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="admin-btn admin-btn--gold"
-                >
-                  {editingHorse ? 'Cập nhật' : 'Thêm mới'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
