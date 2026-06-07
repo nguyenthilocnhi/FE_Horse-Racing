@@ -51,16 +51,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAddClick }) {
       )}
 
       <div className="admin-header-actions">
-        {location.pathname === '/horses' && (
-          <button
-            type="button"
-            className="admin-btn admin-btn--gold admin-btn--sm"
-            onClick={onAddClick}
-            style={{ borderRadius: '8px' }}
-          >
-            + Add New Horse
-          </button>
-        )}
+
 
         <div className="admin-dropdown" ref={userRef}>
           <button

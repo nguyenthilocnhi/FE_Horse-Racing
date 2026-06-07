@@ -51,7 +51,7 @@ export default function PaymentManagement() {
                   <td>{p.buyer}</td>
                   <td className="payment-amount">{formatCurrency(p.amount)}</td>
                   <td>{p.method}</td>
-                  <td><StatusBadge status={p.status === 'completed' ? 'approved' : 'pending'} /></td>
+                  <td><StatusBadge status={p.status === 'completed' ? 'approved' : 'pending_payment'} /></td>
                   <td>{p.date}</td>
                 </tr>
               ))}

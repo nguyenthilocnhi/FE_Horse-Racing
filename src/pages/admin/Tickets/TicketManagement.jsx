@@ -52,7 +52,7 @@ export default function TicketManagement() {
                   <td><span className="admin-badge admin-badge--gold">{t.type}</span></td>
                   <td>{t.quantity}</td>
                   <td className="ticket-amount">{formatCurrency(t.amount)}</td>
-                  <td><StatusBadge status={t.paymentStatus} /></td>
+                  <td><StatusBadge status={t.paymentStatus === 'pending' ? 'pending_payment' : t.paymentStatus} /></td>
                 </tr>
               ))}
             </tbody>

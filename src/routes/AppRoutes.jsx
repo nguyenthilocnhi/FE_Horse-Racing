@@ -7,6 +7,7 @@ import JockeyLayout from '../layouts/JockeyLayout'
 import HomePage from '../pages/HomePage'
 import Login from '../pages/Auth/Login'
 import Register from '../pages/Auth/Register'
+import ResetPassword from '../pages/Auth/ResetPassword'
 import HorseList from '../pages/Horses/HorseList'
 import HorseDetail from '../pages/Horses/HorseDetail'
 import HorseForm from '../pages/Horses/HorseForm'
@@ -25,6 +26,19 @@ import PaymentManagement from '../pages/admin/Payments/PaymentManagement'
 import NotificationManagement from '../pages/admin/Notifications/NotificationManagement'
 import ReportsAnalytics from '../pages/admin/Reports/ReportsAnalytics'
 import AuditLog from '../pages/admin/AuditLog/AuditLog'
+import JockeyManagement from '../pages/admin/Jockeys/JockeyManagement'
+import HorseManagement from '../pages/admin/Horses/HorseManagement'
+import PredictionManagement from '../pages/admin/Predictions/PredictionManagement'
+import SpectatorLayout from '../layouts/SpectatorLayout'
+import SpectatorDashboard from '../pages/spectator/Dashboard/SpectatorDashboard'
+import SpectatorRankings from '../pages/spectator/Rankings/SpectatorRankings'
+import SpectatorPredictions from '../pages/spectator/Predictions/SpectatorPredictions'
+import SpectatorProfile from '../pages/spectator/Profile/SpectatorProfile'
+// Referee pages
+import RefereeLayout from '../layouts/RefereeLayout'
+import RefereeInspection from '../pages/referee/Inspection/RefereeInspection'
+import RefereeTracking from '../pages/referee/Tracking/RefereeTracking'
+import RefereeViolations from '../pages/referee/Violations/RefereeViolations'
 // Jockey pages
 import JockeyDashboard from '../pages/jockey/Dashboard/JockeyDashboard'
 import Invitations from '../pages/jockey/Invitations/Invitations'
@@ -46,22 +60,26 @@ export default function AppRoutes() {
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Route>
 
-      <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+      <Route element={<MainLayout />}>
         <Route path="/horses" element={<HorseList />} />
         <Route path="/horses/new" element={<HorseForm />} />
         <Route path="/horses/:id" element={<HorseDetail />} />
       </Route>
 
-      <Route element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+      <Route element={<AdminLayout />}>
         <Route path="/admin" element={<Dashboard />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/tournaments" element={<TournamentManagement />} />
         <Route path="/admin/races" element={<RaceManagement />} />
+        <Route path="/admin/horses" element={<HorseManagement />} />
+        <Route path="/admin/jockeys" element={<JockeyManagement />} />
         <Route path="/admin/registrations" element={<RegistrationApproval />} />
         <Route path="/admin/referees" element={<RefereeAssignment />} />
         <Route path="/admin/results" element={<ResultApproval />} />
+        <Route path="/admin/predictions" element={<PredictionManagement />} />
         <Route path="/admin/rankings" element={<RankingManagement />} />
         <Route path="/admin/violations" element={<ViolationManagement />} />
         <Route path="/admin/complaints" element={<ComplaintManagement />} />
@@ -81,6 +99,22 @@ export default function AppRoutes() {
         <Route path="/jockey/rankings" element={<Rankings />} />
         <Route path="/jockey/profile" element={<Profile />} />
       </Route>
+
+      {/* ── Referee Portal ── */}
+      <Route element={<PrivateRoute><RefereeLayout /></PrivateRoute>}>
+        <Route path="/referee" element={<RefereeInspection />} />
+        <Route path="/referee/tracking" element={<RefereeTracking />} />
+        <Route path="/referee/violations" element={<RefereeViolations />} />
+      </Route>
+
+      {/* ── Spectator Portal ── */}
+      <Route element={<PrivateRoute><SpectatorLayout /></PrivateRoute>}>
+        <Route path="/spectator" element={<SpectatorDashboard />} />
+        <Route path="/spectator/rankings" element={<SpectatorRankings />} />
+        <Route path="/spectator/predictions" element={<SpectatorPredictions />} />
+        <Route path="/spectator/profile" element={<SpectatorProfile />} />
+      </Route>
+
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

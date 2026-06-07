@@ -27,17 +27,17 @@ export const recentActivities = [
 
 export const users = [
   { id: 1, name: 'Nguyen Van A', email: 'nguyenvana@email.com', role: 'ADMIN', status: 'active', joined: '2024-01-15' },
-  { id: 2, name: 'Tran Thi B', email: 'tranthib@email.com', role: 'ORGANIZER', status: 'active', joined: '2024-03-20' },
+  { id: 2, name: 'Tran Thi B', email: 'tranthib@email.com', role: 'HORSE_OWNER', status: 'active', joined: '2024-03-20' },
   { id: 3, name: 'Le Van C', email: 'levanc@email.com', role: 'JOCKEY', status: 'locked', joined: '2024-05-10' },
   { id: 4, name: 'Pham Thi D', email: 'phamthid@email.com', role: 'REFEREE', status: 'active', joined: '2024-06-01' },
-  { id: 5, name: 'Hoang Van E', email: 'hoangvane@email.com', role: 'USER', status: 'active', joined: '2025-02-14' },
+  { id: 5, name: 'Hoang Van E', email: 'hoangvane@email.com', role: 'SPECTATOR', status: 'active', joined: '2025-02-14' },
 ]
 
 export const tournaments = [
-  { id: 'T-001', name: 'Cúp Vàng Hoàng Gia 2026', venue: 'Ascot Grand Arena', startDate: '2026-09-12', endDate: '2026-09-14', status: 'upcoming', races: 24, prize: '1.2M USD' },
-  { id: 'T-002', name: 'Derby Quốc Gia', venue: 'Saigon Racecourse', startDate: '2026-06-03', endDate: '2026-06-05', status: 'ongoing', races: 18, prize: '800K USD' },
-  { id: 'T-003', name: 'Championship Sprint', venue: 'Hanoi Turf Club', startDate: '2026-04-20', endDate: '2026-04-22', status: 'completed', races: 12, prize: '500K USD' },
-  { id: 'T-004', name: 'Winter Classic', venue: 'Da Nang Arena', startDate: '2026-11-08', endDate: '2026-11-10', status: 'cancelled', races: 0, prize: '300K USD' },
+  { id: 'T-001', name: 'Cúp Vàng Hoàng Gia 2026', venue: 'Ascot Grand Arena', startDate: '2026-09-12', endDate: '2026-09-14', status: 'upcoming', races: 24, prize: '12 triệu đồng' },
+  { id: 'T-002', name: 'Derby Quốc Gia', venue: 'Saigon Racecourse', startDate: '2026-06-03', endDate: '2026-06-05', status: 'ongoing', races: 18, prize: '80 triệu đồng' },
+  { id: 'T-003', name: 'Championship Sprint', venue: 'Hanoi Turf Club', startDate: '2026-04-20', endDate: '2026-04-22', status: 'completed', races: 12, prize: '50 triệu đồng' },
+  { id: 'T-004', name: 'Winter Classic', venue: 'Da Nang Arena', startDate: '2026-11-08', endDate: '2026-11-10', status: 'cancelled', races: 0, prize: '30 triệu đồng' },
 ]
 
 export const races = [
@@ -97,15 +97,15 @@ export const complaints = [
 ]
 
 export const tickets = [
-  { id: 'TKT-9001', buyer: 'Nguyen Van A', email: 'nguyenvana@email.com', race: 'Derby Một Dặm', type: 'VIP', quantity: 2, amount: 4000000, paymentStatus: 'paid' },
-  { id: 'TKT-9002', buyer: 'Tran Thi B', email: 'tranthib@email.com', race: 'Đua nước rút', type: 'Standard', quantity: 4, amount: 800000, paymentStatus: 'paid' },
-  { id: 'TKT-9003', buyer: 'Le Van C', email: 'levanc@email.com', race: 'Cúp Nhà Vô Địch', type: 'Premium', quantity: 1, amount: 2500000, paymentStatus: 'pending' },
+  { id: 'TKT-9001', buyer: 'Nguyen Van A', email: 'nguyenvana@email.com', race: 'Derby Một Dặm', type: 'VIP', quantity: 2, amount: 300000, paymentStatus: 'paid' },
+  { id: 'TKT-9002', buyer: 'Tran Thi B', email: 'tranthib@email.com', race: 'Đua nước rút', type: 'Standard', quantity: 4, amount: 100000, paymentStatus: 'paid' },
+  { id: 'TKT-9003', buyer: 'Le Van C', email: 'levanc@email.com', race: 'Cúp Nhà Vô Địch', type: 'Standard', quantity: 1, amount: 100000, paymentStatus: 'pending' },
 ]
 
 export const payments = [
-  { id: 'PAY-7001', transactionId: 'TXN-20260603-001', buyer: 'Nguyen Van A', amount: 4000000, method: 'VNPay', status: 'completed', date: '2026-06-01 10:30' },
-  { id: 'PAY-7002', transactionId: 'TXN-20260602-045', buyer: 'Tran Thi B', amount: 800000, method: 'MoMo', status: 'completed', date: '2026-06-02 14:15' },
-  { id: 'PAY-7003', transactionId: 'TXN-20260603-012', buyer: 'Le Van C', amount: 2500000, method: 'Bank Transfer', status: 'pending', date: '2026-06-03 09:00' },
+  { id: 'PAY-7001', transactionId: 'TXN-20260603-001', buyer: 'Nguyen Van A', amount: 300000, method: 'VNPay', status: 'completed', date: '2026-06-01 10:30' },
+  { id: 'PAY-7002', transactionId: 'TXN-20260602-045', buyer: 'Tran Thi B', amount: 100000, method: 'MoMo', status: 'completed', date: '2026-06-02 14:15' },
+  { id: 'PAY-7003', transactionId: 'TXN-20260603-012', buyer: 'Le Van C', amount: 100000, method: 'Bank Transfer', status: 'pending', date: '2026-06-03 09:00' },
 ]
 
 export const notifications = [
@@ -115,12 +115,12 @@ export const notifications = [
 ]
 
 export const monthlyReports = [
-  { month: 'T1/2026', revenue: 420000000, races: 28, participants: 340 },
-  { month: 'T2/2026', revenue: 510000000, races: 32, participants: 385 },
-  { month: 'T3/2026', revenue: 480000000, races: 30, participants: 360 },
-  { month: 'T4/2026', revenue: 620000000, races: 38, participants: 420 },
-  { month: 'T5/2026', revenue: 710000000, races: 42, participants: 480 },
-  { month: 'T6/2026', revenue: 680000000, races: 40, participants: 465 },
+  { month: 'T1/2026', revenue: 42000000, races: 28, participants: 340 },
+  { month: 'T2/2026', revenue: 51000000, races: 32, participants: 385 },
+  { month: 'T3/2026', revenue: 48000000, races: 30, participants: 360 },
+  { month: 'T4/2026', revenue: 62000000, races: 38, participants: 420 },
+  { month: 'T5/2026', revenue: 71000000, races: 42, participants: 480 },
+  { month: 'T6/2026', revenue: 68000000, races: 40, participants: 465 },
 ]
 
 export const auditLogs = [
@@ -136,9 +136,12 @@ export const adminNavItems = [
   { path: '/admin/users', label: 'Quản lý User', icon: '◎' },
   { path: '/admin/tournaments', label: 'Giải đấu', icon: '◆' },
   { path: '/admin/races', label: 'Cuộc đua', icon: '▶' },
+  { path: '/admin/horses', label: 'Quản lý Ngựa', icon: '♞' },
+  { path: '/admin/jockeys', label: 'Quản lý Jockey', icon: '♏' },
   { path: '/admin/registrations', label: 'Duyệt đăng ký', icon: '◉' },
   { path: '/admin/referees', label: 'Phân công TT', icon: '◐' },
   { path: '/admin/results', label: 'Duyệt kết quả', icon: '✓' },
+  { path: '/admin/predictions', label: 'Quản lý Dự đoán', icon: '⚖' },
   { path: '/admin/rankings', label: 'Xếp hạng', icon: '▲' },
   { path: '/admin/violations', label: 'Vi phạm', icon: '⚠' },
   { path: '/admin/complaints', label: 'Khiếu nại', icon: '✉' },
@@ -154,9 +157,12 @@ export const breadcrumbLabels = {
   '/admin/users': 'Quản lý User',
   '/admin/tournaments': 'Quản lý Giải đấu',
   '/admin/races': 'Quản lý Cuộc đua',
+  '/admin/horses': 'Quản lý Ngựa',
+  '/admin/jockeys': 'Quản lý Jockey',
   '/admin/registrations': 'Duyệt Đăng ký',
   '/admin/referees': 'Phân công Trọng tài',
   '/admin/results': 'Duyệt Kết quả',
+  '/admin/predictions': 'Quản lý Dự đoán',
   '/admin/rankings': 'Quản lý Xếp hạng',
   '/admin/violations': 'Quản lý Vi phạm',
   '/admin/complaints': 'Quản lý Khiếu nại',
@@ -166,3 +172,26 @@ export const breadcrumbLabels = {
   '/admin/reports': 'Báo cáo & Phân tích',
   '/admin/audit-log': 'Audit Log',
 }
+
+export const mockJockeys = [
+  { id: 1, name: 'L. Anderson', license: 'JOC-2024-001', experience: 12, points: 3200, wins: 320, races: 450, status: 'active' },
+  { id: 2, name: 'M. Rodriguez', license: 'JOC-2023-089', experience: 8, points: 2890, wins: 289, races: 410, status: 'active' },
+  { id: 3, name: 'S. Nakamura', license: 'JOC-2022-114', experience: 10, points: 2700, wins: 270, races: 395, status: 'active' },
+  { id: 4, name: 'K. McEvoy', license: 'JOC-2025-023', experience: 5, points: 1850, wins: 120, races: 250, status: 'injured' },
+  { id: 5, name: 'Hoang Van E', license: 'JOC-2026-004', experience: 2, points: 670, wins: 15, races: 48, status: 'suspended' },
+]
+
+export const mockPredictions = [
+  { id: 'PRED-001', raceId: 'R-1042', raceName: 'Derby Một Dặm', totalPool: 245000000, participants: 128, status: 'open', endDate: '2026-06-03 15:00' },
+  { id: 'PRED-002', raceId: 'R-1043', raceName: 'Đua nước rút', totalPool: 182000000, participants: 95, status: 'closed', endDate: '2026-06-03 14:15' },
+  { id: 'PRED-003', raceId: 'R-1044', raceName: 'Cúp Nhà Vô Địch', totalPool: 580000000, participants: 340, status: 'open', endDate: '2026-09-12 15:50' },
+  { id: 'PRED-004', raceId: 'R-1040', raceName: 'Sprint Classic', totalPool: 120000000, participants: 75, status: 'distributed', endDate: '2026-04-21 13:50', winner: 'Aurelius' }
+]
+
+export const mockUserPredictions = [
+  { id: 'UPRED-701', user: 'Nguyen Van A', race: 'Derby Một Dặm', horse: 'Aurelius', amount: 5000000, odds: 2.5, status: 'pending' },
+  { id: 'UPRED-702', user: 'Hoang Van E', race: 'Derby Một Dặm', horse: 'Midnight Star', amount: 2000000, odds: 3.1, status: 'pending' },
+  { id: 'UPRED-703', user: 'Tran Thi B', race: 'Sprint Classic', horse: 'Aurelius', amount: 10000000, odds: 1.8, status: 'won', payout: 18000000 },
+  { id: 'UPRED-704', user: 'Le Van C', race: 'Sprint Classic', horse: 'Midnight Star', amount: 3000000, odds: 4.2, status: 'lost', payout: 0 }
+]
+
