@@ -19,16 +19,37 @@ const MOCK_NOTIFICATIONS = [
 ]
 
 export default function SpectatorProfile() {
-  const [profile, setProfile] = useState(INITIAL_PROFILE)
+  const [profile, setProfile] = useState(() => {
+    const stored = localStorage.getItem('spectator_profile')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    return INITIAL_PROFILE
+  })
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({ ...INITIAL_PROFILE })
-  const [userPreds, setUserPreds] = useState(initialUserPreds)
+  const [formData, setFormData] = useState({ ...profile })
+  const [userPreds, setUserPreds] = useState(() => {
+    const stored = localStorage.getItem('spectator_user_preds')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    return initialUserPreds
+  })
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS)
   const [depositAmount, setDepositAmount] = useState('')
 
   const handleUpdateProfile = (e) => {
     e.preventDefault()
     setProfile({ ...formData })
+    localStorage.setItem('spectator_profile', JSON.stringify(formData))
     setIsEditing(false)
     alert('✅ Cập nhật thông tin tài khoản thành công!')
   }
@@ -40,7 +61,9 @@ export default function SpectatorProfile() {
       alert('Vui lòng nhập số tiền nạp hợp lệ!')
       return
     }
-    setProfile(prev => ({ ...prev, balance: prev.balance + amount }))
+    const updated = { ...profile, balance: profile.balance + amount }
+    setProfile(updated)
+    localStorage.setItem('spectator_profile', JSON.stringify(updated))
     setDepositAmount('')
     alert(`💳 Nạp tiền thành công! Đã cộng ${formatCurrency(amount)} vào tài khoản.`);
   }

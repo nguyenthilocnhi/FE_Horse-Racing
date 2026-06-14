@@ -79,8 +79,182 @@ export default function Register() {
   }
 
   if (success) {
+    const roleLabel = role === 'JOCKEY'
+      ? 'Kỵ Sĩ'
+      : role === 'REFEREE'
+        ? 'Trọng tài'
+        : (role === 'HORSE_OWNER' || role === 'HORSE OWNER')
+          ? 'Chủ ngựa'
+          : 'Khán giả'
+
     return (
       <div className="auth-shell" style={{ height: '620px', alignItems: 'stretch' }}>
+        <style>{`
+          .success-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px;
+            background: radial-gradient(circle at center, rgba(74, 222, 128, 0.04) 0%, rgba(0, 0, 0, 0) 70%);
+          }
+          .success-icon-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .success-icon-circle {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: rgba(74, 222, 128, 0.1);
+            border: 2px solid rgba(74, 222, 128, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 25px rgba(74, 222, 128, 0.2);
+            z-index: 2;
+          }
+          .success-icon-circle svg {
+            width: 38px;
+            height: 38px;
+            stroke: #4ade80;
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            filter: drop-shadow(0 0 5px rgba(74, 222, 128, 0.4));
+          }
+          .success-icon-pulse-1 {
+            position: absolute;
+            width: 96px;
+            height: 96px;
+            border-radius: 50%;
+            background: rgba(74, 222, 128, 0.03);
+            border: 1px solid rgba(74, 222, 128, 0.08);
+            z-index: 1;
+            animation: pulse-slow 3s infinite ease-in-out;
+          }
+          .success-icon-pulse-2 {
+            position: absolute;
+            width: 116px;
+            height: 116px;
+            border-radius: 50%;
+            background: rgba(74, 222, 128, 0.015);
+            border: 1px solid rgba(74, 222, 128, 0.04);
+            z-index: 0;
+            animation: pulse-fast 2s infinite ease-in-out;
+          }
+          @keyframes pulse-slow {
+            0% { transform: scale(0.9); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 0.3; }
+            100% { transform: scale(0.9); opacity: 0.8; }
+          }
+          @keyframes pulse-fast {
+            0% { transform: scale(0.85); opacity: 0.9; }
+            50% { transform: scale(1.15); opacity: 0.2; }
+            100% { transform: scale(0.85); opacity: 0.9; }
+          }
+          .success-title {
+            background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            font-size: 26px !important;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+          }
+          .success-desc {
+            color: #aaa;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+            max-width: 380px;
+            margin-left: auto;
+            margin-right: auto;
+          }
+          .account-details-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+            max-width: 340px;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: inset 0 1px 1px rgba(255,255,255,0.03);
+          }
+          .details-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+          }
+          .details-row:not(:last-child) {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+          }
+          .details-label {
+            color: #888;
+            font-size: 13px;
+          }
+          .details-val {
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+          }
+          .badge-role {
+            background: rgba(212, 175, 55, 0.12);
+            color: #d4af37;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+          }
+          .success-btn-login {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 44px;
+            width: 220px;
+            background: linear-gradient(135deg, #e6c564, #d4af37);
+            color: #0a0a0a !important;
+            font-weight: 700;
+            font-size: 14px;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(212,175,55,0.22);
+            transition: all 0.25s ease;
+            margin-bottom: 18px;
+            cursor: pointer;
+            border: none;
+          }
+          .success-btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(212,175,55,0.32);
+            background: linear-gradient(135deg, #fff, #d4af37);
+          }
+          .success-link-home {
+            color: #888;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+            display: inline-block;
+          }
+          .success-link-home:hover {
+            color: #d4af37;
+          }
+        `}</style>
+
         <div className="auth-panel auth-image-panel" style={{ height: '100%' }}>
           <img
             src="https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=1200&q=80"
@@ -94,16 +268,40 @@ export default function Register() {
           </div>
         </div>
 
-        <div className="auth-panel auth-admin" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center', padding: '40px' }}>
-          <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
-          <h2 style={{ color: '#4ade80', marginBottom: '12px' }}>Đăng ký tài khoản thành công!</h2>
-          <p style={{ color: '#aaa', fontSize: '14px', lineHeight: '1.6', marginBottom: '30px', maxWidth: '360px', marginLeft: 'auto', marginRight: 'auto' }}>
-            Tài khoản với tên đăng nhập <strong>{username}</strong> và vai trò <strong>{role === 'JOCKEY' ? 'Kỵ Sĩ' : role === 'REFEREE' ? 'Trọng tài' : (role === 'HORSE_OWNER' || role === 'HORSE OWNER') ? 'Chủ ngựa' : 'Khán giả'}</strong> đã được thiết lập thành công cùng thông tin hồ sơ chi tiết.
+        <div className="auth-panel auth-admin success-container">
+          <div className="success-icon-container">
+            <div className="success-icon-pulse-1"></div>
+            <div className="success-icon-pulse-2"></div>
+            <div className="success-icon-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                <circle cx="26" cy="26" r="25" fill="none" />
+                <path fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8" />
+              </svg>
+            </div>
+          </div>
+
+          <h2 className="success-title">Đăng ký thành công!</h2>
+          <p className="success-desc">
+            Tài khoản của bạn đã được thiết lập thành công. Chào mừng bạn gia nhập cộng đồng HORSIE!
           </p>
-          <Link to="/login" className="btn btn-primary" style={{ textDecoration: 'none', display: 'inline-block', lineHeight: '38px', height: '38px', width: '200px', alignSelf: 'center', marginBottom: '20px' }}>
+
+          <div className="account-details-card">
+            <div className="details-row">
+              <span className="details-label">Tên đăng nhập</span>
+              <span className="details-val">{username}</span>
+            </div>
+            <div className="details-row">
+              <span className="details-label">Vai trò tài khoản</span>
+              <span className="details-val">
+                <span className="badge-role">{roleLabel}</span>
+              </span>
+            </div>
+          </div>
+
+          <Link to="/login" className="success-btn-login">
             Đăng nhập ngay
           </Link>
-          <Link to="/" style={{ color: '#d4af37', textDecoration: 'none', fontSize: '13px', fontWeight: '500' }}>
+          <Link to="/" className="success-link-home">
             Quay về trang chủ
           </Link>
         </div>
@@ -132,8 +330,12 @@ export default function Register() {
             <span className="hero-label">
               {role === 'JOCKEY' ? 'Kỵ Sĩ' : role === 'REFEREE' ? 'Trọng Tài' : (role === 'HORSE_OWNER' || role === 'HORSE OWNER') ? 'Chủ Ngựa' : 'Khán Giả'}
             </span>
-            <h2>Thông tin chức vụ</h2>
-            <p>Vui lòng điền các thông tin dành riêng cho vai trò của bạn.</p>
+            {role !== 'SPECTATOR' && (
+              <>
+                <h2>Thông tin chức vụ</h2>
+                <p>Vui lòng điền các thông tin dành riêng cho vai trò của bạn.</p>
+              </>
+            )}
           </div>
 
           <form onSubmit={handleRoleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -301,7 +503,6 @@ export default function Register() {
         <div className="auth-panel-head">
           <span className="hero-label">Đăng ký</span>
           <h2>Tạo tài khoản mới</h2>
-          <p>Điền thông tin để hệ thống xác minh độ tuổi tham gia.</p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

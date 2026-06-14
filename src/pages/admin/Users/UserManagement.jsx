@@ -11,12 +11,13 @@ export default function UserManagement() {
 
   // Create User modal
   const [showAddForm, setShowAddForm] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'SPECTATOR', status: 'active' })
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
 
   const filtered = users.filter((u) => {
     const matchSearch =
       u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (u.phone && u.phone.includes(search))
     const matchRole = roleFilter === 'ALL' || u.role === roleFilter
     return matchSearch && matchRole
   })
@@ -39,12 +40,32 @@ export default function UserManagement() {
 
   const handleCreateUser = (e) => {
     e.preventDefault()
-    if (!newUser.name || !newUser.email) return
+    if (!newUser.name || !newUser.email || !newUser.dob) return
+
+    // Age validation (must be at least 18 years old)
+    const birthDate = new Date(newUser.dob)
+    if (isNaN(birthDate.getTime())) {
+      alert('Ngày sinh không hợp lệ.')
+      return
+    }
+    const today = new Date('2026-06-14') // Use current date in 2026 as per metadata
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+
+    if (age < 18) {
+      alert(`Không thể đăng ký tài khoản: Người dùng chưa đủ 18 tuổi (Hiện tại ${age} tuổi).`)
+      return
+    }
 
     const created = {
       id: Date.now(),
       name: newUser.name,
       email: newUser.email,
+      phone: newUser.phone,
+      dob: newUser.dob,
       role: newUser.role,
       status: newUser.status,
       joined: new Date().toISOString().split('T')[0]
@@ -52,7 +73,7 @@ export default function UserManagement() {
 
     setUsers([created, ...users])
     setShowAddForm(false)
-    setNewUser({ name: '', email: '', role: 'SPECTATOR', status: 'active' })
+    setNewUser({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
   }
 
   return (
@@ -97,6 +118,7 @@ export default function UserManagement() {
                   <th>ID</th>
                   <th>Họ tên</th>
                   <th>Email</th>
+                  <th>Số điện thoại</th>
                   <th>Role</th>
                   <th>Trạng thái</th>
                   <th>Thao tác</th>
@@ -108,6 +130,7 @@ export default function UserManagement() {
                     <td>#{u.id}</td>
                     <td>{u.name}</td>
                     <td>{u.email}</td>
+                    <td>{u.phone || '—'}</td>
                     <td><span className="admin-badge admin-badge--gold">{u.role}</span></td>
                     <td><StatusBadge status={u.status} /></td>
                     <td>
@@ -146,6 +169,10 @@ export default function UserManagement() {
               <h4>{selectedUser.name}</h4>
               <p>{selectedUser.email}</p>
               <dl className="user-detail-dl">
+                <dt>Số điện thoại</dt>
+                <dd>{selectedUser.phone || '—'}</dd>
+                <dt>Ngày sinh</dt>
+                <dd>{selectedUser.dob || '—'}</dd>
                 <dt>Role</dt>
                 <dd>
                   <select
@@ -154,6 +181,9 @@ export default function UserManagement() {
                     style={{ width: '100%', padding: '6px 10px', fontSize: '12px', minWidth: 'auto', marginTop: '4px' }}
                     onChange={(e) => {
                       const nextRole = e.target.value
+                      const confirmChange = window.confirm(`Bạn có chắc chắn muốn thay đổi vai trò của người dùng từ ${selectedUser.role} thành ${nextRole}?`)
+                      if (!confirmChange) return
+
                       const nextUser = { ...selectedUser, role: nextRole }
                       setSelectedUser(nextUser)
                       setUsers(users.map(u => u.id === selectedUser.id ? nextUser : u))
@@ -219,6 +249,28 @@ export default function UserManagement() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số điện thoại</label>
+                <input
+                  type="tel"
+                  className="admin-input"
+                  placeholder="Nhập số điện thoại..."
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Ngày sinh</label>
+                <input
+                  required
+                  type="date"
+                  className="admin-input"
+                  value={newUser.dob}
+                  onChange={(e) => setNewUser(prev => ({ ...prev, dob: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Hệ Role</label>
                 <select
                   className="admin-select"
@@ -231,19 +283,6 @@ export default function UserManagement() {
                   <option value="JOCKEY">JOCKEY</option>
                   <option value="REFEREE">REFEREE</option>
                   <option value="SPECTATOR">SPECTATOR</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái</label>
-                <select
-                  className="admin-select"
-                  value={newUser.status}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, status: e.target.value }))}
-                  style={{ width: '100%' }}
-                >
-                  <option value="active">Active</option>
-                  <option value="locked">Locked</option>
                 </select>
               </div>
 

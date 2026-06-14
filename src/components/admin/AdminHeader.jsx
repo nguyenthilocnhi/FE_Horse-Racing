@@ -104,9 +104,6 @@ export default function AdminHeader() {
               <Link to="/" className="admin-dropdown-item">
                 Về trang chủ
               </Link>
-              <Link to="/admin/audit-log" className="admin-dropdown-item">
-                Audit Log
-              </Link>
               <button type="button" className="admin-dropdown-item" onClick={logout}>
                 Đăng xuất
               </button>

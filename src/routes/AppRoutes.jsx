@@ -25,7 +25,6 @@ import TicketManagement from '../pages/admin/Tickets/TicketManagement'
 import PaymentManagement from '../pages/admin/Payments/PaymentManagement'
 import NotificationManagement from '../pages/admin/Notifications/NotificationManagement'
 import ReportsAnalytics from '../pages/admin/Reports/ReportsAnalytics'
-import AuditLog from '../pages/admin/AuditLog/AuditLog'
 import JockeyManagement from '../pages/admin/Jockeys/JockeyManagement'
 import HorseManagement from '../pages/admin/Horses/HorseManagement'
 import PredictionManagement from '../pages/admin/Predictions/PredictionManagement'
@@ -95,7 +94,6 @@ export default function AppRoutes() {
         <Route path="/admin/payments" element={<PaymentManagement />} />
         <Route path="/admin/notifications" element={<NotificationManagement />} />
         <Route path="/admin/reports" element={<ReportsAnalytics />} />
-        <Route path="/admin/audit-log" element={<AuditLog />} />
       </Route>
 
       {/* ── Jockey Portal ── */}

@@ -26,11 +26,11 @@ export const recentActivities = [
 ]
 
 export const users = [
-  { id: 1, name: 'Nguyen Van A', email: 'nguyenvana@email.com', role: 'ADMIN', status: 'active', joined: '2024-01-15' },
-  { id: 2, name: 'Tran Thi B', email: 'tranthib@email.com', role: 'HORSE_OWNER', status: 'active', joined: '2024-03-20' },
-  { id: 3, name: 'Le Van C', email: 'levanc@email.com', role: 'JOCKEY', status: 'locked', joined: '2024-05-10' },
-  { id: 4, name: 'Pham Thi D', email: 'phamthid@email.com', role: 'REFEREE', status: 'active', joined: '2024-06-01' },
-  { id: 5, name: 'Hoang Van E', email: 'hoangvane@email.com', role: 'SPECTATOR', status: 'active', joined: '2025-02-14' },
+  { id: 1, name: 'Nguyen Van A', email: 'nguyenvana@email.com', phone: '0912345678', dob: '1990-01-15', role: 'ADMIN', status: 'active', joined: '2024-01-15' },
+  { id: 2, name: 'Tran Thi B', email: 'tranthib@email.com', phone: '0987654321', dob: '1992-03-20', role: 'HORSE_OWNER', status: 'active', joined: '2024-03-20' },
+  { id: 3, name: 'Le Van C', email: 'levanc@email.com', phone: '0901234567', dob: '1995-05-10', role: 'JOCKEY', status: 'locked', joined: '2024-05-10' },
+  { id: 4, name: 'Pham Thi D', email: 'phamthid@email.com', phone: '0934567890', dob: '1993-06-01', role: 'REFEREE', status: 'active', joined: '2024-06-01' },
+  { id: 5, name: 'Hoang Van E', email: 'hoangvane@email.com', phone: '0976543210', dob: '2000-02-14', role: 'SPECTATOR', status: 'active', joined: '2025-02-14' },
 ]
 
 export const tournaments = [
@@ -123,13 +123,6 @@ export const monthlyReports = [
   { month: 'T6/2026', revenue: 68000000, races: 40, participants: 465 },
 ]
 
-export const auditLogs = [
-  { id: 'AUD-001', action: 'LOGIN', detail: 'Admin đăng nhập hệ thống', user: 'Admin Nguyen', timestamp: '2026-06-03 08:00:12', ip: '192.168.1.10' },
-  { id: 'AUD-002', action: 'APPROVE', detail: 'Duyệt đăng ký REG-502', user: 'Admin Tran', timestamp: '2026-06-03 09:15:33', ip: '192.168.1.11' },
-  { id: 'AUD-003', action: 'CREATE', detail: 'Tạo giải đấu T-001', user: 'Admin Nguyen', timestamp: '2026-06-02 14:22:01', ip: '192.168.1.10' },
-  { id: 'AUD-004', action: 'PUBLISH', detail: 'Công bố kết quả RES-803', user: 'Admin Le', timestamp: '2026-06-03 11:45:00', ip: '192.168.1.12' },
-  { id: 'AUD-005', action: 'DELETE', detail: 'Hủy giải đấu T-004', user: 'Admin Pham', timestamp: '2026-06-01 16:30:45', ip: '192.168.1.13' },
-]
 
 export const adminNavItems = [
   { path: '/admin', label: 'Dashboard', icon: '◈' },
@@ -149,7 +142,6 @@ export const adminNavItems = [
   { path: '/admin/payments', label: 'Thanh toán', icon: '$' },
   { path: '/admin/notifications', label: 'Thông báo', icon: '◔' },
   { path: '/admin/reports', label: 'Báo cáo', icon: '▤' },
-  { path: '/admin/audit-log', label: 'Audit Log', icon: '◷' },
 ]
 
 export const breadcrumbLabels = {
@@ -170,7 +162,6 @@ export const breadcrumbLabels = {
   '/admin/payments': 'Quản lý Thanh toán',
   '/admin/notifications': 'Quản lý Thông báo',
   '/admin/reports': 'Báo cáo & Phân tích',
-  '/admin/audit-log': 'Audit Log',
 }
 
 export const mockJockeys = [

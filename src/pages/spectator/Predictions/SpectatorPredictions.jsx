@@ -38,6 +38,40 @@ export default function SpectatorPredictions() {
   const [selectedJockeyDetail, setSelectedJockeyDetail] = useState(null)
   const [successModal, setSuccessModal] = useState(null)
 
+  // Load profile from localStorage to check/deduct balance
+  const [profile, setProfile] = useState(() => {
+    const stored = localStorage.getItem('spectator_profile')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    const INITIAL_PROFILE = {
+      name: 'Hoang Van E',
+      email: 'hoangvane@email.com',
+      phone: '0987 654 321',
+      balance: 5500000,
+      joined: '2025-02-14',
+      momoLinked: true
+    }
+    return INITIAL_PROFILE
+  })
+
+  // Load userPreds to append new predictions
+  const [userPreds, setUserPreds] = useState(() => {
+    const stored = localStorage.getItem('spectator_user_preds')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    return initialUserPreds
+  })
+
   const handleSelectPool = (pool) => {
     setSelectedPool(pool)
     setPredictedHorse('')
@@ -69,6 +103,29 @@ export default function SpectatorPredictions() {
 
     const finalAmount = ticketType === 'vip' ? 300000 : 100000
     const finalTypeName = ticketType === 'vip' ? 'VIP' : 'Standard'
+
+    if (profile.balance < finalAmount) {
+      alert(`⚠️ Số dư ví không đủ! Bạn cần ít nhất ${formatCurrency(finalAmount)} để mua vé này.`)
+      return
+    }
+
+    // Deduct balance and sync to localStorage
+    const updatedProfile = { ...profile, balance: profile.balance - finalAmount }
+    setProfile(updatedProfile)
+    localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
+
+    // Add new prediction entry and sync to localStorage
+    const newPred = {
+      id: Date.now(),
+      race: selectedPool.raceName,
+      amount: finalAmount,
+      horse: predictedHorse,
+      ticketType: finalTypeName,
+      status: 'pending'
+    }
+    const updatedUserPreds = [newPred, ...userPreds]
+    setUserPreds(updatedUserPreds)
+    localStorage.setItem('spectator_user_preds', JSON.stringify(updatedUserPreds))
 
     // Update pool state locally
     setPools(pools.map(p =>
@@ -238,16 +295,22 @@ export default function SpectatorPredictions() {
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', gap: '16px' }}>
                     <div>
                       <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Ngựa cược:</span>
                       <strong style={{ color: predictedHorse ? '#4ade80' : '#f87171', fontSize: '14px' }}>
                         {predictedHorse || 'Chưa chọn ngựa'}
                       </strong>
                     </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Số dư ví:</span>
+                      <strong style={{ color: '#fff', fontSize: '14px' }}>
+                        {formatCurrency(profile.balance)}
+                      </strong>
+                    </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Tổng thanh toán vé:</span>
-                      <strong style={{ color: '#d4af37', fontSize: '18px' }}>
+                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Thanh toán:</span>
+                      <strong style={{ color: '#d4af37', fontSize: '16px' }}>
                         {formatCurrency(ticketType === 'vip' ? 300000 : 100000)}
                       </strong>
                     </div>
@@ -356,6 +419,7 @@ export default function SpectatorPredictions() {
               <div><span style={{ color: '#888' }}>- Loại vé:</span> <strong style={{ color: '#fff' }}>Vé {successModal.ticketType}</strong></div>
               <div><span style={{ color: '#888' }}>- Ngựa dự đoán:</span> <strong style={{ color: '#fff' }}>{successModal.horse}</strong></div>
               <div><span style={{ color: '#888' }}>- Tổng thanh toán:</span> <strong style={{ color: '#d4af37' }}>{formatCurrency(successModal.amount)}</strong></div>
+              <div><span style={{ color: '#888' }}>- Số dư ví còn lại:</span> <strong style={{ color: '#4ade80' }}>{formatCurrency(profile.balance)}</strong></div>
             </div>
 
             <p style={{ color: '#888', fontSize: '12px', marginBottom: '20px' }}>

@@ -1,0 +1,5 @@
+{
+  "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary": "Walkthrough describing the removal of the Audit Log feature, including code changes, successful production build validation, and visual validation in the browser dashboard showing sidebar and dropdown updates.",
+  "updatedAt": "2026-06-11T01:45:59.670258300Z"
+}

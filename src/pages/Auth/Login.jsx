@@ -66,7 +66,6 @@ export default function Login() {
         <div className="auth-panel-head">
           <span className="hero-label">Tài khoản</span>
           <h2>Đăng nhập</h2>
-          <p>Chào mừng trở lại! Vui lòng nhập thông tin của bạn.</p>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -91,7 +90,7 @@ export default function Login() {
           <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginBottom: '14px' }}>
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
-          
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', fontSize: '13px' }}>
             <Link to="/reset-password" style={{ color: '#d4af37', textDecoration: 'none', fontWeight: '500' }}>
               Quên mật khẩu?
