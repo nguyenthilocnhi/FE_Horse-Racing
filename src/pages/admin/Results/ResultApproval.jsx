@@ -23,13 +23,26 @@ const MOCK_REPORT_DETAILS = {
 }
 
 export default function ResultApproval() {
-  const [reports, setReports] = useState(initialReports)
+  const [reports, setReports] = useState(() => {
+    const stored = localStorage.getItem('mock_result_reports')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    localStorage.setItem('mock_result_reports', JSON.stringify(initialReports))
+    return initialReports
+  })
   const [selectedReport, setSelectedReport] = useState(null)
 
   const handleUpdateStatus = (id, newStatus) => {
-    setReports(reports.map(r => 
+    const updated = reports.map(r => 
       r.id === id ? { ...r, status: newStatus } : r
-    ))
+    )
+    setReports(updated)
+    localStorage.setItem('mock_result_reports', JSON.stringify(updated))
     if (selectedReport && selectedReport.id === id) {
       setSelectedReport(prev => ({ ...prev, status: newStatus }))
     }
@@ -81,34 +94,6 @@ export default function ResultApproval() {
                 >
                   Xem biên bản
                 </button>
-                {r.status === 'pending' && (
-                  <>
-                    <button 
-                      type="button" 
-                      className="admin-btn admin-btn--success admin-btn--sm"
-                      onClick={() => handleUpdateStatus(r.id, 'approved')}
-                    >
-                      Duyệt
-                    </button>
-                    <button 
-                      type="button" 
-                      className="admin-btn admin-btn--danger admin-btn--sm"
-                      onClick={() => handleUpdateStatus(r.id, 'rejected')}
-                    >
-                      Từ chối
-                    </button>
-                  </>
-                )}
-                {r.status === 'approved' && (
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--gold admin-btn--sm"
-                    onClick={() => handleUpdateStatus(r.id, 'published')}
-                    style={{ flex: 1.2 }}
-                  >
-                    🚀 Công bố (Publish)
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -175,13 +160,22 @@ export default function ResultApproval() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedReport(null)}>Đóng</button>
                 {selectedReport.status === 'pending' && (
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--success"
-                    onClick={() => handleUpdateStatus(selectedReport.id, 'approved')}
-                  >
-                    Duyệt báo cáo
-                  </button>
+                  <>
+                    <button 
+                      type="button" 
+                      className="admin-btn admin-btn--success"
+                      onClick={() => handleUpdateStatus(selectedReport.id, 'approved')}
+                    >
+                      Duyệt báo cáo
+                    </button>
+                    <button 
+                      type="button" 
+                      className="admin-btn admin-btn--danger"
+                      onClick={() => handleUpdateStatus(selectedReport.id, 'rejected')}
+                    >
+                      Từ chối
+                    </button>
+                  </>
                 )}
                 {selectedReport.status === 'approved' && (
                   <button 

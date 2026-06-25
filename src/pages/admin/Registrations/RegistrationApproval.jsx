@@ -12,7 +12,18 @@ const TABS = [
 
 export default function RegistrationApproval() {
   const [tab, setTab] = useState('pending')
-  const [registrations, setRegistrations] = useState(initialRegistrations)
+  const [registrations, setRegistrations] = useState(() => {
+    const stored = localStorage.getItem('mock_registrations')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    localStorage.setItem('mock_registrations', JSON.stringify(initialRegistrations))
+    return initialRegistrations
+  })
   const [selectedReg, setSelectedReg] = useState(null)
   
   // Checklist state for selected registration
@@ -53,7 +64,8 @@ export default function RegistrationApproval() {
       return r
     })
     setRegistrations(updated)
-    alert(newStatus === 'approved' ? 'Đã duyệt đăng ký thành công!' : 'Đã từ chối đăng ký!')
+    localStorage.setItem('mock_registrations', JSON.stringify(updated))
+    alert(newStatus === 'approved' ? 'Đã duyệt đăng ký thành công!' : newStatus === 'rejected' ? 'Đã từ chối đăng ký!' : 'Đã trả hồ sơ về hàng chờ!')
   }
 
   return (

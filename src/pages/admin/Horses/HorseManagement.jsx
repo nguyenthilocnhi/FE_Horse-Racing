@@ -4,18 +4,18 @@ import { StatusBadge } from '../../../utils/adminHelpers'
 import './HorseManagement.css'
 
 const DEFAULT_HORSES = [
-  { id: 1, name: 'Aurelius', age: 5, breed: 'Thoroughbred', owner: 'Stable Alpha', status: 'active', wins: 12, races: 18, points: 2450, image: 'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&w=600&q=80' },
-  { id: 2, name: 'Midnight Star', age: 4, breed: 'Arabian', owner: 'Blue Ridge Farm', status: 'active', wins: 9, races: 16, points: 2280, image: 'https://images.unsplash.com/photo-1551884833-0a24ee98a2ae?auto=format&fit=crop&w=600&q=80' },
-  { id: 3, name: 'Velvet Thunder', age: 6, breed: 'Quarter Horse', owner: 'Golden Hooves', status: 'active', wins: 15, races: 22, points: 2150, image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80' },
-  { id: 4, name: 'Storm Rider', age: 5, breed: 'Thoroughbred', owner: 'Wind Valley', status: 'injured', wins: 5, races: 11, points: 1240, image: 'https://images.unsplash.com/photo-1523464862212-d6631d073194?auto=format&fit=crop&w=600&q=80' },
-  { id: 5, name: 'Thunder Bolt', age: 3, breed: 'Appaloosa', owner: 'Silver Mane', status: 'retired', wins: 2, races: 8, points: 670, image: 'https://images.unsplash.com/photo-1538688423619-a81d3f23454b?auto=format&fit=crop&w=600&q=80' },
-  { id: 6, name: 'Golden Eagle', age: 5, breed: 'Thoroughbred', owner: 'Stable Alpha', status: 'active', wins: 8, races: 14, points: 1890, image: 'https://images.unsplash.com/photo-1488229202572-88edaa1a6544?auto=format&fit=crop&w=600&q=80' },
-  { id: 7, name: 'Shadow Dancer', age: 4, breed: 'Arabian', owner: 'Blue Ridge Farm', status: 'injured', wins: 3, races: 7, points: 920, image: 'https://images.unsplash.com/photo-1507724623194-e36ee0077977?auto=format&fit=crop&w=600&q=80' },
-  { id: 8, name: 'Pegasus', age: 6, breed: 'Thoroughbred', owner: 'Wind Valley', status: 'active', wins: 10, races: 15, points: 2010, image: 'https://images.unsplash.com/photo-1596701062351-8c2c14d1fcd1?auto=format&fit=crop&w=600&q=80' },
-  { id: 9, name: 'Starlight', age: 3, breed: 'Mustang', owner: 'Golden Hooves', status: 'active', wins: 1, races: 4, points: 450, image: 'https://images.unsplash.com/photo-1563889362-ea011f7d4444?auto=format&fit=crop&w=600&q=80' },
-  { id: 10, name: 'Iron Hoof', age: 5, breed: 'Quarter Horse', owner: 'Silver Mane', status: 'retired', wins: 4, races: 12, points: 1120, image: 'https://images.unsplash.com/photo-1501426026826-31c667bdf23d?auto=format&fit=crop&w=600&q=80' },
-  { id: 11, name: 'Royal Flash', age: 4, breed: 'Thoroughbred', owner: 'Royal Stables', status: 'active', wins: 7, races: 10, points: 1600, image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80' },
-  { id: 12, name: 'Blazing Wind', age: 5, breed: 'Appaloosa', owner: 'Windy Plains', status: 'active', wins: 6, races: 13, points: 1450, image: 'https://images.unsplash.com/photo-1504198322253-cfa87a0ff25f?auto=format&fit=crop&w=600&q=80' }
+  { id: 1, name: 'Aurelius', age: 5, breed: 'Thoroughbred', owner: 'Stable Alpha', status: 'active', health: 'Khỏe mạnh', wins: 12, races: 18, points: 2450, image: 'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?auto=format&fit=crop&w=600&q=80' },
+  { id: 2, name: 'Midnight Star', age: 4, breed: 'Arabian', owner: 'Blue Ridge Farm', status: 'active', health: 'Khỏe mạnh', wins: 9, races: 16, points: 2280, image: 'https://images.unsplash.com/photo-1551884833-0a24ee98a2ae?auto=format&fit=crop&w=600&q=80' },
+  { id: 3, name: 'Velvet Thunder', age: 6, breed: 'Quarter Horse', owner: 'Golden Hooves', status: 'active', health: 'Khỏe mạnh', wins: 15, races: 22, points: 2150, image: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80' },
+  { id: 4, name: 'Storm Rider', age: 5, breed: 'Thoroughbred', owner: 'Wind Valley', status: 'injured', health: 'Chấn thương chân', wins: 5, races: 11, points: 1240, image: 'https://images.unsplash.com/photo-1523464862212-d6631d073194?auto=format&fit=crop&w=600&q=80' },
+  { id: 5, name: 'Thunder Bolt', age: 3, breed: 'Appaloosa', owner: 'Silver Mane', status: 'retired', health: 'Khỏe mạnh', wins: 2, races: 8, points: 670, image: 'https://images.unsplash.com/photo-1538688423619-a81d3f23454b?auto=format&fit=crop&w=600&q=80' },
+  { id: 6, name: 'Golden Eagle', age: 5, breed: 'Thoroughbred', owner: 'Stable Alpha', status: 'active', health: 'Khỏe mạnh', wins: 8, races: 14, points: 1890, image: 'https://images.unsplash.com/photo-1488229202572-88edaa1a6544?auto=format&fit=crop&w=600&q=80' },
+  { id: 7, name: 'Shadow Dancer', age: 4, breed: 'Arabian', owner: 'Blue Ridge Farm', status: 'injured', health: 'Căng cơ', wins: 3, races: 7, points: 920, image: 'https://images.unsplash.com/photo-1507724623194-e36ee0077977?auto=format&fit=crop&w=600&q=80' },
+  { id: 8, name: 'Pegasus', age: 6, breed: 'Thoroughbred', owner: 'Wind Valley', status: 'active', health: 'Khỏe mạnh', wins: 10, races: 15, points: 2010, image: 'https://images.unsplash.com/photo-1596701062351-8c2c14d1fcd1?auto=format&fit=crop&w=600&q=80' },
+  { id: 9, name: 'Starlight', age: 3, breed: 'Mustang', owner: 'Golden Hooves', status: 'active', health: 'Khỏe mạnh', wins: 1, races: 4, points: 450, image: 'https://images.unsplash.com/photo-1563889362-ea011f7d4444?auto=format&fit=crop&w=600&q=80' },
+  { id: 10, name: 'Iron Hoof', age: 5, breed: 'Quarter Horse', owner: 'Silver Mane', status: 'retired', health: 'Khỏe mạnh', wins: 4, races: 12, points: 1120, image: 'https://images.unsplash.com/photo-1501426026826-31c667bdf23d?auto=format&fit=crop&w=600&q=80' },
+  { id: 11, name: 'Royal Flash', age: 4, breed: 'Thoroughbred', owner: 'Royal Stables', status: 'active', health: 'Khỏe mạnh', wins: 7, races: 10, points: 1600, image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80' },
+  { id: 12, name: 'Blazing Wind', age: 5, breed: 'Appaloosa', owner: 'Windy Plains', status: 'active', health: 'Đang hồi phục', wins: 6, races: 13, points: 1450, image: 'https://images.unsplash.com/photo-1504198322253-cfa87a0ff25f?auto=format&fit=crop&w=600&q=80' }
 ]
 
 export default function HorseManagement() {
@@ -39,7 +39,7 @@ export default function HorseManagement() {
   // Modal states
   const [modalOpen, setModalOpen] = useState(false)
   const [editingHorse, setEditingHorse] = useState(null)
-  const [formData, setFormData] = useState({ name: '', age: '', breed: '', owner: '', status: 'active', image: '' })
+  const [formData, setFormData] = useState({ name: '', age: '', breed: '', owner: '', status: 'active', health: 'Khỏe mạnh', image: '' })
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1)
@@ -72,7 +72,7 @@ export default function HorseManagement() {
   // Actions
   const handleOpenAdd = () => {
     setEditingHorse(null)
-    setFormData({ name: '', age: '', breed: '', owner: '', status: 'active', image: '' })
+    setFormData({ name: '', age: '', breed: '', owner: '', status: 'active', health: 'Khỏe mạnh', image: '' })
     setModalOpen(true)
   }
 
@@ -84,6 +84,7 @@ export default function HorseManagement() {
       breed: horse.breed,
       owner: horse.owner,
       status: horse.status,
+      health: horse.health || 'Khỏe mạnh',
       image: horse.image || ''
     })
     setModalOpen(true)
@@ -188,6 +189,7 @@ export default function HorseManagement() {
                   <th>Tuổi</th>
                   <th>Giống</th>
                   <th>Chủ sở hữu</th>
+                  <th>Sức khỏe</th>
                   <th>Trạng thái</th>
                   <th style={{ textAlign: 'right' }}>Thao tác</th>
                 </tr>
@@ -200,6 +202,7 @@ export default function HorseManagement() {
                       <td>{horse.age} tuổi</td>
                       <td>{horse.breed}</td>
                       <td>{horse.owner}</td>
+                      <td>{horse.health || 'Khỏe mạnh'}</td>
                       <td>
                         <StatusBadge status={horse.status} />
                       </td>
@@ -232,7 +235,7 @@ export default function HorseManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
                       Không tìm thấy kết quả phù hợp
                     </td>
                   </tr>
@@ -315,6 +318,9 @@ export default function HorseManagement() {
                 
                 <dt>Chủ sở hữu</dt>
                 <dd>{selectedHorse.owner}</dd>
+                
+                <dt>Sức khỏe</dt>
+                <dd>{selectedHorse.health || 'Khỏe mạnh'}</dd>
                 
                 <dt>Trạng thái</dt>
                 <dd>
@@ -445,6 +451,23 @@ export default function HorseManagement() {
                   value={formData.image}
                   onChange={(e) => setFormData(f => ({ ...f, image: e.target.value }))}
                 />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tình trạng Sức khỏe</label>
+                <select
+                  className="admin-select"
+                  value={formData.health}
+                  onChange={(e) => setFormData(f => ({ ...f, health: e.target.value }))}
+                  style={{ width: '100%' }}
+                >
+                  <option value="Khỏe mạnh">Khỏe mạnh (Healthy)</option>
+                  <option value="Chấn thương nhẹ">Chấn thương nhẹ (Mild Injury)</option>
+                  <option value="Chấn thương chân">Chấn thương chân (Leg Injury)</option>
+                  <option value="Đang hồi phục">Đang hồi phục (Recovering)</option>
+                  <option value="Căng cơ">Căng cơ (Muscle Strain)</option>
+                  <option value="Bệnh nhẹ">Bệnh nhẹ (Mild Sickness)</option>
+                </select>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

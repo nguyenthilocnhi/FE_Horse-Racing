@@ -23,3 +23,29 @@
     grid-template-columns: 1fr;
   }
 }
+
+.tournament-mgmt-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.tournament-mgmt-layout:has(.tournament-detail-panel) {
+  grid-template-columns: 1fr 340px;
+}
+
+.tournament-detail-panel {
+  position: sticky;
+  top: 100px;
+  align-self: start;
+}
+
+@media (max-width: 1024px) {
+  .tournament-mgmt-layout:has(.tournament-detail-panel) {
+    grid-template-columns: 1fr;
+  }
+
+  .tournament-detail-panel {
+    position: static;
+  }
+}
