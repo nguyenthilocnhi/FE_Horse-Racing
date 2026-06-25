@@ -4,11 +4,11 @@ import { useAuth } from '../../contexts/AuthContext'
 
 function getLoginErrorMessage(error) {
   if (!error.response) {
-    return 'Không thể kết nối máy chủ. Hãy chạy backend tại http://localhost:4000.'
+    return 'Không thể kết nối máy chủ backend. Vui lòng kiểm tra lại kết nối mạng hoặc máy chủ.'
   }
 
   if (error.response.status >= 500) {
-    return 'Máy chủ backend chưa sẵn sàng. Hãy khởi động backend tại http://localhost:4000.'
+    return 'Máy chủ backend đang gặp sự cố (500). Vui lòng thử lại sau.'
   }
 
   return error.response.data?.message || 'Email hoặc mật khẩu không đúng.'
@@ -38,6 +38,8 @@ export default function Login() {
         navigate('/referee')
       } else if (role === 'SPECTATOR') {
         navigate('/spectator')
+      } else if (role === 'OWNER') {
+        navigate('/owner')
       } else {
         navigate('/')
       }
