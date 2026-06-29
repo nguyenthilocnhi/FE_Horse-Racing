@@ -1,45 +1,161 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { users as initialUsers } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import * as adminAccountService from '../../../services/adminAccountService'
 import './UserManagement.css'
 
 export default function UserManagement() {
-  const [users, setUsers] = useState(initialUsers)
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(false)
   const { searchQuery: search = '', setSearchQuery: setSearch = () => {} } = useOutletContext() || {}
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [selectedUser, setSelectedUser] = useState(null)
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10
+
+  // Sorting State
+  const [sortOption, setSortOption] = useState('NEWEST')
 
   // Create User modal
   const [showAddForm, setShowAddForm] = useState(false)
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
 
-  const filtered = users.filter((u) => {
+  const fetchAccounts = async () => {
+    setLoading(true)
+    try {
+      const data = await adminAccountService.getAllAccounts()
+      setUsers(data || [])
+    } catch (err) {
+      console.error("Failed to fetch accounts from API:", err)
+      setUsers([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [])
+
+  // Reset page to 1 when filters or sorting change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, roleFilter, sortOption])
+
+  // Sort users based on selected option
+  const sortedUsers = [...users].sort((a, b) => {
+    if (sortOption === 'NEWEST') {
+      return b.id - a.id
+    }
+    if (sortOption === 'OLDEST') {
+      return a.id - b.id
+    }
+    if (sortOption === 'AZ') {
+      const nameA = a.fullName || a.name || ''
+      const nameB = b.fullName || b.name || ''
+      return nameA.localeCompare(nameB, 'vi', { sensitivity: 'base' })
+    }
+    return 0
+  })
+
+  const filtered = sortedUsers.filter((u) => {
+    // 1. Exclude ADMIN accounts
+    if (u.role === 'ADMIN') return false
+
+    const nameVal = u.fullName || u.name
     const matchSearch =
-      u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
+      (nameVal && nameVal.toLowerCase().includes(search.toLowerCase())) ||
+      (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
       (u.phone && u.phone.includes(search))
     const matchRole = roleFilter === 'ALL' || u.role === roleFilter
     return matchSearch && matchRole
   })
 
+  // Pagination Slice
+  const totalPages = Math.ceil(filtered.length / pageSize)
+  const paginatedUsers = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
   // Handlers
-  const handleToggleLock = (userId) => {
-    const updated = users.map(u => {
-      if (u.id === userId) {
-        const nextStatus = u.status === 'locked' ? 'active' : 'locked'
-        const nextUser = { ...u, status: nextStatus }
-        if (selectedUser && selectedUser.id === userId) {
-          setSelectedUser(nextUser)
-        }
-        return nextUser
+  const handleToggleLock = async (userId) => {
+    const userToUpdate = users.find(u => u.id === userId)
+    if (!userToUpdate) return
+    const nextStatus = userToUpdate.status === 'locked' ? 'active' : 'locked'
+    
+    try {
+      const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
+        ...userToUpdate,
+        status: nextStatus
+      })
+      const nextUser = updated || { ...userToUpdate, status: nextStatus }
+      setUsers(users.map(u => u.id === userId ? nextUser : u))
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(nextUser)
       }
-      return u
-    })
-    setUsers(updated)
+    } catch (err) {
+      alert("Cập nhật trạng thái thất bại: " + (err.response?.data?.message || err.message))
+    }
   }
 
-  const handleCreateUser = (e) => {
+  const handleApproveUser = async (userId) => {
+    const userToUpdate = users.find(u => u.id === userId)
+    if (!userToUpdate) return
+    
+    try {
+      const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
+        ...userToUpdate,
+        status: 'active'
+      })
+      const nextUser = updated || { ...userToUpdate, status: 'active' }
+      setUsers(users.map(u => u.id === userId ? nextUser : u))
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(nextUser)
+      }
+      alert("Phê duyệt tài khoản thành công!")
+    } catch (err) {
+      alert("Phê duyệt thất bại: " + (err.response?.data?.message || err.message))
+    }
+  }
+
+  const handleDeleteUser = async (userId) => {
+    const userToDelete = users.find(u => u.id === userId)
+    if (!userToDelete) return
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${userToDelete.name}" không?`)) return
+    
+    try {
+      await adminAccountService.deleteAccount(userToDelete.role, userId)
+      setUsers(users.filter(u => u.id !== userId))
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(null)
+      }
+      alert("Xóa tài khoản thành công!")
+    } catch (err) {
+      alert("Xóa tài khoản thất bại: " + (err.response?.data || err.message))
+    }
+  }
+
+  const handleAssignRole = async (userId, nextRole) => {
+    const userToUpdate = users.find(u => u.id === userId)
+    if (!userToUpdate) return
+    const confirmChange = window.confirm(`Bạn có chắc chắn muốn thay đổi vai trò của người dùng từ ${userToUpdate.role} thành ${nextRole}?`)
+    if (!confirmChange) return
+
+    try {
+      const updated = await adminAccountService.assignRole(userToUpdate.role, userId, {
+        newRole: nextRole
+      })
+      const nextUser = updated || { ...userToUpdate, role: nextRole }
+      setSelectedUser(nextUser)
+      setUsers(users.map(u => u.id === userId ? nextUser : u))
+      alert("Gán vai trò thành công!")
+    } catch (err) {
+      alert("Gán vai trò thất bại: " + (err.response?.data?.message || err.message))
+    }
+  }
+
+  const handleCreateUser = async (e) => {
     e.preventDefault()
     if (!newUser.name || !newUser.email || !newUser.dob) return
 
@@ -61,20 +177,28 @@ export default function UserManagement() {
       return
     }
 
-    const created = {
-      id: Date.now(),
-      name: newUser.name,
-      email: newUser.email,
-      phone: newUser.phone,
-      dob: newUser.dob,
-      role: newUser.role,
-      status: newUser.status,
-      joined: new Date().toISOString().split('T')[0]
+    try {
+      const payload = {
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        dob: newUser.dob,
+        role: newUser.role,
+        status: newUser.status,
+      }
+      const created = await adminAccountService.createAccount(payload)
+      const nextUser = created || {
+        id: Date.now(),
+        ...payload,
+        joined: new Date().toISOString().split('T')[0]
+      }
+      setUsers([nextUser, ...users])
+      setShowAddForm(false)
+      setNewUser({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
+      alert("Tạo tài khoản thành công!")
+    } catch (err) {
+      alert("Tạo tài khoản thất bại: " + (err.response?.data?.message || err.message))
     }
-
-    setUsers([created, ...users])
-    setShowAddForm(false)
-    setNewUser({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
   }
 
   return (
@@ -102,61 +226,120 @@ export default function UserManagement() {
         />
         <select className="admin-select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
           <option value="ALL">Tất cả Role</option>
-          <option value="ADMIN">ADMIN</option>
           <option value="HORSE_OWNER">HORSE OWNER</option>
           <option value="JOCKEY">JOCKEY</option>
           <option value="REFEREE">REFEREE</option>
           <option value="SPECTATOR">SPECTATOR</option>
         </select>
+        <select className="admin-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
+          <option value="NEWEST">Sắp xếp: Mới nhất</option>
+          <option value="OLDEST">Sắp xếp: Cũ nhất</option>
+          <option value="AZ">Sắp xếp: Tên A → Z</option>
+        </select>
       </div>
 
       <div className="user-mgmt-layout">
         <div className="admin-card user-mgmt-table-card">
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Họ tên</th>
-                  <th>Email</th>
-                  <th>Số điện thoại</th>
-                  <th>Role</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((u) => (
-                  <tr key={u.id}>
-                    <td>#{u.id}</td>
-                    <td>{u.name}</td>
-                    <td>{u.email}</td>
-                    <td>{u.phone || '—'}</td>
-                    <td><span className="admin-badge admin-badge--gold">{u.role}</span></td>
-                    <td><StatusBadge status={u.status} /></td>
-                    <td>
-                      <div className="admin-table-actions">
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--ghost admin-btn--sm"
-                          onClick={() => setSelectedUser(u)}
-                        >
-                          Chi tiết
-                        </button>
-                        <button
-                          type="button"
-                          className={`admin-btn admin-btn--sm ${u.status === 'locked' ? 'admin-btn--success' : 'admin-btn--danger'}`}
-                          onClick={() => handleToggleLock(u.id)}
-                        >
-                          {u.status === 'locked' ? 'Mở khóa' : 'Khóa'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#aaa' }}>Đang tải dữ liệu...</div>
+          ) : (
+            <>
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Họ tên</th>
+                      <th>Email</th>
+                      <th>Số điện thoại</th>
+                      <th>Role</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedUsers.map((u, index) => (
+                      <tr key={`${u.role}-${u.id || index}-${index}`}>
+                        <td>#{u.id}</td>
+                        <td>{u.fullName || u.name}</td>
+                        <td>{u.email}</td>
+                        <td>{u.phone || '—'}</td>
+                        <td><span className="admin-badge admin-badge--gold">{u.role}</span></td>
+                        <td><StatusBadge status={u.status} /></td>
+                        <td>
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--ghost admin-btn--sm"
+                              onClick={() => setSelectedUser(u)}
+                            >
+                              Chi tiết
+                            </button>
+                            {u.status === 'pending' ? (
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--success admin-btn--sm"
+                                onClick={() => handleApproveUser(u.id)}
+                              >
+                                Duyệt
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className={`admin-btn admin-btn--sm ${u.status === 'locked' ? 'admin-btn--success' : 'admin-btn--danger'}`}
+                                onClick={() => handleToggleLock(u.id)}
+                              >
+                                {u.status === 'locked' ? 'Mở khóa' : 'Khóa'}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--danger admin-btn--sm"
+                              onClick={() => handleDeleteUser(u.id)}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              {totalPages > 1 && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '16px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                  background: 'rgba(0, 0, 0, 0.1)'
+                }}>
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    className="admin-btn admin-btn--outline admin-btn--sm"
+                    style={{ minWidth: '40px', padding: '4px 8px' }}
+                  >
+                    ◀
+                  </button>
+                  <span style={{ fontSize: '13px', color: '#ccc', fontWeight: 500 }}>
+                    Trang {currentPage} / {totalPages} ({filtered.length} tài khoản)
+                  </span>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    className="admin-btn admin-btn--outline admin-btn--sm"
+                    style={{ minWidth: '40px', padding: '4px 8px' }}
+                  >
+                    ▶
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {selectedUser && (
@@ -166,8 +349,8 @@ export default function UserManagement() {
               <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedUser(null)}>✕</button>
             </div>
             <div className="admin-card-body user-detail-body">
-              <div className="user-detail-avatar">{(selectedUser.name).charAt(0)}</div>
-              <h4>{selectedUser.name}</h4>
+              <div className="user-detail-avatar">{(selectedUser.fullName || selectedUser.name || 'U').charAt(0)}</div>
+              <h4>{selectedUser.fullName || selectedUser.name}</h4>
               <p>{selectedUser.email}</p>
               <dl className="user-detail-dl">
                 <dt>Số điện thoại</dt>
@@ -180,15 +363,7 @@ export default function UserManagement() {
                     className="admin-select"
                     value={selectedUser.role}
                     style={{ width: '100%', padding: '6px 10px', fontSize: '12px', minWidth: 'auto', marginTop: '4px' }}
-                    onChange={(e) => {
-                      const nextRole = e.target.value
-                      const confirmChange = window.confirm(`Bạn có chắc chắn muốn thay đổi vai trò của người dùng từ ${selectedUser.role} thành ${nextRole}?`)
-                      if (!confirmChange) return
-
-                      const nextUser = { ...selectedUser, role: nextRole }
-                      setSelectedUser(nextUser)
-                      setUsers(users.map(u => u.id === selectedUser.id ? nextUser : u))
-                    }}
+                    onChange={(e) => handleAssignRole(selectedUser.id, e.target.value)}
                   >
                     <option value="ADMIN">ADMIN</option>
                     <option value="HORSE_OWNER">HORSE OWNER</option>
