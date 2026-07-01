@@ -53,10 +53,39 @@ import OwnerJockeys from '../pages/owner/Jockeys/OwnerJockeys'
 import OwnerRaces from '../pages/owner/Races/OwnerRaces'
 import OwnerFinances from '../pages/owner/Finances/OwnerFinances'
 import OwnerProfile from '../pages/owner/Profile/OwnerProfile'
-// import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/AuthContext'
 
-function PrivateRoute({ children }) {
-  // Bỏ ràng buộc đăng nhập cho các role
+function ProtectedRoute({ children, allowedRoles }) {
+  const { token, user } = useAuth()
+
+  // 1. Chưa đăng nhập -> redirect về trang login
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+
+  // 2. Đang có token nhưng chưa load kịp user object -> tạm thời cho render
+  if (!user) {
+    return children
+  }
+
+  const userRole = user.role?.toUpperCase()
+  const roles = allowedRoles.map(r => r.toUpperCase())
+
+  // Normalize owner role name variations
+  const isOwnerUser = ['OWNER', 'HORSE_OWNER', 'HORSE OWNER'].includes(userRole)
+  const isOwnerAllowed = roles.some(r => ['OWNER', 'HORSE_OWNER', 'HORSE OWNER'].includes(r))
+
+  // 3. Sai quyền hạn -> Chuyển hướng về trang tương ứng của role đó
+  if (!roles.includes(userRole) && !(isOwnerUser && isOwnerAllowed)) {
+    if (userRole === 'ADMIN') return <Navigate to="/admin" replace />
+    if (userRole === 'JOCKEY') return <Navigate to="/jockey" replace />
+    if (userRole === 'REFEREE') return <Navigate to="/referee" replace />
+    if (userRole === 'SPECTATOR') return <Navigate to="/spectator" replace />
+    if (isOwnerUser) return <Navigate to="/owner" replace />
+
+    return <Navigate to="/" replace />
+  }
+
   return children
 }
 
@@ -76,7 +105,8 @@ export default function AppRoutes() {
         <Route path="/horses/:id" element={<HorseDetail />} />
       </Route>
 
-      <Route element={<AdminLayout />}>
+      {/* ── Admin Portal ── */}
+      <Route element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminLayout /></ProtectedRoute>}>
         <Route path="/admin" element={<Dashboard />} />
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/tournaments" element={<TournamentManagement />} />
@@ -97,7 +127,7 @@ export default function AppRoutes() {
       </Route>
 
       {/* ── Jockey Portal ── */}
-      <Route element={<PrivateRoute><JockeyLayout /></PrivateRoute>}>
+      <Route element={<ProtectedRoute allowedRoles={['JOCKEY']}><JockeyLayout /></ProtectedRoute>}>
         <Route path="/jockey" element={<JockeyDashboard />} />
         <Route path="/jockey/invitations" element={<Invitations />} />
         <Route path="/jockey/my-races" element={<MyRaces />} />
@@ -107,7 +137,7 @@ export default function AppRoutes() {
       </Route>
 
       {/* ── Owner Portal ── */}
-      <Route element={<PrivateRoute><OwnerLayout /></PrivateRoute>}>
+      <Route element={<ProtectedRoute allowedRoles={['OWNER', 'HORSE_OWNER', 'HORSE OWNER']}><OwnerLayout /></ProtectedRoute>}>
         <Route path="/owner" element={<OwnerDashboard />} />
         <Route path="/owner/horses" element={<OwnerHorses />} />
         <Route path="/owner/jockeys" element={<OwnerJockeys />} />
@@ -117,14 +147,14 @@ export default function AppRoutes() {
       </Route>
 
       {/* ── Referee Portal ── */}
-      <Route element={<PrivateRoute><RefereeLayout /></PrivateRoute>}>
+      <Route element={<ProtectedRoute allowedRoles={['REFEREE']}><RefereeLayout /></ProtectedRoute>}>
         <Route path="/referee" element={<RefereeInspection />} />
         <Route path="/referee/tracking" element={<RefereeTracking />} />
         <Route path="/referee/violations" element={<RefereeViolations />} />
       </Route>
 
       {/* ── Spectator Portal ── */}
-      <Route element={<PrivateRoute><SpectatorLayout /></PrivateRoute>}>
+      <Route element={<ProtectedRoute allowedRoles={['SPECTATOR']}><SpectatorLayout /></ProtectedRoute>}>
         <Route path="/spectator" element={<SpectatorDashboard />} />
         <Route path="/spectator/rankings" element={<SpectatorRankings />} />
         <Route path="/spectator/predictions" element={<SpectatorPredictions />} />
@@ -136,3 +166,4 @@ export default function AppRoutes() {
     </Routes>
   )
 }
+

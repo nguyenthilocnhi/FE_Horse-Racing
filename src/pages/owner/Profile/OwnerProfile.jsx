@@ -1,20 +1,66 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ownerProfile as initialProfile } from '../../../data/ownerMockData'
+import { useAuth } from '../../../contexts/AuthContext'
 
 export default function OwnerProfile() {
+  const { user } = useAuth()
+
   const [profile, setProfile] = useState(initialProfile)
-  const [name, setName] = useState(profile.name)
-  const [stableName, setStableName] = useState(profile.stableName)
-  const [email, setEmail] = useState(profile.email)
-  const [phone, setPhone] = useState(profile.phone)
-  const [location, setLocation] = useState(profile.location)
-  const [bio, setBio] = useState(profile.bio)
+  const [name, setName] = useState('')
+  const [stableName, setStableName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [location, setLocation] = useState('')
+  const [bio, setBio] = useState('')
   const [stableColor, setStableColor] = useState('#d4af37') // Gold by default
   const [saved, setSaved] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  // ── Load Owner Profile Details from registered snapshot or AuthContext ──
+  useEffect(() => {
+    setLoading(true)
+
+    // Khởi tạo các giá trị mặc định từ user AuthContext
+    const defaultName = user?.fullName ?? user?.name ?? 'Chủ sở hữu'
+    const defaultEmail = user?.email ?? ''
+    const defaultPhone = user?.phone ?? ''
+
+    // Kiểm tra pending_profile của owner vừa đăng ký
+    const pending = localStorage.getItem('pending_profile')
+    let initialized = false
+
+    if (pending) {
+      try {
+        const parsed = JSON.parse(pending)
+        const isMatch = parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id
+        if (isMatch) {
+          setName(parsed.name ?? defaultName)
+          setStableName(parsed.stableName ?? 'My Stable')
+          setEmail(parsed.email ?? defaultEmail)
+          setPhone(parsed.phone ?? defaultPhone)
+          setLocation(parsed.address ?? 'Hồ Chí Minh, Việt Nam')
+          setBio('Stable chất lượng cao chuyên đào tạo các giống ngựa đua hàng đầu.')
+          initialized = true
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    if (!initialized) {
+      setName(defaultName)
+      setStableName('Stable Demo')
+      setEmail(defaultEmail)
+      setPhone(defaultPhone)
+      setLocation('Hồ Chí Minh, Việt Nam')
+      setBio('Giới thiệu thông tin trang trại của bạn tại đây.')
+    }
+
+    setLoading(false)
+  }, [user])
 
   const handleSave = (e) => {
     e.preventDefault()
-    setProfile({
+    // Lưu tạm vào local để ghi nhớ thông tin sửa đổi của Owner
+    const updated = {
       ...profile,
       name,
       stableName,
@@ -22,9 +68,14 @@ export default function OwnerProfile() {
       phone,
       location,
       bio
-    })
+    }
+    setProfile(updated)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
+  }
+
+  if (loading) {
+    return <div style={{ color: '#aaa', padding: 20 }}>Đang tải thông tin hồ sơ...</div>
   }
 
   return (

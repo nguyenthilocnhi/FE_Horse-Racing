@@ -76,21 +76,37 @@ function LogoutModal({ onConfirm, onCancel }) {
 }
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem('token'))
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user') || 'null'))
+  const [token, setToken] = useState(() => {
+    const t = localStorage.getItem('token')
+    // Nếu là token dev cũ -> xóa sạch
+    if (t === 'dev-token') {
+      localStorage.removeItem('token')
+      return null
+    }
+    return t
+  })
+  const [user, setUser] = useState(() => {
+    const u = localStorage.getItem('user')
+    if (u) {
+      try {
+        const parsed = JSON.parse(u)
+        // Nếu là user dev cũ -> xóa sạch
+        if (parsed?.id === 'DEV-ADMIN') {
+          localStorage.removeItem('user')
+          return null
+        }
+        return parsed
+      } catch (_) {
+        return null
+      }
+    }
+    return null
+  })
   const [showLogoutModal, setShowLogoutModal] = useState(false)
 
-  useEffect(() => {
-    const disableDevAutoLogin = localStorage.getItem('disableDevAutoLogin') === '1'
-    if (import.meta.env.DEV && !disableDevAutoLogin && !token) {
-      setToken('dev-token')
-      setUser({
-        id: 'DEV-ADMIN',
-        name: 'Admin Demo',
-        role: 'ADMIN',
-      })
-    }
-  }, [token])
+
+  // Đã bỏ tự động đăng nhập tài khoản DEV để tránh tự ý vào portal khi vào trang chủ /
+
 
   useEffect(() => {
     if (token) localStorage.setItem('token', token)
@@ -104,7 +120,17 @@ export function AuthProvider({ children }) {
 
   async function login(credentials) {
     const data = await authService.login(credentials)
-    const userObj = data.user || (data.role ? { name: data.fullName || data.name, role: data.role } : null)
+    // Gộp tất cả thông tin từ data.user và response gốc để không bỏ sót field
+    const raw = data.user ? { ...data, ...data.user } : data
+    const userObj = raw.role ? {
+      id:        raw.id        ?? raw.userId      ?? null,
+      username:  raw.userName  ?? raw.username    ?? '',
+      name:      raw.fullName  ?? raw.name        ?? '',
+      email:     raw.email     ?? '',
+      phone:     raw.phone     ?? raw.phoneNumber ?? '',
+      role:      raw.role,
+      createdAt: raw.createdAt ?? raw.joinedAt    ?? raw.joined ?? null,
+    } : null
     setToken(data.token)
     setUser(userObj)
     return { ...data, user: userObj }

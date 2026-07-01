@@ -14,6 +14,7 @@ export default function Register() {
   const [success, setSuccess] = useState(false)
   const [showRoleForm, setShowRoleForm] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [emailChecking, setEmailChecking] = useState(false)
 
   // Jockey specific states
   const [jockeyExp, setJockeyExp] = useState('')
@@ -58,7 +59,7 @@ export default function Register() {
     return null
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
 
@@ -79,6 +80,63 @@ export default function Register() {
       return
     }
 
+    // Kiểm tra email trùng trước khi chuyển bước
+    setEmailChecking(true)
+    try {
+      const result = await authService.checkEmail(email)
+      if (result?.exists) {
+        setError('Email này đã được sử dụng. Vui lòng dùng email khác hoặc đăng nhập.')
+        setEmailChecking(false)
+        return
+      }
+    } catch (err) {
+      // Nếu API chưa có hoặc lỗi mạng → bỏ qua, cho phép tiếp tục
+      console.warn('Không thể kiểm tra email:', err?.response?.status, err?.message)
+    } finally {
+      setEmailChecking(false)
+    }
+
+    // SPECTATOR: đăng ký thẳng, không cần bước 2
+    if (role === 'SPECTATOR') {
+      setLoading(true)
+      try {
+        const payload = {
+          fullName: name,
+          userName: username,
+          email,
+          phone,
+          password,
+          birthDate: dob,
+          role: 'SPECTATOR',
+          newRole: 'SPECTATOR',
+        }
+        const data = await authService.register(payload)
+        if (data.success || data.token || data.user || data.id) {
+          // Lưu thông tin đăng ký vào localStorage để Profile đọc được ngay
+          const profileSnapshot = {
+            id:        data.id   ?? data.user?.id   ?? null,
+            userName:  username,
+            name:      name,
+            email:     email,
+            phone:     phone,
+            joined:    new Date().toISOString(),
+            balance:   0,
+            momoLinked: false,
+          }
+          localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
+          setSuccess(true)
+        } else {
+          setError(data.message || 'Đăng ký thất bại, vui lòng thử lại!')
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || err.message || 'Đăng ký thất bại, vui lòng thử lại!')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    // Các role khác → chuyển sang bước 2
     setShowRoleForm(true)
   }
 
@@ -109,6 +167,18 @@ export default function Register() {
       
       const data = await authService.register(payload)
       if (data.success || data.token || data.user) {
+        // Lưu thông tin đăng ký vào localStorage để Profile đọc được ngay
+        const profileSnapshot = {
+          id:        data.id   ?? data.user?.id   ?? null,
+          userName:  username,
+          name:      name,
+          email:     email,
+          phone:     phone,
+          joined:    new Date().toISOString(),
+          balance:   0,
+          momoLinked: false,
+        }
+        localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
         setSuccess(true)
       } else {
         setError(data.message || 'Đăng ký thất bại, vui lòng thử lại!')
@@ -551,7 +621,6 @@ export default function Register() {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {error && <p className="auth-error" style={{ color: '#f87171', fontSize: '13px', background: 'rgba(248,113,113,0.08)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(248,113,113,0.15)', margin: '0 0 10px 0' }}>{error}</p>}
 
           <div className="form-group">
             <input
@@ -635,8 +704,23 @@ export default function Register() {
             </select>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: '10px' }}>
-            Đăng ký tài khoản
+          {error && (
+            <p style={{
+              color: '#f87171',
+              fontSize: '13px',
+              background: 'rgba(248,113,113,0.08)',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1px solid rgba(248,113,113,0.25)',
+              margin: '4px 0 0',
+              lineHeight: '1.5'
+            }}>
+              ⚠️ {error}
+            </p>
+          )}
+
+          <button type="submit" className="btn btn-primary" style={{ marginTop: '6px' }} disabled={emailChecking || loading}>
+            {emailChecking ? 'Đang kiểm tra email...' : loading ? 'Đang đăng ký...' : 'Đăng ký tài khoản'}
           </button>
 
           <p className="help-text" style={{ marginTop: 14, textAlign: 'center', fontSize: '13px' }}>

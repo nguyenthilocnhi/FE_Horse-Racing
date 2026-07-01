@@ -1,8 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ownerHorses as initialHorses, ownerRaces } from '../../../data/ownerMockData'
+import * as ownerService from '../../../services/ownerService'
 
 export default function OwnerHorses() {
-  const [horses, setHorses] = useState(initialHorses)
+  const [horses, setHorses] = useState([])
+  const [loading, setLoading] = useState(true)
   const [newHorseModal, setNewHorseModal] = useState(false)
   const [registerModal, setRegisterModal] = useState(false)
   const [selectedHorse, setSelectedHorse] = useState(null)
@@ -17,24 +19,87 @@ export default function OwnerHorses() {
   // Registration Form fields
   const [selectedRaceId, setSelectedRaceId] = useState('')
 
-  const handleAddHorse = (e) => {
+  // ── Fetch horses from API on mount ──
+  useEffect(() => {
+    async function loadHorses() {
+      try {
+        setLoading(true)
+        const data = await ownerService.getOwnerHorses()
+        // API response format validation
+        const list = Array.isArray(data) ? data : data?.data ?? data?.content ?? []
+        
+        // Map API fields (stable-owner attributes) if needed
+        const formatted = list.map(h => ({
+          id:            h.id ?? h.horseId ?? `HRS-00${Math.floor(Math.random() * 1000)}`,
+          name:          h.name ?? h.fullName ?? 'Chưa đặt tên',
+          breed:         h.breed ?? 'Thoroughbred',
+          age:           h.age ?? 3,
+          gender:        h.gender ?? 'Đực',
+          wins:          h.wins ?? 0,
+          races:         h.racesCount ?? h.races ?? 0,
+          earnings:      h.earnings ?? '0 VND',
+          status:        h.status ?? 'ready',
+          currentJockey: h.jockeyName ?? null,
+          color:         h.color ?? 'Hạt dẻ'
+        }))
+        setHorses(formatted)
+      } catch (err) {
+        console.warn('API getOwnerHorses lỗi, dùng dữ liệu giả lập:', err.message)
+        // Fallback to initial mock data during dev
+        setHorses(initialHorses)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadHorses()
+  }, [])
+
+  const handleAddHorse = async (e) => {
     e.preventDefault()
     if (!name || !age) return
-    const newHorse = {
-      id: `HRS-00${horses.length + 1}`,
+    
+    const payload = {
       name,
       age: parseInt(age, 10),
       gender,
-      wins: 0,
-      races: 0,
-      earnings: '0 VND',
-      status: 'ready',
-      currentJockey: null,
-      lastRace: 'Mới đăng ký',
       breed,
-      color
+      color,
+      status: 'ready'
     }
-    setHorses([...horses, newHorse])
+
+    try {
+      const data = await ownerService.createOwnerHorse(payload)
+      const newHorse = {
+        id:            data?.id ?? data?.horseId ?? `HRS-00${horses.length + 1}`,
+        name:          data?.name ?? name,
+        age:           data?.age ?? parseInt(age, 10),
+        gender:        data?.gender ?? gender,
+        breed:         data?.breed ?? breed,
+        color:         data?.color ?? color,
+        wins:          0,
+        races:         0,
+        earnings:      '0 VND',
+        status:        'ready',
+        currentJockey: null
+      }
+      setHorses([...horses, newHorse])
+      alert('✅ Đăng ký ngựa mới thành công!')
+    } catch (err) {
+      console.warn('Đăng ký ngựa qua API lỗi, tạo cục bộ:', err.message)
+      // Fallback: Create locally
+      const localNew = {
+        id: `HRS-00${horses.length + 1}`,
+        ...payload,
+        wins: 0,
+        races: 0,
+        earnings: '0 VND',
+        currentJockey: null,
+        lastRace: 'Mới đăng ký'
+      }
+      setHorses([...horses, localNew])
+      alert('⚠️ Đăng ký ngựa thành công (Dữ liệu lưu tạm thời)')
+    }
+
     setNewHorseModal(false)
     setName('')
     setAge('')
@@ -42,7 +107,6 @@ export default function OwnerHorses() {
 
   const openRegisterModal = (horse) => {
     setSelectedHorse(horse)
-    // Find races that are upcoming
     const availableRaces = ownerRaces.filter(r => r.status === 'upcoming')
     if (availableRaces.length > 0) {
       setSelectedRaceId(availableRaces[0].id)
@@ -50,20 +114,45 @@ export default function OwnerHorses() {
     setRegisterModal(true)
   }
 
-  const handleRegisterToRace = (e) => {
+  const handleRegisterToRace = async (e) => {
     e.preventDefault()
     if (!selectedHorse || !selectedRaceId) return
     
-    // Update horse state
-    setHorses(horses.map(h => {
-      if (h.id === selectedHorse.id) {
-        return { ...h, status: 'registered' }
-      }
-      return h
-    }))
+    try {
+      await ownerService.registerHorseToRace({
+        horseId: selectedHorse.id,
+        raceScheduleId: selectedRaceId
+      })
+      
+      setHorses(horses.map(h => {
+        if (h.id === selectedHorse.id) {
+          return { ...h, status: 'registered' }
+        }
+        return h
+      }))
+      alert(`✅ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu!`)
+    } catch (err) {
+      console.warn('Đăng ký giải đấu qua API lỗi, xử lý cục bộ:', err.message)
+      // Fallback
+      setHorses(horses.map(h => {
+        if (h.id === selectedHorse.id) {
+          return { ...h, status: 'registered' }
+        }
+        return h
+      }))
+      alert(`⚠️ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu (Lưu tạm thời)`)
+    }
     
-    alert(`Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu!`)
     setRegisterModal(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="own-horses" style={{ padding: 20, color: '#aaa' }}>
+        <h2>Chiến mã của Stable</h2>
+        <p>Đang tải thông tin ngựa từ hệ thống...</p>
+      </div>
+    )
   }
 
   return (
