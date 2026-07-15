@@ -10,5 +10,5 @@ npm run dev
 ```
 
 Notes:
-- Backend API expected at `http://localhost:4000/api` (see `src/constants/api.js`).
+- Backend API expected at `http://localhost:6768`
 
