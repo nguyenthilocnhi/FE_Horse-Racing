@@ -91,7 +91,10 @@ export default function Login() {
       //    }
       // }
 
-      const role = data.role || data.user?.role
+      let role = data.user?.role || data.role
+      if (typeof role === 'string') {
+        role = role.replace(/^ROLE_/i, '').toUpperCase()
+      }
 
 
       switch (role) {
@@ -105,6 +108,7 @@ export default function Login() {
           break
 
         case 'REFEREE':
+        case 'RACE_REFEREE':
           navigate('/referee')
           break
 
