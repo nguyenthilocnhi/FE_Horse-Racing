@@ -128,7 +128,7 @@ export function AuthProvider({ children }) {
       name:      raw.fullName  ?? raw.name        ?? '',
       email:     raw.email     ?? '',
       phone:     raw.phone     ?? raw.phoneNumber ?? '',
-      role:      raw.role,
+      role:      String(raw.role).replace(/^ROLE_/i, '').toUpperCase(),
       createdAt: raw.createdAt ?? raw.joinedAt    ?? raw.joined ?? null,
     } : null
     setToken(data.token)
