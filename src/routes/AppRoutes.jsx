@@ -79,7 +79,7 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (!roles.includes(userRole) && !(isOwnerUser && isOwnerAllowed)) {
     if (userRole === 'ADMIN') return <Navigate to="/admin" replace />
     if (userRole === 'JOCKEY') return <Navigate to="/jockey" replace />
-    if (userRole === 'REFEREE') return <Navigate to="/referee" replace />
+    if (userRole === 'REFEREE' || userRole === 'RACE_REFEREE') return <Navigate to="/referee" replace />
     if (userRole === 'SPECTATOR') return <Navigate to="/spectator" replace />
     if (isOwnerUser) return <Navigate to="/owner" replace />
 
@@ -147,7 +147,7 @@ export default function AppRoutes() {
       </Route>
 
       {/* ── Referee Portal ── */}
-      <Route element={<ProtectedRoute allowedRoles={['REFEREE']}><RefereeLayout /></ProtectedRoute>}>
+      <Route element={<ProtectedRoute allowedRoles={['REFEREE', 'RACE_REFEREE']}><RefereeLayout /></ProtectedRoute>}>
         <Route path="/referee" element={<RefereeInspection />} />
         <Route path="/referee/tracking" element={<RefereeTracking />} />
         <Route path="/referee/violations" element={<RefereeViolations />} />
