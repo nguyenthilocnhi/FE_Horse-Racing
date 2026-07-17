@@ -138,7 +138,7 @@ export default function PersonalResults() {
                         <td>{m.races}</td>
                         <td style={{ color: '#4ade80', fontWeight: 600 }}>{m.wins}</td>
                         <td style={{ color: '#d4af37' }}>{m.top3}</td>
-                        <td style={{ color: '#00d4aa', fontWeight: 600 }}>{m.points}</td>
+                        <td style={{ color: '#d4af37', fontWeight: 600 }}>{m.points}</td>
                         <td>
                           <div className="res-winrate-bar-wrap">
                             <div className="res-winrate-bar">
@@ -191,7 +191,7 @@ export default function PersonalResults() {
                     <td><PositionMedal pos={r.position} /></td>
                     <td style={{ color: '#fff', fontWeight: 600 }}>{r.race}</td>
                     <td>
-                      <span style={{ color: '#00d4aa' }}>🐴 {r.horse}</span>
+                      <span style={{ color: '#d4af37' }}>🐴 {r.horse}</span>
                     </td>
                     <td style={{ fontFamily: 'monospace', color: '#ccc' }}>{r.time}</td>
                     <td>

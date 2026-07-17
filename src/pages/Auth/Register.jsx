@@ -112,18 +112,23 @@ export default function Register() {
         }
         const data = await authService.register(payload)
         if (data.success || data.token || data.user || data.id) {
-          // Lưu thông tin đăng ký vào localStorage để Profile đọc được ngay
           const profileSnapshot = {
             id:        data.id   ?? data.user?.id   ?? null,
             userName:  username,
             name:      name,
             email:     email,
             phone:     phone,
+            dob:       dob,
             joined:    new Date().toISOString(),
             balance:   0,
             momoLinked: false,
           }
           localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
+          
+          const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
+          historyList.push(profileSnapshot)
+          localStorage.setItem('registered_users_history', JSON.stringify(historyList))
+
           setSuccess(true)
         } else {
           setError(data.message || 'Đăng ký thất bại, vui lòng thử lại!')
@@ -167,18 +172,23 @@ export default function Register() {
       
       const data = await authService.register(payload)
       if (data.success || data.token || data.user) {
-        // Lưu thông tin đăng ký vào localStorage để Profile đọc được ngay
         const profileSnapshot = {
           id:        data.id   ?? data.user?.id   ?? null,
           userName:  username,
           name:      name,
           email:     email,
           phone:     phone,
+          dob:       dob,
           joined:    new Date().toISOString(),
           balance:   0,
           momoLinked: false,
         }
         localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
+        
+        const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
+        historyList.push(profileSnapshot)
+        localStorage.setItem('registered_users_history', JSON.stringify(historyList))
+
         setSuccess(true)
       } else {
         setError(data.message || 'Đăng ký thất bại, vui lòng thử lại!')

@@ -68,7 +68,7 @@ function RaceDetailModal({ race, onClose }) {
             <>
               <div className="jockey-detail-row">
                 <span className="jockey-detail-label">Thời gian hoàn thành</span>
-                <span className="jockey-detail-value" style={{ color: '#00d4aa' }}>{race.result.time}</span>
+                <span className="jockey-detail-value" style={{ color: '#d4af37' }}>{race.result.time}</span>
               </div>
               <div className="jockey-detail-row">
                 <span className="jockey-detail-label">Điểm nhận được</span>
@@ -212,7 +212,7 @@ export default function MyRaces() {
                       </td>
                       <td>{r.distance}</td>
                       <td>
-                        <span style={{ color: '#00d4aa' }}>🐴 {r.horse}</span>
+                        <span style={{ color: '#d4af37' }}>🐴 {r.horse}</span>
                         <div style={{ fontSize: 11, color: '#555' }}>{r.owner}</div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -224,7 +224,7 @@ export default function MyRaces() {
                             <div style={{ fontWeight: 700, color: r.result.position <= 3 ? '#d4af37' : '#ccc' }}>
                               {POS_LABEL[r.result.position] || `#${r.result.position}`}
                             </div>
-                            <div style={{ fontSize: 11, color: '#00d4aa' }}>+{r.result.points} pts</div>
+                            <div style={{ fontSize: 11, color: '#d4af37' }}>+{r.result.points} pts</div>
                           </div>
                         ) : (
                           <span style={{ color: '#444' }}>—</span>

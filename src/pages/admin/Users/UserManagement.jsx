@@ -10,6 +10,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(false)
   const { searchQuery: search = '', setSearchQuery: setSearch = () => {} } = useOutletContext() || {}
   const [roleFilter, setRoleFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedUser, setSelectedUser] = useState(null)
   
   // Pagination State
@@ -27,7 +28,33 @@ export default function UserManagement() {
     setLoading(true)
     try {
       const data = await adminAccountService.getAllAccounts()
-      setUsers(data || [])
+      const list = data || []
+      
+      // Load registration history from localStorage
+      const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
+      
+      const normalized = list.map(u => {
+        // Find in history by email, userName, or phone
+        const matched = historyList.find(h => 
+          (h.email && u.email && h.email.toLowerCase() === u.email.toLowerCase()) ||
+          (h.userName && u.userName && h.userName.toLowerCase() === u.userName.toLowerCase()) ||
+          (h.phone && u.phone && h.phone === u.phone)
+        )
+        
+        // Map date of birth and joined date
+        const dobVal = u.birthDate || u.dob || matched?.dob || ''
+        const joinedVal = matched?.joined 
+          ? new Date(matched.joined).toLocaleDateString('vi-VN') 
+          : (u.joined || new Date().toLocaleDateString('vi-VN'))
+
+        return {
+          ...u,
+          dob: dobVal,
+          joined: joinedVal
+        }
+      })
+
+      setUsers(normalized)
     } catch (err) {
       console.error("Failed to fetch accounts from API:", err)
       setUsers([])
@@ -43,7 +70,7 @@ export default function UserManagement() {
   // Reset page to 1 when filters or sorting change
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, roleFilter, sortOption])
+  }, [search, roleFilter, statusFilter, sortOption])
 
   // Sort users based on selected option
   const sortedUsers = [...users].sort((a, b) => {
@@ -71,7 +98,15 @@ export default function UserManagement() {
       (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
       (u.phone && u.phone.includes(search))
     const matchRole = roleFilter === 'ALL' || u.role === roleFilter
-    return matchSearch && matchRole
+
+    const userStatus = u.status?.toLowerCase() || ''
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      userStatus === statusFilter.toLowerCase() ||
+      (statusFilter === 'active' && userStatus === 'approved') ||
+      (statusFilter === 'locked' && userStatus === 'rejected')
+
+    return matchSearch && matchRole && matchStatus
   })
 
   // Pagination Slice
@@ -82,14 +117,21 @@ export default function UserManagement() {
   const handleToggleLock = async (userId) => {
     const userToUpdate = users.find(u => u.id === userId)
     if (!userToUpdate) return
-    const nextStatus = userToUpdate.status === 'locked' ? 'active' : 'locked'
+    const isLocked = userToUpdate.status?.toLowerCase() === 'locked'
+    const nextStatus = isLocked ? 'ACTIVE' : 'LOCKED'
     
     try {
       const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
         ...userToUpdate,
         status: nextStatus
       })
-      const nextUser = updated || { ...userToUpdate, status: nextStatus }
+      const nextUser = updated 
+        ? { 
+            ...updated, 
+            dob: updated.birthDate || updated.dob || userToUpdate.dob, 
+            joined: userToUpdate.joined 
+          }
+        : { ...userToUpdate, status: nextStatus }
       setUsers(users.map(u => u.id === userId ? nextUser : u))
       if (selectedUser && selectedUser.id === userId) {
         setSelectedUser(nextUser)
@@ -106,9 +148,15 @@ export default function UserManagement() {
     try {
       const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
         ...userToUpdate,
-        status: 'active'
+        status: 'ACTIVE'
       })
-      const nextUser = updated || { ...userToUpdate, status: 'active' }
+      const nextUser = updated 
+        ? { 
+            ...updated, 
+            dob: updated.birthDate || updated.dob || userToUpdate.dob, 
+            joined: userToUpdate.joined 
+          }
+        : { ...userToUpdate, status: 'ACTIVE' }
       setUsers(users.map(u => u.id === userId ? nextUser : u))
       if (selectedUser && selectedUser.id === userId) {
         setSelectedUser(nextUser)
@@ -231,6 +279,12 @@ export default function UserManagement() {
           <option value="REFEREE">REFEREE</option>
           <option value="SPECTATOR">SPECTATOR</option>
         </select>
+        <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="ALL">Tất cả Trạng thái</option>
+          <option value="pending">Chờ phê duyệt</option>
+          <option value="active">Đang hoạt động</option>
+          <option value="locked">Bị khóa</option>
+        </select>
         <select className="admin-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
           <option value="NEWEST">Sắp xếp: Mới nhất</option>
           <option value="OLDEST">Sắp xếp: Cũ nhất</option>
@@ -275,7 +329,7 @@ export default function UserManagement() {
                             >
                               Chi tiết
                             </button>
-                            {u.status === 'pending' ? (
+                            {u.status?.toLowerCase() === 'pending' ? (
                               <button
                                 type="button"
                                 className="admin-btn admin-btn--success admin-btn--sm"
@@ -286,10 +340,10 @@ export default function UserManagement() {
                             ) : (
                               <button
                                 type="button"
-                                className={`admin-btn admin-btn--sm ${u.status === 'locked' ? 'admin-btn--success' : 'admin-btn--danger'}`}
+                                className={`admin-btn admin-btn--sm ${u.status?.toLowerCase() === 'locked' ? 'admin-btn--success' : 'admin-btn--danger'}`}
                                 onClick={() => handleToggleLock(u.id)}
                               >
-                                {u.status === 'locked' ? 'Mở khóa' : 'Khóa'}
+                                {u.status?.toLowerCase() === 'locked' ? 'Mở khóa' : 'Khóa'}
                               </button>
                             )}
                             <button
@@ -356,7 +410,18 @@ export default function UserManagement() {
                 <dt>Số điện thoại</dt>
                 <dd>{selectedUser.phone || '—'}</dd>
                 <dt>Ngày sinh</dt>
-                <dd>{selectedUser.dob || '—'}</dd>
+                <dd>
+                  {selectedUser.dob
+                    ? (() => {
+                        try {
+                          const d = new Date(selectedUser.dob);
+                          return isNaN(d.getTime()) ? selectedUser.dob : d.toLocaleDateString('vi-VN');
+                        } catch (e) {
+                          return selectedUser.dob;
+                        }
+                      })()
+                    : '—'}
+                </dd>
                 <dt>Role</dt>
                 <dd>
                   <select
@@ -375,8 +440,37 @@ export default function UserManagement() {
                 <dt>Trạng thái</dt>
                 <dd><StatusBadge status={selectedUser.status} /></dd>
                 <dt>Ngày tham gia</dt>
-                <dd>{selectedUser.joined}</dd>
+                <dd>{selectedUser.joined || '—'}</dd>
               </dl>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                {selectedUser.status?.toLowerCase() === 'pending' ? (
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--success"
+                    style={{ flex: 1 }}
+                    onClick={() => handleApproveUser(selectedUser.id)}
+                  >
+                    Phê duyệt
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={`admin-btn ${selectedUser.status?.toLowerCase() === 'locked' ? 'admin-btn--success' : 'admin-btn--danger'}`}
+                    style={{ flex: 1 }}
+                    onClick={() => handleToggleLock(selectedUser.id)}
+                  >
+                    {selectedUser.status?.toLowerCase() === 'locked' ? 'Mở khóa' : 'Khóa'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--outline"
+                  style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }}
+                  onClick={() => handleDeleteUser(selectedUser.id)}
+                >
+                  Xóa
+                </button>
+              </div>
             </div>
           </div>
         )}

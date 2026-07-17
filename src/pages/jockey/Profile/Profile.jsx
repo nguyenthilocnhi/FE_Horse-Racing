@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { jockeyProfile } from '../../../data/jockeyMockData'
+import { useAuth } from '../../../contexts/AuthContext'
+import * as jockeyService from '../../../services/jockeyService'
 import './Profile.css'
 
 /* ── Registration Form (for new Jockey) ── */
@@ -144,7 +146,7 @@ function RegisterForm({ onDone }) {
           onChange={(e) => set('agreeTerms', e.target.checked)}
           className="profile-checkbox"
         />
-        <span>Tôi đồng ý với <a href="#!" style={{ color: '#00d4aa' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#00d4aa' }}>Chính sách bảo mật</a> của HORSIE.</span>
+        <span>Tôi đồng ý với <a href="#!" style={{ color: '#d4af37' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#d4af37' }}>Chính sách bảo mật</a> của HORSIE.</span>
       </label>
       {errors.agreeTerms && <span className="profile-err">{errors.agreeTerms}</span>}
 
@@ -159,23 +161,107 @@ function RegisterForm({ onDone }) {
 
 /* ── Profile View (for existing jockey) ── */
 function ProfileView() {
+  const { user } = useAuth()
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({
-    name: jockeyProfile.name,
-    nickname: jockeyProfile.nickname,
-    phone: jockeyProfile.phone,
-    weight: jockeyProfile.weight,
-    height: jockeyProfile.height,
-    experience: jockeyProfile.experience,
+  const [form, setForm] = useState(() => {
+    const defaultName = user?.fullName ?? user?.name ?? jockeyProfile.name
+    const defaultPhone = user?.phone ?? jockeyProfile.phone
+    const defaultEmail = user?.email ?? jockeyProfile.email
+
+    const pending = localStorage.getItem('pending_profile')
+    if (pending) {
+      try {
+        const parsed = JSON.parse(pending)
+        const isMatch = parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id || (parsed.name && parsed.name === user?.name)
+        if (isMatch) {
+          return {
+            name: parsed.name ?? defaultName,
+            nickname: parsed.nickname ?? 'Nài ngựa mới',
+            phone: parsed.phone ?? defaultPhone,
+            weight: parsed.weight ?? '54',
+            height: parsed.height ?? '162',
+            experience: parsed.experienceYears ? `${parsed.experienceYears} năm` : 'Chưa cập nhật',
+            email: parsed.email ?? defaultEmail,
+            licenseNo: parsed.licenseNumber ?? 'VN-JOC-PENDING',
+            licenseExpiry: parsed.licenseExpiryDate ?? 'Chưa rõ',
+            dob: parsed.dob ?? jockeyProfile.dob,
+            nationality: parsed.nationality ?? jockeyProfile.nationality
+          }
+        }
+      } catch (_) {}
+    }
+
+    return {
+      name: defaultName,
+      nickname: jockeyProfile.nickname,
+      phone: defaultPhone,
+      weight: jockeyProfile.weight,
+      height: jockeyProfile.height,
+      experience: jockeyProfile.experience,
+      email: defaultEmail,
+      licenseNo: jockeyProfile.licenseNo,
+      licenseExpiry: jockeyProfile.licenseExpiry,
+      dob: jockeyProfile.dob,
+      nationality: jockeyProfile.nationality
+    }
   })
+
+  React.useEffect(() => {
+    let cancelled = false
+    async function loadData() {
+      try {
+        const data = await jockeyService.getJockeyProfile(user?.id)
+        if (!cancelled && data) {
+          setForm({
+            name: data.fullName ?? user?.fullName ?? user?.name ?? jockeyProfile.name,
+            nickname: data.nickname ?? 'Nài ngựa mới',
+            phone: data.phone ?? user?.phone ?? jockeyProfile.phone,
+            weight: data.weight ?? '54',
+            height: data.height ?? '162',
+            experience: data.experienceYears ? `${data.experienceYears} năm` : 'Chưa cập nhật',
+            email: data.email ?? user?.email ?? jockeyProfile.email,
+            licenseNo: data.licenseNumber ?? 'VN-JOC-PENDING',
+            licenseExpiry: data.licenseExpiryDate ?? 'Chưa rõ',
+            dob: data.birthDate ?? data.dob ?? jockeyProfile.dob,
+            nationality: data.nationality ?? jockeyProfile.nationality
+          })
+        }
+      } catch (err) {
+        console.warn("Failed to load jockey profile from API:", err.message)
+      }
+    }
+    if (user?.id) {
+      loadData()
+    }
+    return () => { cancelled = true }
+  }, [user?.id])
 
   function set(field, val) {
     setForm((prev) => ({ ...prev, [field]: val }))
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault()
-    setEditing(false)
+    
+    // Parse experienceYears (e.g. "5 năm" -> 5)
+    const expNum = parseInt(form.experience, 10) || 0
+
+    const payload = {
+      fullName: form.name,
+      phone: form.phone,
+      birthDate: form.dob,
+      experienceYears: expNum,
+      licenseNumber: form.licenseNo,
+      licenseExpiryDate: form.licenseExpiry
+    }
+
+    try {
+      await jockeyService.updateJockeyProfile(user?.id, payload)
+      alert('✅ Cập nhật hồ sơ thành công!')
+      setEditing(false)
+    } catch (err) {
+      alert('❌ Cập nhật hồ sơ thất bại: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   return (
@@ -184,7 +270,7 @@ function ProfileView() {
       <div className="profile-hero">
         <div className="profile-avatar-wrap">
           <div className="profile-avatar">
-            {jockeyProfile.name.charAt(0)}
+            {form.name.charAt(0)}
           </div>
           <span className={`jockey-badge ${jockeyProfile.status === 'active' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
             {jockeyProfile.status === 'active' ? '✓ Hoạt động' : 'Không hoạt động'}
@@ -194,8 +280,8 @@ function ProfileView() {
           <h2 className="profile-hero-name">{form.name}</h2>
           <div className="profile-hero-nick">"{form.nickname}"</div>
           <div className="profile-hero-meta">
-            <span>🪪 {jockeyProfile.id}</span>
-            <span>📋 {jockeyProfile.licenseNo}</span>
+            <span>🪪 {user?.id || jockeyProfile.id}</span>
+            <span>📋 {form.licenseNo}</span>
             <span>📅 Tham gia {jockeyProfile.joinedDate}</span>
           </div>
           <div className="profile-hero-stats">
@@ -208,7 +294,7 @@ function ProfileView() {
               <span>Chiến thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#00d4aa' }}>{jockeyProfile.stats.winRate}%</strong>
+              <strong style={{ color: '#d4af37' }}>{jockeyProfile.stats.winRate}%</strong>
               <span>Tỷ lệ thắng</span>
             </div>
             <div className="profile-hero-stat">
@@ -271,10 +357,10 @@ function ProfileView() {
               <>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Họ tên</span><span className="jockey-detail-value">{form.name}</span></div>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Biệt danh</span><span className="jockey-detail-value">"{form.nickname}"</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Email</span><span className="jockey-detail-value">{jockeyProfile.email}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Email</span><span className="jockey-detail-value">{form.email}</span></div>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Điện thoại</span><span className="jockey-detail-value">{form.phone}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Ngày sinh</span><span className="jockey-detail-value">{jockeyProfile.dob}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Quốc tịch</span><span className="jockey-detail-value">{jockeyProfile.nationality}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Ngày sinh</span><span className="jockey-detail-value">{form.dob}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Quốc tịch</span><span className="jockey-detail-value">{form.nationality}</span></div>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Kinh nghiệm</span><span className="jockey-detail-value">{form.experience}</span></div>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Cân nặng</span><span className="jockey-detail-value">{form.weight} kg</span></div>
                 <div className="jockey-detail-row"><span className="jockey-detail-label">Chiều cao</span><span className="jockey-detail-value">{form.height} cm</span></div>
@@ -289,22 +375,22 @@ function ProfileView() {
             <div className="profile-license-badge">
               <span className="plb-icon">🪪</span>
               <div>
-                <div className="plb-number">{jockeyProfile.licenseNo}</div>
+                <div className="plb-number">{form.licenseNo}</div>
                 <div className="plb-sub">Giấy phép thi đấu chính thức</div>
               </div>
               <span className="jockey-badge jockey-badge--green">Còn hiệu lực</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Số hiệu</span>
-              <span className="jockey-detail-value">{jockeyProfile.licenseNo}</span>
+              <span className="jockey-detail-value">{form.licenseNo}</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Ngày hết hạn</span>
-              <span className="jockey-detail-value">{jockeyProfile.licenseExpiry}</span>
+              <span className="jockey-detail-value">{form.licenseExpiry}</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Mã jockey</span>
-              <span className="jockey-detail-value">{jockeyProfile.id}</span>
+              <span className="jockey-detail-value">{user?.id || jockeyProfile.id}</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Ngày tham gia</span>

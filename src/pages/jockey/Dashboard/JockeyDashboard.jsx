@@ -25,7 +25,7 @@ function MiniResultRow({ r }) {
       <td><span className={`jockey-medal ${posClass}`}>{r.position}</span></td>
       <td style={{ color: '#fff' }}>{r.race}</td>
       <td>{r.horse}</td>
-      <td style={{ color: '#00d4aa', fontWeight: 600 }}>+{r.points} pts</td>
+      <td style={{ color: '#d4af37', fontWeight: 600 }}>+{r.points} pts</td>
       <td style={{ color: '#555', fontSize: 12 }}>{r.date}</td>
     </tr>
   )
@@ -47,7 +47,7 @@ export default function JockeyDashboard() {
         <div>
           <h1 className="jockey-page-title">Xin chào, {jockeyProfile.nickname} 👋</h1>
           <p className="jockey-page-sub">
-            Hạng hiện tại <strong style={{ color: '#00d4aa' }}>#3 Toàn quốc</strong> · Giấy phép {jockeyProfile.licenseNo}
+            Hạng hiện tại <strong style={{ color: '#d4af37' }}>#3 Toàn quốc</strong> · Giấy phép {jockeyProfile.licenseNo}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -93,7 +93,7 @@ export default function JockeyDashboard() {
         <div className="jockey-card">
           <div className="jockey-card-head">
             <h3>Điểm tích lũy theo tháng</h3>
-            <Link to="/jockey/results" style={{ fontSize: 12, color: '#00d4aa', textDecoration: 'none' }}>
+            <Link to="/jockey/results" style={{ fontSize: 12, color: '#d4af37', textDecoration: 'none' }}>
               Chi tiết →
             </Link>
           </div>
@@ -117,7 +117,7 @@ export default function JockeyDashboard() {
         <div className="jockey-card">
           <div className="jockey-card-head">
             <h3>Kết quả gần đây</h3>
-            <Link to="/jockey/results" style={{ fontSize: 12, color: '#00d4aa', textDecoration: 'none' }}>
+            <Link to="/jockey/results" style={{ fontSize: 12, color: '#d4af37', textDecoration: 'none' }}>
               Xem tất cả →
             </Link>
           </div>

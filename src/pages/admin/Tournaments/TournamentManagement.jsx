@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { tournaments as initialTournaments } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import * as tournamentService from '../../../services/tournamentService'
 import './TournamentManagement.css'
 
 export default function TournamentManagement() {
@@ -52,8 +53,13 @@ export default function TournamentManagement() {
     })
   }
 
-  const handleCancelTournament = (id) => {
+  const handleCancelTournament = async (id) => {
     if (window.confirm('Bạn có chắc chắn muốn hủy giải đấu này?')) {
+      try {
+        await tournamentService.cancelTournament(id)
+      } catch (err) {
+        console.warn('API cancelTournament lỗi:', err.message)
+      }
       const updatedList = tournaments.map(t =>
         t.id === id ? { ...t, status: 'cancelled' } : t
       )
@@ -64,7 +70,7 @@ export default function TournamentManagement() {
     }
   }
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
     if (!formData.name || !formData.venue || !formData.startDate || !formData.endDate) {
       alert('Vui lòng điền đầy đủ thông tin giải đấu!')
@@ -76,8 +82,21 @@ export default function TournamentManagement() {
       return
     }
 
+    const payload = {
+      name: formData.name,
+      location: formData.venue,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      status: formData.status?.toUpperCase() || 'DRAFT'
+    }
+
     if (selectedTournament) {
       // Edit
+      try {
+        await tournamentService.updateTournament(selectedTournament.id, payload)
+      } catch (err) {
+        console.warn('API updateTournament lỗi:', err.message)
+      }
       const updatedList = tournaments.map(t =>
         t.id === selectedTournament.id
           ? { ...t, ...formData }
@@ -87,8 +106,15 @@ export default function TournamentManagement() {
       setSelectedTournament(null)
     } else {
       // Create
+      let createdId = `T-00${tournaments.length + 1}`
+      try {
+        const res = await tournamentService.createTournament(payload)
+        if (res?.id) createdId = res.id
+      } catch (err) {
+        console.warn('API createTournament lỗi:', err.message)
+      }
       const newT = {
-        id: `T-00${tournaments.length + 1}`,
+        id: createdId,
         ...formData,
         races: 0
       }

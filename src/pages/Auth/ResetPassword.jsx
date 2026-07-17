@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import * as authService from '../../services/authService'
 
 export default function ResetPassword() {
     const [step, setStep] = useState(1) // 1: Email, 2: Verification & New Password
@@ -12,7 +13,7 @@ export default function ResetPassword() {
     const [success, setSuccess] = useState('')
     const navigate = useNavigate()
 
-    function handleSendCode(e) {
+    async function handleSendCode(e) {
         e.preventDefault()
         if (!email) {
             setError('Vui lòng nhập địa chỉ email.')
@@ -20,26 +21,42 @@ export default function ResetPassword() {
         }
 
         setError('')
+        setSuccess('')
         setLoading(true)
 
-        // Simulate API request
-        setTimeout(() => {
-            setLoading(false)
+        try {
+            const data = await authService.forgotPassword(email)
+            // Parse response message if it is stringified JSON
+            let cleanMsg = data?.message || 'Mã OTP đã được gửi đến email của bạn!'
+            if (typeof data === 'string' && data.includes('success')) {
+                try {
+                    const parsed = JSON.parse(data)
+                    cleanMsg = parsed.message
+                } catch (_) {}
+            }
             setStep(2)
-            setSuccess('Mã xác minh (OTP) đã được gửi tới email của bạn. Mã OTP demo là: 123456')
-        }, 1200)
+            setSuccess(cleanMsg)
+        } catch (err) {
+            let msg = err.response?.data?.message || err.response?.data || err.message || 'Gửi mã xác minh thất bại.'
+            if (typeof msg === 'string' && msg.includes('message')) {
+                try {
+                    const parsed = JSON.parse(msg)
+                    msg = parsed.message
+                } catch (_) {}
+            }
+            setError(msg)
+        } finally {
+            setLoading(false)
+        }
     }
 
-    function handleResetPassword(e) {
+    async function handleResetPassword(e) {
         e.preventDefault()
         setError('')
+        setSuccess('')
 
         if (!code) {
             setError('Vui lòng nhập mã xác minh.')
-            return
-        }
-        if (code !== '123456') {
-            setError('Mã xác minh không chính xác. Sử dụng mã demo: 123456')
             return
         }
         if (password.length < 6) {
@@ -53,14 +70,37 @@ export default function ResetPassword() {
 
         setLoading(true)
 
-        // Simulate API update
-        setTimeout(() => {
-            setLoading(false)
-            setSuccess('Chúc mừng! Đặt lại mật khẩu thành công. Đang chuyển hướng đăng nhập...')
+        try {
+            const payload = {
+                email,
+                otp: code,
+                newPassword: password,
+                confirmPassword
+            }
+            const data = await authService.resetPassword(payload)
+            let cleanMsg = data?.message || 'Đặt lại mật khẩu thành công!'
+            if (typeof data === 'string' && data.includes('success')) {
+                try {
+                    const parsed = JSON.parse(data)
+                    cleanMsg = parsed.message
+                } catch (_) {}
+            }
+            setSuccess(cleanMsg + ' Đang chuyển hướng đăng nhập...')
             setTimeout(() => {
                 navigate('/login')
             }, 2500)
-        }, 1500)
+        } catch (err) {
+            let msg = err.response?.data?.message || err.response?.data || err.message || 'Đặt lại mật khẩu thất bại.'
+            if (typeof msg === 'string' && msg.includes('message')) {
+                try {
+                    const parsed = JSON.parse(msg)
+                    msg = parsed.message
+                } catch (_) {}
+            }
+            setError(msg)
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (
