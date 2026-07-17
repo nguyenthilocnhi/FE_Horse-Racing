@@ -1,18 +1,46 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { tournaments as initialTournaments } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import * as tournamentService from '../../../services/tournamentService'
 import './TournamentManagement.css'
 
 export default function TournamentManagement() {
-  const [tournaments, setTournaments] = useState(initialTournaments)
+  const [tournaments, setTournaments] = useState([])
+  const [loading, setLoading] = useState(false)
   const { searchQuery = '' } = useOutletContext() || {}
+
+  const fetchTournaments = async () => {
+    setLoading(true)
+    try {
+      const data = await tournamentService.getTournaments()
+      const list = data || []
+      const mapped = list.map(t => ({
+        id: t.id,
+        name: t.name || '',
+        venue: t.location || '',
+        startDate: t.startDate || '',
+        endDate: t.endDate || '',
+        prize: '1.5 Tỷ VND',
+        status: t.status ? t.status.toLowerCase() : 'draft',
+        races: t.races || 0
+      }))
+      setTournaments(mapped)
+    } catch (err) {
+      console.error("Failed to load tournaments:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTournaments()
+  }, [])
 
   const filteredTournaments = tournaments.filter(t => {
     const q = searchQuery.toLowerCase()
     return t.name.toLowerCase().includes(q) || t.venue.toLowerCase().includes(q)
   })
+
   const [showForm, setShowForm] = useState(false)
   const [selectedTournament, setSelectedTournament] = useState(null)
 
@@ -23,7 +51,7 @@ export default function TournamentManagement() {
     startDate: '',
     endDate: '',
     prize: '',
-    status: 'upcoming'
+    status: 'draft'
   })
 
   // Handlers
@@ -34,8 +62,8 @@ export default function TournamentManagement() {
       venue: '',
       startDate: '',
       endDate: '',
-      prize: '',
-      status: 'upcoming'
+      prize: '1.5 Tỷ VND',
+      status: 'draft'
     })
     setShowForm(true)
   }
@@ -54,19 +82,25 @@ export default function TournamentManagement() {
   }
 
   const handleCancelTournament = async (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn hủy giải đấu này?')) {
-      try {
-        await tournamentService.cancelTournament(id)
-      } catch (err) {
-        console.warn('API cancelTournament lỗi:', err.message)
-      }
-      const updatedList = tournaments.map(t =>
-        t.id === id ? { ...t, status: 'cancelled' } : t
-      )
-      setTournaments(updatedList)
+    const reason = window.prompt('Nhập lý do hủy giải đấu:')
+    if (reason === null) return
+    if (!reason.trim()) {
+      alert('Lý do hủy không được để trống!')
+      return
+    }
+
+    try {
+      await tournamentService.cancelTournament(id, {
+        forceCancel: true,
+        reason: reason
+      })
+      alert('Hủy giải đấu thành công!')
+      fetchTournaments()
       if (selectedTournament && selectedTournament.id === id) {
-        setSelectedTournament({ ...selectedTournament, status: 'cancelled' })
+        setSelectedTournament(null)
       }
+    } catch (err) {
+      alert('Không thể hủy giải đấu: ' + (err.response?.data?.message || err.message))
     }
   }
 
@@ -90,36 +124,21 @@ export default function TournamentManagement() {
       status: formData.status?.toUpperCase() || 'DRAFT'
     }
 
-    if (selectedTournament) {
-      // Edit
-      try {
+    try {
+      if (selectedTournament) {
+        // Edit
         await tournamentService.updateTournament(selectedTournament.id, payload)
-      } catch (err) {
-        console.warn('API updateTournament lỗi:', err.message)
+        alert('Cập nhật giải đấu thành công!')
+        setSelectedTournament(null)
+      } else {
+        // Create
+        await tournamentService.createTournament(payload)
+        alert('Tạo giải đấu thành công!')
+        setShowForm(false)
       }
-      const updatedList = tournaments.map(t =>
-        t.id === selectedTournament.id
-          ? { ...t, ...formData }
-          : t
-      )
-      setTournaments(updatedList)
-      setSelectedTournament(null)
-    } else {
-      // Create
-      let createdId = `T-00${tournaments.length + 1}`
-      try {
-        const res = await tournamentService.createTournament(payload)
-        if (res?.id) createdId = res.id
-      } catch (err) {
-        console.warn('API createTournament lỗi:', err.message)
-      }
-      const newT = {
-        id: createdId,
-        ...formData,
-        races: 0
-      }
-      setTournaments([newT, ...tournaments])
-      setShowForm(false)
+      fetchTournaments()
+    } catch (err) {
+      alert('Thao tác thất bại: ' + (err.response?.data?.message || err.message))
     }
   }
 
@@ -181,18 +200,6 @@ export default function TournamentManagement() {
                 />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giải thưởng</label>
-                <input
-                  required
-                  className="admin-input"
-                  placeholder="Ví dụ: 1.2M USD hoặc 5 tỷ VND..."
-                  value={formData.prize}
-                  onChange={(e) => setFormData({ ...formData, prize: e.target.value })}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Ngày bắt đầu</label>
@@ -230,55 +237,64 @@ export default function TournamentManagement() {
 
       <div className="tournament-mgmt-layout">
         <div className="admin-card">
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Mã</th>
-                  <th>Tên giải đấu</th>
-                  <th>Địa điểm</th>
-                  <th>Thời gian</th>
-                  <th>Races</th>
-                  <th>Giải thưởng</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTournaments.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.id}</td>
-                    <td><strong className="tournament-name" style={{ color: '#fff' }}>{t.name}</strong></td>
-                    <td>{t.venue}</td>
-                    <td>{t.startDate} → {t.endDate}</td>
-                    <td>{t.races} races</td>
-                    <td>{t.prize}</td>
-                    <td><StatusBadge status={t.status} /></td>
-                    <td>
-                      <div className="admin-table-actions">
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--ghost admin-btn--sm"
-                          onClick={() => handleOpenEdit(t)}
-                        >
-                          Sửa
-                        </button>
-                        {t.status !== 'cancelled' && (
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải danh sách giải đấu...</div>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Mã</th>
+                    <th>Tên giải đấu</th>
+                    <th>Địa điểm</th>
+                    <th>Thời gian</th>
+                    <th>Races</th>
+                    <th>Giải thưởng</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTournaments.map((t) => (
+                    <tr key={t.id}>
+                      <td>#{t.id}</td>
+                      <td><strong className="tournament-name" style={{ color: '#fff' }}>{t.name}</strong></td>
+                      <td>{t.venue}</td>
+                      <td>{t.startDate} → {t.endDate}</td>
+                      <td>{t.races} races</td>
+                      <td>{t.prize}</td>
+                      <td><StatusBadge status={t.status} /></td>
+                      <td>
+                        <div className="admin-table-actions">
                           <button
                             type="button"
-                            className="admin-btn admin-btn--danger admin-btn--sm"
-                            onClick={() => handleCancelTournament(t.id)}
+                            className="admin-btn admin-btn--ghost admin-btn--sm"
+                            onClick={() => handleOpenEdit(t)}
                           >
-                            Hủy
+                            Sửa
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                          {t.status !== 'cancelled' && (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--danger admin-btn--sm"
+                              onClick={() => handleCancelTournament(t.id)}
+                            >
+                              Hủy
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredTournaments.length === 0 && (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy giải đấu phù hợp</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {selectedTournament && (
@@ -306,17 +322,6 @@ export default function TournamentManagement() {
                   className="admin-input"
                   value={formData.venue}
                   onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                  style={{ width: '100%', fontSize: '13px', padding: '6px 10px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giải thưởng</label>
-                <input
-                  required
-                  className="admin-input"
-                  value={formData.prize}
-                  onChange={(e) => setFormData({ ...formData, prize: e.target.value })}
                   style={{ width: '100%', fontSize: '13px', padding: '6px 10px' }}
                 />
               </div>
@@ -353,6 +358,8 @@ export default function TournamentManagement() {
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   style={{ width: '100%', fontSize: '13px', padding: '6px 10px' }}
                 >
+                  <option value="draft">Nháp (Draft)</option>
+                  <option value="active">Đang kích hoạt (Active)</option>
                   <option value="ongoing">Đang diễn ra (Ongoing)</option>
                   <option value="completed">Đã hoàn thành (Completed)</option>
                   <option value="cancelled">Đã hủy (Cancelled)</option>

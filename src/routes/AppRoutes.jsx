@@ -89,11 +89,33 @@ function ProtectedRoute({ children, allowedRoles }) {
   return children
 }
 
+function GuestRoute({ children }) {
+  const { token, user } = useAuth()
+
+  if (token) {
+    if (!user) {
+      return children
+    }
+    const userRole = user.role?.toUpperCase()
+    const isOwnerUser = ['OWNER', 'HORSE_OWNER', 'HORSE OWNER'].includes(userRole)
+
+    if (userRole === 'ADMIN') return <Navigate to="/admin" replace />
+    if (userRole === 'JOCKEY') return <Navigate to="/jockey" replace />
+    if (userRole === 'REFEREE' || userRole === 'RACE_REFEREE') return <Navigate to="/referee" replace />
+    if (userRole === 'SPECTATOR') return <Navigate to="/spectator" replace />
+    if (isOwnerUser) return <Navigate to="/owner" replace />
+
+    return <Navigate to="/admin" replace />
+  }
+
+  return children
+}
+
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route element={<AuthLayout />}>
+      <Route path="/" element={<GuestRoute><HomePage /></GuestRoute>} />
+      <Route element={<GuestRoute><AuthLayout /></GuestRoute>}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/reset-password" element={<ResetPassword />} />

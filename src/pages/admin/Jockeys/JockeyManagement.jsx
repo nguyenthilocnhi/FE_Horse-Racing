@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { mockJockeys as initialJockeys } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import * as adminAccountService from '../../../services/adminAccountService'
 import './JockeyManagement.css'
 
 export default function JockeyManagement() {
-  const [jockeys, setJockeys] = useState(initialJockeys)
+  const [jockeys, setJockeys] = useState([])
+  const [loading, setLoading] = useState(false)
   const { searchQuery: search = '', setSearchQuery: setSearch = () => {} } = useOutletContext() || {}
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedJockey, setSelectedJockey] = useState(null)
@@ -17,34 +18,70 @@ export default function JockeyManagement() {
     name: '',
     license: '',
     experience: '',
-    points: '',
-    wins: '',
-    races: '',
-    status: 'active'
+    points: '0',
+    wins: '0',
+    races: '0',
+    status: 'active',
+    userName: '',
+    email: '',
+    phone: '',
+    password: '',
+    birthDate: ''
   })
+
+  const fetchJockeys = async () => {
+    setLoading(true)
+    try {
+      const data = await adminAccountService.getAllAccounts()
+      const list = data || []
+      const jockeyList = list
+        .filter(u => u.role === 'JOCKEY')
+        .map(u => {
+          let statusVal = 'active'
+          if (u.status?.toUpperCase() === 'PENDING') {
+            statusVal = 'pending'
+          } else if (u.status?.toUpperCase() === 'REJECTED' || u.status?.toUpperCase() === 'LOCKED') {
+            statusVal = 'suspended'
+          }
+          return {
+            id: u.id,
+            name: u.fullName || u.name,
+            license: u.licenseNumber || '—',
+            experience: u.experienceYears || 0,
+            points: 0,
+            wins: 0,
+            races: 0,
+            status: statusVal,
+            email: u.email || '',
+            phone: u.phone || '',
+            dob: u.dob || u.birthDate || '',
+            userName: u.userName || '',
+            rawUser: u
+          }
+        })
+      setJockeys(jockeyList)
+    } catch (err) {
+      console.error("Failed to fetch jockeys:", err)
+      setJockeys([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchJockeys()
+  }, [])
 
   // Filters
   const filtered = jockeys.filter(j => {
-    const matchSearch = j.name.toLowerCase().includes(search.toLowerCase()) || 
-                        j.license.toLowerCase().includes(search.toLowerCase())
+    const nameVal = j.name || ''
+    const licenseVal = j.license || ''
+    const matchSearch = nameVal.toLowerCase().includes(search.toLowerCase()) || 
+                        licenseVal.toLowerCase().includes(search.toLowerCase())
     const matchStatus = statusFilter === 'ALL' || j.status === statusFilter
     return matchSearch && matchStatus
   })
 
-  // Handlers
-  const handleOpenAdd = () => {
-    setEditingJockey(null)
-    setFormData({
-      name: '',
-      license: '',
-      experience: '1',
-      points: '0',
-      wins: '0',
-      races: '0',
-      status: 'active'
-    })
-    setModalOpen(true)
-  }
 
   const handleOpenEdit = (j) => {
     setEditingJockey(j)
@@ -52,59 +89,67 @@ export default function JockeyManagement() {
       name: j.name,
       license: j.license,
       experience: j.experience.toString(),
-      points: j.points.toString(),
-      wins: j.wins.toString(),
-      races: j.races.toString(),
-      status: j.status
+      points: (j.points || 0).toString(),
+      wins: (j.wins || 0).toString(),
+      races: (j.races || 0).toString(),
+      status: j.status,
+      userName: j.userName || '',
+      email: j.email || '',
+      phone: j.phone || '',
+      password: '',
+      birthDate: j.dob || ''
     })
     setModalOpen(true)
   }
 
-  const handleDeleteJockey = (id) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa Jockey này?')) {
-      const updated = jockeys.filter(j => j.id !== id)
-      setJockeys(updated)
-      if (selectedJockey && selectedJockey.id === id) {
-        setSelectedJockey(null)
-      }
-    }
-  }
-
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
     if (!formData.name || !formData.license) {
       alert('Vui lòng điền tên và số giấy phép!')
       return
     }
 
-    const nextJ = {
-      name: formData.name,
-      license: formData.license,
-      experience: parseInt(formData.experience) || 0,
-      points: parseInt(formData.points) || 0,
-      wins: parseInt(formData.wins) || 0,
-      races: parseInt(formData.races) || 0,
-      status: formData.status
-    }
+    try {
+      if (editingJockey) {
+        // Edit flow
+        const updated = await adminAccountService.updateAccount('JOCKEY', editingJockey.id, {
+          ...editingJockey.rawUser,
+          fullName: formData.name,
+          phone: formData.phone,
+          licenseNumber: formData.license,
+          experienceYears: parseInt(formData.experience) || 0,
+          status: formData.status === 'active' ? 'APPROVED' : (formData.status === 'suspended' ? 'REJECTED' : 'PENDING'),
+          birthDate: formData.birthDate || editingJockey.dob
+        })
+        
+        let statusVal = 'active'
+        if (updated.status?.toUpperCase() === 'PENDING') {
+          statusVal = 'pending'
+        } else if (updated.status?.toUpperCase() === 'REJECTED' || updated.status?.toUpperCase() === 'LOCKED') {
+          statusVal = 'suspended'
+        }
 
-    if (editingJockey) {
-      // Edit
-      setJockeys(jockeys.map(j => 
-        j.id === editingJockey.id ? { ...j, ...nextJ } : j
-      ))
-      if (selectedJockey && selectedJockey.id === editingJockey.id) {
-        setSelectedJockey({ ...selectedJockey, ...nextJ })
-      }
-    } else {
-      // Add
-      const newJ = {
-        id: Date.now(),
-        ...nextJ
-      }
-      setJockeys([newJ, ...jockeys])
-    }
+        const nextJ = {
+          ...editingJockey,
+          name: updated.fullName || updated.name || formData.name,
+          license: updated.licenseNumber || formData.license,
+          experience: updated.experienceYears || parseInt(formData.experience) || 0,
+          status: statusVal,
+          phone: updated.phone || formData.phone,
+          dob: updated.dob || updated.birthDate || formData.birthDate,
+          rawUser: updated
+        }
 
-    setModalOpen(false)
+        setJockeys(jockeys.map(j => j.id === editingJockey.id ? nextJ : j))
+        if (selectedJockey && selectedJockey.id === editingJockey.id) {
+          setSelectedJockey(nextJ)
+        }
+        alert('Cập nhật Jockey thành công!')
+      }
+      setModalOpen(false)
+    } catch (err) {
+      alert('Thao tác thất bại: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   return (
@@ -112,15 +157,8 @@ export default function JockeyManagement() {
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Quản lý Jockey (Nài ngựa)</h1>
-          <p className="admin-page-sub">Danh sách nài ngựa đua chuyên nghiệp, kinh nghiệm và thống kê phong độ</p>
+          <p className="admin-page-sub">Danh sách nài ngựa đua chuyên nghiệp, kinh nghiệm và thống kê phong độ từ API</p>
         </div>
-        <button 
-          type="button" 
-          className="admin-btn admin-btn--gold"
-          onClick={handleOpenAdd}
-        >
-          + Add New Jockey
-        </button>
       </div>
 
       <div className="admin-filter-bar">
@@ -133,75 +171,72 @@ export default function JockeyManagement() {
         <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
           <option value="ALL">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động (Active)</option>
-          <option value="injured">Chấn thương (Injured)</option>
+          <option value="pending">Chờ phê duyệt (Pending)</option>
           <option value="suspended">Tạm đình chỉ (Suspended)</option>
         </select>
       </div>
 
       <div className="user-mgmt-layout" style={{ display: 'grid', gridTemplateColumns: selectedJockey ? '1fr 340px' : '1fr', gap: '20px' }}>
         <div className="admin-card user-mgmt-table-card">
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Họ tên Jockey</th>
-                  <th>Giấy phép</th>
-                  <th>Kinh nghiệm</th>
-                  <th>Trận thắng</th>
-                  <th>Tổng số trận</th>
-                  <th>Trạng thái</th>
-                  <th style={{ textAlign: 'right' }}>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length > 0 ? (
-                  filtered.map((j) => (
-                    <tr key={j.id}>
-                      <td style={{ fontWeight: '600', color: '#fff' }}>{j.name}</td>
-                      <td><code>{j.license}</code></td>
-                      <td>{j.experience} năm</td>
-                      <td style={{ color: '#4ade80' }}>{j.wins} thắng</td>
-                      <td>{j.races} trận</td>
-                      <td>
-                        <StatusBadge status={j.status} />
-                      </td>
-                      <td>
-                        <div className="admin-table-actions" style={{ justifyContent: 'flex-end' }}>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--ghost admin-btn--sm"
-                            onClick={() => setSelectedJockey(j)}
-                          >
-                            Chi tiết
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--outline admin-btn--sm"
-                            onClick={() => handleOpenEdit(j)}
-                          >
-                            Sửa
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--danger admin-btn--sm"
-                            onClick={() => handleDeleteJockey(j.id)}
-                          >
-                            Xóa
-                          </button>
-                        </div>
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải dữ liệu Jockey...</div>
+          ) : (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Họ tên Jockey</th>
+                    <th>Giấy phép</th>
+                    <th>Kinh nghiệm</th>
+                    <th>Trận thắng</th>
+                    <th>Tổng số trận</th>
+                    <th>Trạng thái</th>
+                    <th style={{ textAlign: 'right' }}>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length > 0 ? (
+                    filtered.map((j) => (
+                      <tr key={j.id}>
+                        <td style={{ fontWeight: '600', color: '#fff' }}>{j.name}</td>
+                        <td><code>{j.license}</code></td>
+                        <td>{j.experience} năm</td>
+                        <td style={{ color: '#4ade80' }}>{j.wins} thắng</td>
+                        <td>{j.races} trận</td>
+                        <td>
+                          <StatusBadge status={j.status} />
+                        </td>
+                        <td>
+                          <div className="admin-table-actions" style={{ justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--ghost admin-btn--sm"
+                              onClick={() => setSelectedJockey(j)}
+                            >
+                              Chi tiết
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--outline admin-btn--sm"
+                              onClick={() => handleOpenEdit(j)}
+                            >
+                              Sửa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                        Không tìm thấy kết quả phù hợp
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
-                      Không tìm thấy kết quả phù hợp
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {selectedJockey && (
@@ -231,6 +266,29 @@ export default function JockeyManagement() {
                 <dd>
                   <StatusBadge status={selectedJockey.status} />
                 </dd>
+
+                <dt>Tên đăng nhập</dt>
+                <dd>{selectedJockey.userName || '—'}</dd>
+
+                <dt>Email</dt>
+                <dd>{selectedJockey.email || '—'}</dd>
+
+                <dt>Số điện thoại</dt>
+                <dd>{selectedJockey.phone || '—'}</dd>
+
+                <dt>Ngày sinh</dt>
+                <dd>
+                  {selectedJockey.dob
+                    ? (() => {
+                      try {
+                        const d = new Date(selectedJockey.dob);
+                        return isNaN(d.getTime()) ? selectedJockey.dob : d.toLocaleDateString('vi-VN');
+                      } catch (e) {
+                        return selectedJockey.dob;
+                      }
+                    })()
+                    : '—'}
+                </dd>
                 
                 <dt>Điểm phong độ</dt>
                 <dd style={{ color: '#d4af37', fontWeight: '700' }}>{selectedJockey.points} PTS</dd>
@@ -241,22 +299,14 @@ export default function JockeyManagement() {
                 </dd>
               </dl>
               
-              <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
+              <div style={{ marginTop: '24px' }}>
                 <button
                   type="button"
                   className="admin-btn admin-btn--outline admin-btn--sm"
-                  style={{ flex: 1 }}
+                  style={{ width: '100%' }}
                   onClick={() => handleOpenEdit(selectedJockey)}
                 >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--danger admin-btn--sm"
-                  style={{ flex: 1 }}
-                  onClick={() => handleDeleteJockey(selectedJockey.id)}
-                >
-                  Xóa
+                  Sửa hồ sơ
                 </button>
               </div>
             </div>
@@ -290,7 +340,7 @@ export default function JockeyManagement() {
             }}
           >
             <div className="admin-card-head">
-              <h3>{editingJockey ? `Sửa Jockey: ${editingJockey.name}` : 'Thêm Jockey mới'}</h3>
+              <h3>Sửa Jockey: {editingJockey?.name}</h3>
               <button
                 type="button"
                 className="admin-btn admin-btn--ghost admin-btn--sm"
@@ -309,6 +359,28 @@ export default function JockeyManagement() {
                   placeholder="Nhập tên Jockey..."
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số điện thoại</label>
+                <input
+                  required
+                  type="tel"
+                  className="admin-input"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Ngày sinh</label>
+                <input
+                  required
+                  type="date"
+                  className="admin-input"
+                  value={formData.birthDate}
+                  onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                 />
               </div>
 
@@ -336,39 +408,6 @@ export default function JockeyManagement() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thắng</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="admin-input"
-                    value={formData.wins}
-                    onChange={(e) => setFormData({ ...formData, wins: e.target.value })}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Tổng trận</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="admin-input"
-                    value={formData.races}
-                    onChange={(e) => setFormData({ ...formData, races: e.target.value })}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Điểm</label>
-                  <input
-                    type="number"
-                    min="0"
-                    className="admin-input"
-                    value={formData.points}
-                    onChange={(e) => setFormData({ ...formData, points: e.target.value })}
-                  />
-                </div>
-              </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái</label>
                 <select
@@ -378,7 +417,7 @@ export default function JockeyManagement() {
                   style={{ width: '100%' }}
                 >
                   <option value="active">Đang hoạt động (Active)</option>
-                  <option value="injured">Chấn thương (Injured)</option>
+                  <option value="pending">Chờ phê duyệt (Pending)</option>
                   <option value="suspended">Tạm đình chỉ (Suspended)</option>
                 </select>
               </div>

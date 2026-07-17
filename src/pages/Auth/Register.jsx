@@ -157,9 +157,9 @@ export default function Register() {
         phone,
         password,
         birthDate: dob,
-        role: role,
+        role: role === 'REFEREE' ? 'RACE_REFEREE' : role,
         // Mapping fields according to public class AssignRoleRequest
-        newRole: role,
+        newRole: role === 'REFEREE' ? 'RACE_REFEREE' : role,
         address: (role === 'HORSE_OWNER' || role === 'HORSE OWNER') ? ownerAddress : undefined,
         experienceYears: role === 'JOCKEY'
           ? (jockeyExp ? parseInt(jockeyExp, 10) : undefined)

@@ -100,30 +100,30 @@ export default function Login() {
       switch (role) {
 
         case 'ADMIN':
-          navigate('/admin')
+          navigate('/admin', { replace: true })
           break
 
         case 'JOCKEY':
-          navigate('/jockey')
+          navigate('/jockey', { replace: true })
           break
 
         case 'REFEREE':
         case 'RACE_REFEREE':
-          navigate('/referee')
+          navigate('/referee', { replace: true })
           break
 
         case 'SPECTATOR':
-          navigate('/spectator')
+          navigate('/spectator', { replace: true })
           break
 
         case 'OWNER':
         case 'HORSE_OWNER':
         case 'HORSE OWNER':
-          navigate('/owner')
+          navigate('/owner', { replace: true })
           break
 
         default:
-          navigate('/')
+          navigate('/', { replace: true })
       }
 
 

@@ -345,10 +345,27 @@ export default function SpectatorProfile() {
                     <dd style={{ color: '#fff', marginBottom: '12px' }}>{profile.phone || '—'}</dd>
 
                     <dt style={{ color: '#888', marginBottom: '4px' }}>Ngày sinh</dt>
-                    <dd style={{ color: '#fff' }}>
+                    <dd style={{ color: '#fff', marginBottom: '12px' }}>
                       {profile.dob
                         ? new Date(profile.dob).toLocaleDateString('vi-VN')
                         : '—'}
+                    </dd>
+
+                    <dt style={{ color: '#888', marginBottom: '4px' }}>Ngày gia nhập</dt>
+                    <dd style={{ color: '#fff' }}>
+                      {(() => {
+                        try {
+                          const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
+                          const matched = historyList.find(h => 
+                            (h.id && user?.id && h.id === user.id) ||
+                            (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase())
+                          )
+                          if (matched?.joined) {
+                            return new Date(matched.joined).toLocaleDateString('vi-VN')
+                          }
+                        } catch (_) {}
+                        return new Date().toLocaleDateString('vi-VN')
+                      })()}
                     </dd>
                   </dl>
                 )}

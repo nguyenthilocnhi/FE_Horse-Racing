@@ -1,53 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { races as initialRaces, tournaments as initialTournaments, mockJockeys } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import * as tournamentService from '../../../services/tournamentService'
+import * as horseService from '../../../services/horseService'
+import * as adminAccountService from '../../../services/adminAccountService'
 import './RaceManagement.css'
 
-// Default horses if localStorage is empty
-const FALLBACK_HORSES = [
-  { id: 1, name: 'Aurelius' },
-  { id: 2, name: 'Midnight Star' },
-  { id: 3, name: 'Velvet Thunder' },
-  { id: 4, name: 'Storm Rider' },
-  { id: 5, name: 'Thunder Bolt' },
-  { id: 6, name: 'Golden Eagle' },
-  { id: 7, name: 'Shadow Dancer' },
-  { id: 8, name: 'Pegasus' }
-]
-
 export default function RaceManagement() {
-  const [races, setRaces] = useState(initialRaces)
-  const [tournaments] = useState(initialTournaments)
+  const [races, setRaces] = useState([])
+  const [tournaments, setTournaments] = useState([])
+  const [jockeysList, setJockeysList] = useState([])
+  const [horsesList, setHorsesList] = useState([])
+  const [loading, setLoading] = useState(false)
+
   const [showForm, setShowForm] = useState(false)
   const [editingRace, setEditingRace] = useState(null)
   
   const { searchQuery = '' } = useOutletContext() || {}
 
-  const filteredRaces = races.filter(race => {
-    const q = searchQuery.toLowerCase()
-    return race.name.toLowerCase().includes(q) || 
-           race.tournament.toLowerCase().includes(q) ||
-           race.id.toLowerCase().includes(q)
-  })
-  
-  // Horses list (load from localStorage if available)
-  const [horsesList, setHorsesList] = useState(FALLBACK_HORSES)
-  useEffect(() => {
-    const stored = localStorage.getItem('mock_horses')
-    if (stored) {
-      try {
-        setHorsesList(JSON.parse(stored))
-      } catch (e) {
-        console.error(e)
-      }
-    }
-  }, [])
-
   // Create/Edit Race Form state
   const [formData, setFormData] = useState({
     name: '',
-    tournament: '',
+    tournamentId: '',
     date: '',
     time: '',
     distance: '1600m',
@@ -56,23 +30,94 @@ export default function RaceManagement() {
 
   // Round Arrangement State
   const [arrangingRace, setArrangingRace] = useState(null)
-  const [rounds, setRounds] = useState({}) // maps raceId -> list of rounds (each round has lanes)
+  const [rounds, setRounds] = useState({}) // maps raceId -> list of rounds
   const [activeRoundIndex, setActiveRoundIndex] = useState(0)
+
+  const fetchAllData = async () => {
+    setLoading(true)
+    try {
+      // 1. Fetch Tournaments
+      const tourns = await tournamentService.getTournaments()
+      const mappedTournaments = (tourns || []).map(t => ({
+        id: t.id,
+        name: t.name || '',
+        location: t.location || '',
+        startDate: t.startDate || '',
+        endDate: t.endDate || '',
+        status: t.status ? t.status.toLowerCase() : 'draft'
+      }))
+      setTournaments(mappedTournaments)
+
+      // 2. Fetch schedules for each tournament
+      let allRaces = []
+      for (const t of mappedTournaments) {
+        try {
+          const res = await tournamentService.getTournamentSchedule(t.id)
+          const schedules = res?.data || res || []
+          const mappedRaces = schedules.map(r => {
+            let statusVal = 'scheduled'
+            if (r.status === 'RUNNING' || r.status === 'ONGOING') statusVal = 'ongoing'
+            else if (r.status === 'COMPLETED') statusVal = 'completed'
+            else if (r.status === 'CANCELLED') statusVal = 'cancelled'
+
+            return {
+              id: r.id?.toString() || '',
+              name: r.raceName || r.name || `Race #${r.id}`,
+              tournament: t.name,
+              tournamentId: t.id,
+              date: r.raceDate || r.startTime?.split('T')[0] || '',
+              time: r.startTime?.split('T')[1]?.substring(0, 5) || '',
+              distance: r.distance || '1600m',
+              status: statusVal,
+              horses: r.raceParticipationList?.length || 0,
+              rawRace: r
+            }
+          })
+          allRaces = [...allRaces, ...mappedRaces]
+        } catch (err) {
+          console.error(`Failed to load schedules for tournament ${t.id}:`, err)
+        }
+      }
+      setRaces(allRaces)
+
+      // 3. Fetch Jockeys & Horses for arranging lanes
+      const jockeyList = await adminAccountService.getAllAccounts()
+      setJockeysList((jockeyList || []).filter(u => u.role === 'JOCKEY'))
+      
+      const horseList = await horseService.getHorses()
+      setHorsesList(horseList || [])
+
+    } catch (err) {
+      console.error("Failed to load races/tournaments data:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllData()
+  }, [])
+
+  const filteredRaces = races.filter(race => {
+    const q = searchQuery.toLowerCase()
+    return race.name.toLowerCase().includes(q) || 
+           race.tournament.toLowerCase().includes(q) ||
+           race.id.toLowerCase().includes(q)
+  })
 
   // Initialize rounds for a race if not exists
   const openArrangement = (race) => {
     setArrangingRace(race)
     setActiveRoundIndex(0)
     
-    // If this race doesn't have rounds in state yet, initialize with default rounds
     if (!rounds[race.id]) {
       const initialRoundsForRace = [
         {
           name: 'Vòng loại 1',
           lanes: Array.from({ length: 8 }, (_, i) => ({
             lane: i + 1,
-            horseId: i < 4 ? horsesList[i]?.id || '' : '',
-            jockeyId: i < 4 ? mockJockeys[i]?.id || '' : ''
+            horseId: '',
+            jockeyId: ''
           }))
         },
         {
@@ -144,7 +189,7 @@ export default function RaceManagement() {
     setEditingRace(null)
     setFormData({
       name: '',
-      tournament: tournaments[0]?.name || '',
+      tournamentId: tournaments[0]?.id?.toString() || '',
       date: '',
       time: '',
       distance: '1600m',
@@ -157,7 +202,7 @@ export default function RaceManagement() {
     setEditingRace(race)
     setFormData({
       name: race.name,
-      tournament: race.tournament,
+      tournamentId: race.tournamentId?.toString() || '',
       date: race.date,
       time: race.time,
       distance: race.distance,
@@ -166,39 +211,67 @@ export default function RaceManagement() {
     setShowForm(true)
   }
 
-  const handleCancelRace = (id) => {
+  const handleCancelRace = async (id, tournamentId) => {
     if (window.confirm('Bạn có chắc chắn muốn hủy cuộc đua này?')) {
-      setRaces(races.map(r => 
-        r.id === id ? { ...r, status: 'cancelled' } : r
-      ))
+      try {
+        await tournamentService.cancelRaceSchedule(tournamentId, id)
+        alert('Hủy cuộc đua thành công!')
+        fetchAllData()
+      } catch (err) {
+        alert('Không thể hủy cuộc đua: ' + (err.response?.data?.message || err.message))
+      }
     }
   }
 
-  const handleSaveRace = (e) => {
+  const handleSaveRace = async (e) => {
     e.preventDefault()
-    if (!formData.name || !formData.tournament || !formData.date || !formData.time) {
+    if (!formData.name || !formData.tournamentId || !formData.date || !formData.time) {
       alert('Vui lòng điền đầy đủ thông tin cuộc đua!')
       return
     }
 
-    if (editingRace) {
-      setRaces(races.map(r => 
-        r.id === editingRace.id ? { ...r, ...formData } : r
-      ))
-    } else {
-      const newRace = {
-        id: `R-${1000 + races.length + 5}`,
-        ...formData,
-        horses: 0
-      }
-      setRaces([newRace, ...races])
+    const startStr = `${formData.date}T${formData.time}:00`
+    
+    // Construct local end time strictly on the same date to satisfy backend validation
+    const [hours, minutes] = formData.time.split(':').map(Number)
+    let endHours = hours + 2
+    if (endHours >= 24) {
+      endHours = 23
     }
+    const endHoursStr = String(endHours).padStart(2, '0')
+    const endMinutesStr = String(minutes).padStart(2, '0')
+    const endStr = `${formData.date}T${endHoursStr}:${endMinutesStr}:00`
 
-    setShowForm(false)
+    const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
+
+    try {
+      if (editingRace) {
+        // Edit mode
+        await tournamentService.updateRaceSchedule(editingRace.tournamentId, editingRace.id, {
+          startTime: startStr,
+          endTime: endStr,
+          participationIds: editingRace.rawRace?.participationIds || []
+        })
+        alert('Cập nhật cuộc đua thành công!')
+      } else {
+        // Add mode
+        await tournamentService.createRaceSchedule(formData.tournamentId, {
+          name: formData.name,
+          raceDate: formData.date,
+          location: selectedT?.location || 'Sân đua chính',
+          startTime: startStr,
+          endTime: endStr
+        })
+        alert('Tạo cuộc đua thành công!')
+      }
+      setShowForm(false)
+      fetchAllData()
+    } catch (err) {
+      alert('Thao tác thất bại: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   const handleSaveArrangement = () => {
-    // Calculate total horses assigned in this arrangement across rounds
     if (!arrangingRace) return
     const raceId = arrangingRace.id
     const raceRounds = rounds[raceId] || []
@@ -216,7 +289,7 @@ export default function RaceManagement() {
     ))
 
     setArrangingRace(null)
-    alert('Sắp xếp vòng đua và cuốc đua đã được lưu thành công!')
+    alert('Sắp xếp vòng đua và làn chạy đã được lưu thành công (tạm thời)!')
   }
 
   return (
@@ -252,6 +325,7 @@ export default function RaceManagement() {
               <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Tên cuộc đua (Race name)</label>
               <input 
                 required
+                disabled={!!editingRace}
                 className="admin-input" 
                 placeholder="Ví dụ: Derby nước rút..." 
                 value={formData.name}
@@ -264,12 +338,14 @@ export default function RaceManagement() {
               <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thuộc Giải đấu</label>
               <select 
                 className="admin-select"
-                value={formData.tournament}
-                onChange={(e) => setFormData({ ...formData, tournament: e.target.value })}
+                disabled={!!editingRace}
+                value={formData.tournamentId}
+                onChange={(e) => setFormData({ ...formData, tournamentId: e.target.value })}
                 style={{ width: '100%' }}
               >
+                <option value="">Chọn giải đấu...</option>
                 {tournaments.map(t => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>
             </div>
@@ -278,6 +354,7 @@ export default function RaceManagement() {
               <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Cự ly chạy</label>
               <select 
                 className="admin-select"
+                disabled={!!editingRace}
                 value={formData.distance}
                 onChange={(e) => setFormData({ ...formData, distance: e.target.value })}
                 style={{ width: '100%' }}
@@ -316,21 +393,6 @@ export default function RaceManagement() {
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: 'span 2' }}>
-              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái</label>
-              <select 
-                className="admin-select"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                style={{ width: '100%' }}
-              >
-                <option value="scheduled">Đã lên lịch (Scheduled)</option>
-                <option value="ongoing">Đang diễn ra (Ongoing)</option>
-                <option value="completed">Đã hoàn thành (Completed)</option>
-                <option value="cancelled">Đã hủy (Cancelled)</option>
-              </select>
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', gridColumn: 'span 2', marginTop: '12px' }}>
               <button 
                 type="button" 
@@ -350,51 +412,58 @@ export default function RaceManagement() {
         </div>
       )}
 
-      <div className="race-cards-grid">
-        {filteredRaces.map((race) => (
-          <div key={race.id} className="admin-card race-card-item">
-            <div className="race-card-top">
-              <span className="race-card-id">{race.id}</span>
-              <StatusBadge status={race.status} />
-            </div>
-            <h3>{race.name}</h3>
-            <p className="race-card-tournament">{race.tournament}</p>
-            <div className="race-card-meta">
-              <span>📅 {race.date} · ⏰ {race.time}</span>
-              <span>📏 Cự ly: {race.distance}</span>
-            </div>
-            <div className="race-card-horses">
-              <strong>{race.horses}</strong>
-              <span>ngựa tham gia</span>
-            </div>
-            <div className="admin-table-actions">
-              <button 
-                type="button" 
-                className="admin-btn admin-btn--ghost admin-btn--sm"
-                onClick={() => handleOpenEdit(race)}
-              >
-                Sửa
-              </button>
-              <button 
-                type="button" 
-                className="admin-btn admin-btn--outline admin-btn--sm"
-                onClick={() => openArrangement(race)}
-              >
-                Sắp xếp cuốc/vòng
-              </button>
-              {race.status === 'scheduled' && (
+      {loading ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải lịch trình cuộc đua...</div>
+      ) : (
+        <div className="race-cards-grid">
+          {filteredRaces.map((race) => (
+            <div key={race.id} className="admin-card race-card-item">
+              <div className="race-card-top">
+                <span className="race-card-id">#{race.id}</span>
+                <StatusBadge status={race.status} />
+              </div>
+              <h3>{race.name}</h3>
+              <p className="race-card-tournament">{race.tournament}</p>
+              <div className="race-card-meta">
+                <span>📅 {race.date} · ⏰ {race.time}</span>
+                <span>📏 Cự ly: {race.distance}</span>
+              </div>
+              <div className="race-card-horses">
+                <strong>{race.horses}</strong>
+                <span>ngựa tham gia</span>
+              </div>
+              <div className="admin-table-actions">
                 <button 
                   type="button" 
-                  className="admin-btn admin-btn--danger admin-btn--sm"
-                  onClick={() => handleCancelRace(race.id)}
+                  className="admin-btn admin-btn--ghost admin-btn--sm"
+                  onClick={() => handleOpenEdit(race)}
                 >
-                  Hủy
+                  Sửa
                 </button>
-              )}
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--outline admin-btn--sm"
+                  onClick={() => openArrangement(race)}
+                >
+                  Sắp xếp cuốc/vòng
+                </button>
+                {race.status === 'scheduled' && (
+                  <button 
+                    type="button" 
+                    className="admin-btn admin-btn--danger admin-btn--sm"
+                    onClick={() => handleCancelRace(race.id, race.tournamentId)}
+                  >
+                    Hủy
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          {filteredRaces.length === 0 && (
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy cuộc đua phù hợp</div>
+          )}
+        </div>
+      )}
 
       {/* Round Arrangement Modal */}
       {arrangingRace && (
@@ -413,7 +482,7 @@ export default function RaceManagement() {
             <div className="admin-card-head" style={{ flexShrink: 0 }}>
               <div>
                 <h3>Thiết lập vòng đua & làn chạy</h3>
-                <span style={{ fontSize: '12px', color: '#d4af37' }}>{arrangingRace.name} ({arrangingRace.id})</span>
+                <span style={{ fontSize: '12px', color: '#d4af37' }}>{arrangingRace.name} (ID: {arrangingRace.id})</span>
               </div>
               <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setArrangingRace(null)}>✕</button>
             </div>
@@ -504,8 +573,8 @@ export default function RaceManagement() {
                               style={{ width: '100%', minWidth: 'auto', padding: '6px 10px', fontSize: '12px' }}
                             >
                               <option value="">-- Chọn Jockey --</option>
-                              {mockJockeys.map(j => (
-                                <option key={j.id} value={j.id}>{j.name}</option>
+                              {jockeysList.map(j => (
+                                <option key={j.id} value={j.id}>{j.fullName || j.name || j.userName}</option>
                               ))}
                             </select>
                           </td>
@@ -518,7 +587,7 @@ export default function RaceManagement() {
             </div>
 
             <div className="admin-card-head" style={{ flexShrink: 0, justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', borderBottom: 'none' }}>
-              <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setArrangingRace(null)}>Hủy bỏ</button>
+              <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setArrangingRace(null)}>Hủy bộ</button>
               <button type="button" className="admin-btn admin-btn--gold" onClick={handleSaveArrangement}>Lưu sắp xếp</button>
             </div>
           </div>

@@ -93,6 +93,18 @@ export async function updateRaceSchedule(tournamentId, scheduleId, payload) {
 }
 
 /**
+ * Hủy lịch đua.
+ * @param {string|number} tournamentId
+ * @param {string|number} scheduleId
+ */
+export async function cancelRaceSchedule(tournamentId, scheduleId) {
+  const res = await apiClient.put(
+    `/tournaments/${tournamentId}/race-schedules/${scheduleId}/cancel`
+  )
+  return res.data
+}
+
+/**
  * Xem lịch thi đấu của giải đấu.
  * @param {string|number} tournamentId
  */

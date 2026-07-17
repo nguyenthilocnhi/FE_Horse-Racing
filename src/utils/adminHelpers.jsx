@@ -63,8 +63,9 @@ const STATUS_LABELS = {
 }
 
 export function StatusBadge({ status }) {
-  const variant = STATUS_MAP[status] || 'gray'
-  const label = STATUS_LABELS[status] || status
+  const key = status?.toLowerCase() || ''
+  const variant = STATUS_MAP[key] || 'gray'
+  const label = STATUS_LABELS[key] || status
   return <span className={`admin-badge admin-badge--${variant}`}>{label}</span>
 }
 
