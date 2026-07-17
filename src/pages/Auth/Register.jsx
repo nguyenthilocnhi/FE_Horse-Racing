@@ -113,18 +113,18 @@ export default function Register() {
         const data = await authService.register(payload)
         if (data.success || data.token || data.user || data.id) {
           const profileSnapshot = {
-            id:        data.id   ?? data.user?.id   ?? null,
-            userName:  username,
-            name:      name,
-            email:     email,
-            phone:     phone,
-            dob:       dob,
-            joined:    new Date().toISOString(),
-            balance:   0,
+            id: data.id ?? data.user?.id ?? null,
+            userName: username,
+            name: name,
+            email: email,
+            phone: phone,
+            dob: dob,
+            joined: new Date().toISOString(),
+            balance: 0,
             momoLinked: false,
           }
           localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
-          
+
           const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
           historyList.push(profileSnapshot)
           localStorage.setItem('registered_users_history', JSON.stringify(historyList))
@@ -161,30 +161,30 @@ export default function Register() {
         // Mapping fields according to public class AssignRoleRequest
         newRole: role,
         address: (role === 'HORSE_OWNER' || role === 'HORSE OWNER') ? ownerAddress : undefined,
-        experienceYears: role === 'JOCKEY' 
-          ? (jockeyExp ? parseInt(jockeyExp, 10) : undefined) 
-          : role === 'REFEREE' 
-            ? (refereeExp ? parseInt(refereeExp, 10) : undefined) 
+        experienceYears: role === 'JOCKEY'
+          ? (jockeyExp ? parseInt(jockeyExp, 10) : undefined)
+          : role === 'REFEREE'
+            ? (refereeExp ? parseInt(refereeExp, 10) : undefined)
             : undefined,
         licenseNumber: role === 'JOCKEY' ? jockeyLicense : undefined,
         certificateLevel: role === 'REFEREE' ? refereeCert : undefined,
       }
-      
+
       const data = await authService.register(payload)
       if (data.success || data.token || data.user) {
         const profileSnapshot = {
-          id:        data.id   ?? data.user?.id   ?? null,
-          userName:  username,
-          name:      name,
-          email:     email,
-          phone:     phone,
-          dob:       dob,
-          joined:    new Date().toISOString(),
-          balance:   0,
+          id: data.id ?? data.user?.id ?? null,
+          userName: username,
+          name: name,
+          email: email,
+          phone: phone,
+          dob: dob,
+          joined: new Date().toISOString(),
+          balance: 0,
           momoLinked: false,
         }
         localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
-        
+
         const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
         historyList.push(profileSnapshot)
         localStorage.setItem('registered_users_history', JSON.stringify(historyList))
