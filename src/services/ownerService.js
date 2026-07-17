@@ -25,7 +25,8 @@ export async function getOwnerHorses() {
 
 /**
  * Tạo ngựa mới.
- * @param {{ name, breed, age, weight, color, ... }} payload
+ * @param {{ name: string, age: number, breed: string, 
+ * healthStatus: 'ELIGIBLE'|'INJURED'|'RETIRED' }} payload
  */
 export async function createOwnerHorse(payload) {
   const res = await apiClient.post('/owner/horses', payload)
