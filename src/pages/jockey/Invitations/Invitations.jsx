@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { invitations } from '../../../data/jockeyMockData'
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '../../../contexts/AuthContext'
+import * as tournamentService from '../../../services/tournamentService'
 import './Invitations.css'
 
 const STATUS_LABELS = {
@@ -23,7 +24,7 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
             <span className="inv-horse-icon">🐴</span>
             <div>
               <div className="inv-horse-name">{inv.horseName}</div>
-              <div className="inv-horse-sub">{inv.owner} · {inv.horseAge} tuổi</div>
+              <div className="inv-horse-sub">{inv.owner}</div>
             </div>
             <span className={`jockey-badge ${STATUS_LABELS[inv.status].cls}`}>
               {STATUS_LABELS[inv.status].label}
@@ -104,16 +105,94 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
 }
 
 export default function Invitations() {
-  const [data, setData] = useState(invitations)
+  const { user } = useAuth()
+  const [data, setData] = useState([])
   const [tab, setTab] = useState('all')
   const [selected, setSelected] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadInvitations() {
+      try {
+        setLoading(true)
+        if (!user?.id) return
+        
+        const tournaments = await tournamentService.getTournaments()
+        if (cancelled || !Array.isArray(tournaments)) {
+          setLoading(false)
+          return
+        }
+        
+        const list = []
+        const promises = tournaments.map(async (t) => {
+          try {
+            const schedule = await tournamentService.getTournamentSchedule(t.id)
+            if (Array.isArray(schedule)) {
+              schedule.forEach(race => {
+                const participations = race.participations || race.raceParticipations || [];
+                participations.forEach(p => {
+                  const jockeyId = p.jockeyId || p.jockey?.id;
+                  if (jockeyId === user?.id) {
+                    const status = (p.status || '').toLowerCase();
+                    const storedStatus = localStorage.getItem(`jockey_invitation_accept_${p.id}`);
+                    
+                    let mappedStatus = 'pending';
+                    if (storedStatus) {
+                      mappedStatus = storedStatus;
+                    } else if (status === 'accepted' || status === 'confirmed' || status === 'approved') {
+                      mappedStatus = 'accepted';
+                    } else if (status === 'declined' || status === 'rejected') {
+                      mappedStatus = 'declined';
+                    }
+                    
+                    list.push({
+                      id: p.id,
+                      raceId: `R-${race.id}`,
+                      raceName: race.raceName || race.name || 'Cuộc đua',
+                      tournamentName: t.name || 'Giải đấu',
+                      horseName: p.horseName || p.horse?.name || 'Ngựa thi đấu',
+                      owner: p.ownerName || p.horse?.owner?.fullName || p.horse?.owner?.name || 'Chủ ngựa',
+                      ownerContact: p.ownerPhone || p.horse?.owner?.phone || 'Chưa rõ',
+                      raceDate: race.raceDate ? new Date(race.raceDate).toLocaleDateString() : 'Chưa rõ',
+                      raceTime: race.startTime ? new Date(race.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Chưa rõ',
+                      venue: t.location || t.venue || 'Trường đua',
+                      distance: race.distance || '1000m',
+                      prizePool: t.prizePool || t.prize || 'Chưa rõ',
+                      fee: p.jockeyFee || p.fee || '1,000,000đ',
+                      deadline: race.registrationDeadline ? new Date(race.registrationDeadline).toLocaleDateString() : 'Chưa rõ',
+                      status: mappedStatus,
+                      notes: p.notes || ''
+                    });
+                  }
+                });
+              });
+            }
+          } catch (_) {}
+        })
+        
+        await Promise.all(promises)
+        if (!cancelled) {
+          setData(list)
+        }
+      } catch (err) {
+        console.warn("Failed to load invitations:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadInvitations()
+    return () => { cancelled = true }
+  }, [user?.id])
 
   function handleAccept(id) {
     setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'accepted' } : inv))
+    localStorage.setItem(`jockey_invitation_accept_${id}`, 'accepted')
   }
 
   function handleDecline(id) {
     setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'declined' } : inv))
+    localStorage.setItem(`jockey_invitation_accept_${id}`, 'declined')
   }
 
   const tabs = [
@@ -124,6 +203,14 @@ export default function Invitations() {
   ]
 
   const filtered = tab === 'all' ? data : data.filter((i) => i.status === tab)
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Đang tải lời mời thi đấu...
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -241,3 +328,4 @@ export default function Invitations() {
     </div>
   )
 }
+

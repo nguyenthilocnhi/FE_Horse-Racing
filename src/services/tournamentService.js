@@ -171,3 +171,16 @@ export async function updateRankings(tournamentId, payload) {
   )
   return res.data
 }
+
+/** Lấy danh sách giải đấu */
+export async function getTournaments() {
+  const res = await apiClient.get('/tournaments')
+  return res.data
+}
+
+/** Lấy bảng xếp hạng Jockey trong giải đấu */
+export async function getJockeyRankings(tournamentId) {
+  const res = await apiClient.get(`/tournaments/${tournamentId}/rankings/jockeys`)
+  return res.data
+}
+

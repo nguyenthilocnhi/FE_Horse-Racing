@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
-import { jockeyProfile } from '../../../data/jockeyMockData'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../../contexts/AuthContext'
 import * as jockeyService from '../../../services/jockeyService'
+import * as tournamentService from '../../../services/tournamentService'
 import './Profile.css'
 
 /* ── Registration Form (for new Jockey) ── */
@@ -163,71 +163,105 @@ function RegisterForm({ onDone }) {
 function ProfileView() {
   const { user } = useAuth()
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState(() => {
-    const defaultName = user?.fullName ?? user?.name ?? jockeyProfile.name
-    const defaultPhone = user?.phone ?? jockeyProfile.phone
-    const defaultEmail = user?.email ?? jockeyProfile.email
-
-    const pending = localStorage.getItem('pending_profile')
-    if (pending) {
-      try {
-        const parsed = JSON.parse(pending)
-        const isMatch = parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id || (parsed.name && parsed.name === user?.name)
-        if (isMatch) {
-          return {
-            name: parsed.name ?? defaultName,
-            nickname: parsed.nickname ?? 'Nài ngựa mới',
-            phone: parsed.phone ?? defaultPhone,
-            weight: parsed.weight ?? '54',
-            height: parsed.height ?? '162',
-            experience: parsed.experienceYears ? `${parsed.experienceYears} năm` : 'Chưa cập nhật',
-            email: parsed.email ?? defaultEmail,
-            licenseNo: parsed.licenseNumber ?? 'VN-JOC-PENDING',
-            licenseExpiry: parsed.licenseExpiryDate ?? 'Chưa rõ',
-            dob: parsed.dob ?? jockeyProfile.dob,
-            nationality: parsed.nationality ?? jockeyProfile.nationality
-          }
-        }
-      } catch (_) {}
-    }
-
-    return {
-      name: defaultName,
-      nickname: jockeyProfile.nickname,
-      phone: defaultPhone,
-      weight: jockeyProfile.weight,
-      height: jockeyProfile.height,
-      experience: jockeyProfile.experience,
-      email: defaultEmail,
-      licenseNo: jockeyProfile.licenseNo,
-      licenseExpiry: jockeyProfile.licenseExpiry,
-      dob: jockeyProfile.dob,
-      nationality: jockeyProfile.nationality
-    }
+  const [form, setForm] = useState({
+    name: user?.fullName ?? user?.name ?? '',
+    nickname: 'Nài ngựa',
+    phone: user?.phone ?? '',
+    weight: '54',
+    height: '162',
+    experience: 'Chưa cập nhật',
+    email: user?.email ?? '',
+    licenseNo: 'VN-JOC-PENDING',
+    licenseExpiry: 'Chưa rõ',
+    dob: '',
+    nationality: 'Việt Nam'
+  })
+  const [accountStatus, setAccountStatus] = useState('PENDING')
+  const [joinedDate, setJoinedDate] = useState('Chưa rõ')
+  const [stats, setStats] = useState({
+    totalRaces: 0,
+    wins: 0,
+    winRate: 0,
+    totalPoints: 0
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
     let cancelled = false
     async function loadData() {
       try {
         const data = await jockeyService.getJockeyProfile(user?.id)
         if (!cancelled && data) {
           setForm({
-            name: data.fullName ?? user?.fullName ?? user?.name ?? jockeyProfile.name,
-            nickname: data.nickname ?? 'Nài ngựa mới',
-            phone: data.phone ?? user?.phone ?? jockeyProfile.phone,
+            name: data.fullName ?? user?.fullName ?? user?.name ?? '',
+            nickname: data.nickname ?? 'Nài ngựa',
+            phone: data.phone ?? user?.phone ?? '',
             weight: data.weight ?? '54',
             height: data.height ?? '162',
             experience: data.experienceYears ? `${data.experienceYears} năm` : 'Chưa cập nhật',
-            email: data.email ?? user?.email ?? jockeyProfile.email,
+            email: data.email ?? user?.email ?? '',
             licenseNo: data.licenseNumber ?? 'VN-JOC-PENDING',
             licenseExpiry: data.licenseExpiryDate ?? 'Chưa rõ',
-            dob: data.birthDate ?? data.dob ?? jockeyProfile.dob,
-            nationality: data.nationality ?? jockeyProfile.nationality
+            dob: data.birthDate ?? '',
+            nationality: data.nationality ?? 'Việt Nam'
           })
+          setAccountStatus(data.accountStatus ?? 'PENDING')
+          if (data.joinedDate || data.createdAt) {
+            setJoinedDate(new Date(data.joinedDate || data.createdAt).toLocaleDateString())
+          }
         }
       } catch (err) {
         console.warn("Failed to load jockey profile from API:", err.message)
+      }
+
+      try {
+        const tournaments = await tournamentService.getTournaments()
+        if (cancelled || !Array.isArray(tournaments)) return
+        
+        let totalRaces = 0
+        let wins = 0
+        let totalPoints = 0
+        
+        const promises = tournaments.map(async (t) => {
+          try {
+            const schedule = await tournamentService.getTournamentSchedule(t.id)
+            if (Array.isArray(schedule)) {
+              schedule.forEach(race => {
+                const participations = race.participations || race.raceParticipations || [];
+                const raceResults = race.results || race.raceResults || [];
+                
+                participations.forEach(p => {
+                  const jockeyId = p.jockeyId || p.jockey?.id;
+                  if (jockeyId === user?.id) {
+                    const status = (p.status || '').toUpperCase();
+                    if (status === 'ACCEPTED' || status === 'CONFIRMED' || status === 'APPROVED') {
+                      totalRaces++;
+                      if (p.pointsEarned || p.points) {
+                        totalPoints += (p.pointsEarned || p.points || 0);
+                      }
+                      
+                      const matchedResult = raceResults.find(resItem => resItem.participationId === p.id);
+                      if (matchedResult && (matchedResult.rankPosition === 1 || matchedResult.rank === 1)) {
+                        wins++;
+                      }
+                    }
+                  }
+                });
+              });
+            }
+          } catch (_) {}
+        })
+        
+        await Promise.all(promises)
+        if (!cancelled) {
+          setStats({
+            totalRaces,
+            wins,
+            winRate: totalRaces > 0 ? Math.round((wins / totalRaces) * 100) : 0,
+            totalPoints
+          })
+        }
+      } catch (err) {
+        console.warn("Failed to dynamically compute jockey stats:", err)
       }
     }
     if (user?.id) {
@@ -242,10 +276,7 @@ function ProfileView() {
 
   async function handleSave(e) {
     e.preventDefault()
-    
-    // Parse experienceYears (e.g. "5 năm" -> 5)
     const expNum = parseInt(form.experience, 10) || 0
-
     const payload = {
       fullName: form.name,
       phone: form.phone,
@@ -270,35 +301,35 @@ function ProfileView() {
       <div className="profile-hero">
         <div className="profile-avatar-wrap">
           <div className="profile-avatar">
-            {form.name.charAt(0)}
+            {form.name ? form.name.charAt(0) : 'J'}
           </div>
-          <span className={`jockey-badge ${jockeyProfile.status === 'active' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
-            {jockeyProfile.status === 'active' ? '✓ Hoạt động' : 'Không hoạt động'}
+          <span className={`jockey-badge ${accountStatus === 'APPROVED' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
+            {accountStatus === 'APPROVED' ? '✓ Hoạt động' : 'Chờ xét duyệt'}
           </span>
         </div>
         <div className="profile-hero-info">
           <h2 className="profile-hero-name">{form.name}</h2>
           <div className="profile-hero-nick">"{form.nickname}"</div>
           <div className="profile-hero-meta">
-            <span>🪪 {user?.id || jockeyProfile.id}</span>
+            <span>🪪 {user?.id}</span>
             <span>📋 {form.licenseNo}</span>
-            <span>📅 Tham gia {jockeyProfile.joinedDate}</span>
+            <span>📅 Tham gia {joinedDate}</span>
           </div>
           <div className="profile-hero-stats">
             <div className="profile-hero-stat">
-              <strong>{jockeyProfile.stats.totalRaces}</strong>
+              <strong>{stats.totalRaces}</strong>
               <span>Cuộc đua</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#d4af37' }}>{jockeyProfile.stats.wins}</strong>
+              <strong style={{ color: '#d4af37' }}>{stats.wins}</strong>
               <span>Chiến thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#d4af37' }}>{jockeyProfile.stats.winRate}%</strong>
+              <strong style={{ color: '#d4af37' }}>{stats.winRate}%</strong>
               <span>Tỷ lệ thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#c084fc' }}>{jockeyProfile.stats.totalPoints.toLocaleString()}</strong>
+              <strong style={{ color: '#c084fc' }}>{stats.totalPoints.toLocaleString()}</strong>
               <span>Điểm</span>
             </div>
           </div>
@@ -390,15 +421,17 @@ function ProfileView() {
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Mã jockey</span>
-              <span className="jockey-detail-value">{user?.id || jockeyProfile.id}</span>
+              <span className="jockey-detail-value">{user?.id}</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Ngày tham gia</span>
-              <span className="jockey-detail-value">{jockeyProfile.joinedDate}</span>
+              <span className="jockey-detail-value">{joinedDate}</span>
             </div>
             <div className="jockey-detail-row">
               <span className="jockey-detail-label">Trạng thái</span>
-              <span className="jockey-badge jockey-badge--green">Hoạt động</span>
+              <span className={`jockey-badge ${accountStatus === 'APPROVED' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
+                {accountStatus === 'APPROVED' ? 'Hoạt động' : 'Chờ duyệt'}
+              </span>
             </div>
           </div>
         </div>
@@ -406,6 +439,7 @@ function ProfileView() {
     </div>
   )
 }
+
 
 /* ── Main component ── */
 export default function Profile() {

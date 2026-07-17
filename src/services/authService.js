@@ -51,3 +51,10 @@ export async function checkEmail(email) {
   const res = await apiClient.get(`/check-email?email=${encodeURIComponent(email)}`)
   return res.data
 }
+
+/** Lấy thông tin tài khoản đang đăng nhập */
+export async function getCurrentUser() {
+  const res = await apiClient.get('/auth/me')
+  return res.data
+}
+

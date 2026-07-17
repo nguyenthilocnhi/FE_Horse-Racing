@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
-import { globalRankings, jockeyProfile } from '../../../data/jockeyMockData'
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '../../../contexts/AuthContext'
+import * as tournamentService from '../../../services/tournamentService'
+import * as jockeyService from '../../../services/jockeyService'
 import './Rankings.css'
 
 const TREND_ICON = {
@@ -16,13 +18,78 @@ function MedalCell({ rank }) {
 }
 
 export default function Rankings() {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
+  const [rankings, setRankings] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-  const myRank = globalRankings.find((r) => r.isMe)
-  const filtered = globalRankings.filter((r) =>
+  useEffect(() => {
+    let cancelled = false
+    async function loadRankings() {
+      try {
+        setLoading(true)
+        if (user?.id) {
+          try {
+            const pData = await jockeyService.getJockeyProfile(user.id)
+            if (!cancelled) setProfile(pData)
+          } catch (_) {}
+        }
+
+        const tournaments = await tournamentService.getTournaments()
+        if (cancelled || !Array.isArray(tournaments) || tournaments.length === 0) {
+          setLoading(false)
+          return
+        }
+
+        // Use the first tournament or look for an active one
+        const activeTour = tournaments.find(t => t.status === 'ACTIVE' || t.status === 'UPCOMING') || tournaments[0]
+        const data = await tournamentService.getJockeyRankings(activeTour.id)
+        
+        if (cancelled) return
+        
+        if (Array.isArray(data)) {
+          const mapped = data.map((item, index) => ({
+            rank: item.rank || index + 1,
+            name: item.jockeyName || item.fullName || item.name || 'Jockey',
+            nationality: item.nationality || 'Việt Nam',
+            wins: item.wins || 0,
+            races: item.totalRaces || item.races || 0,
+            winRate: item.winRate || (item.totalRaces ? Math.round((item.wins / item.totalRaces) * 100) : 0),
+            points: item.points || 0,
+            trend: item.trend || 'same',
+            isMe: item.jockeyId === user?.id || item.id === user?.id
+          }))
+          mapped.sort((a, b) => a.rank - b.rank)
+          setRankings(mapped)
+        }
+      } catch (err) {
+        console.warn("Failed to load rankings from API:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    loadRankings()
+    return () => { cancelled = true }
+  }, [user?.id])
+
+  const myRank = rankings.find((r) => r.isMe)
+  const filtered = rankings.filter((r) =>
     r.name.toLowerCase().includes(search.toLowerCase()) ||
     r.nationality.toLowerCase().includes(search.toLowerCase())
   )
+
+  const top1 = rankings.find(r => r.rank === 1)
+  const top2 = rankings.find(r => r.rank === 2)
+  const top3 = rankings.find(r => r.rank === 3)
+
+  if (loading) {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+        Đang tải bảng xếp hạng...
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -37,11 +104,11 @@ export default function Rankings() {
       {myRank && (
         <div className="rank-my-card">
           <div className="rank-my-avatar">
-            {jockeyProfile.name.charAt(0)}
+            {myRank.name.charAt(0)}
           </div>
           <div className="rank-my-info">
             <div className="rank-my-name">{myRank.name}</div>
-            <div className="rank-my-sub">{myRank.nationality} · {jockeyProfile.licenseNo}</div>
+            <div className="rank-my-sub">{myRank.nationality} {profile?.licenseNumber ? `· ${profile.licenseNumber}` : ''}</div>
           </div>
           <div className="rank-my-stats">
             <div className="rank-my-stat">
@@ -69,41 +136,49 @@ export default function Rankings() {
       )}
 
       {/* Top 3 podium */}
-      <div className="rank-podium">
-        {/* 2nd */}
-        <div className="rank-podium-item rank-podium-item--2">
-          <div className="rank-podium-avatar rank-podium-avatar--2">
-            {globalRankings[1].name.charAt(0)}
-          </div>
-          <div className="rank-podium-name">{globalRankings[1].name}</div>
-          <div className="rank-podium-country">{globalRankings[1].nationality}</div>
-          <div className="rank-podium-pts">{globalRankings[1].points.toLocaleString()} pts</div>
-          <div className="rank-podium-step rank-podium-step--2">🥈 #2</div>
-        </div>
+      {(top1 || top2 || top3) && (
+        <div className="rank-podium">
+          {/* 2nd */}
+          {top2 && (
+            <div className="rank-podium-item rank-podium-item--2">
+              <div className="rank-podium-avatar rank-podium-avatar--2">
+                {top2.name.charAt(0)}
+              </div>
+              <div className="rank-podium-name">{top2.name}</div>
+              <div className="rank-podium-country">{top2.nationality}</div>
+              <div className="rank-podium-pts">{top2.points.toLocaleString()} pts</div>
+              <div className="rank-podium-step rank-podium-step--2">🥈 #2</div>
+            </div>
+          )}
 
-        {/* 1st */}
-        <div className="rank-podium-item rank-podium-item--1">
-          <div className="rank-podium-crown">👑</div>
-          <div className="rank-podium-avatar rank-podium-avatar--1">
-            {globalRankings[0].name.charAt(0)}
-          </div>
-          <div className="rank-podium-name">{globalRankings[0].name}</div>
-          <div className="rank-podium-country">{globalRankings[0].nationality}</div>
-          <div className="rank-podium-pts">{globalRankings[0].points.toLocaleString()} pts</div>
-          <div className="rank-podium-step rank-podium-step--1">🥇 #1</div>
-        </div>
+          {/* 1st */}
+          {top1 && (
+            <div className="rank-podium-item rank-podium-item--1">
+              <div className="rank-podium-crown">👑</div>
+              <div className="rank-podium-avatar rank-podium-avatar--1">
+                {top1.name.charAt(0)}
+              </div>
+              <div className="rank-podium-name">{top1.name}</div>
+              <div className="rank-podium-country">{top1.nationality}</div>
+              <div className="rank-podium-pts">{top1.points.toLocaleString()} pts</div>
+              <div className="rank-podium-step rank-podium-step--1">🥇 #1</div>
+            </div>
+          )}
 
-        {/* 3rd */}
-        <div className="rank-podium-item rank-podium-item--3">
-          <div className="rank-podium-avatar rank-podium-avatar--3">
-            {globalRankings[2].name.charAt(0)}
-          </div>
-          <div className="rank-podium-name">{globalRankings[2].name}</div>
-          <div className="rank-podium-country">{globalRankings[2].nationality}</div>
-          <div className="rank-podium-pts">{globalRankings[2].points.toLocaleString()} pts</div>
-          <div className="rank-podium-step rank-podium-step--3">🥉 #3</div>
+          {/* 3rd */}
+          {top3 && (
+            <div className="rank-podium-item rank-podium-item--3">
+              <div className="rank-podium-avatar rank-podium-avatar--3">
+                {top3.name.charAt(0)}
+              </div>
+              <div className="rank-podium-name">{top3.name}</div>
+              <div className="rank-podium-country">{top3.nationality}</div>
+              <div className="rank-podium-pts">{top3.points.toLocaleString()} pts</div>
+              <div className="rank-podium-step rank-podium-step--3">🥉 #3</div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* Full table */}
       <div className="jockey-card">
@@ -184,3 +259,4 @@ export default function Rankings() {
     </div>
   )
 }
+
