@@ -8,6 +8,8 @@ export default function OwnerHorses() {
   const [newHorseModal, setNewHorseModal] = useState(false)
   const [registerModal, setRegisterModal] = useState(false)
   const [selectedHorse, setSelectedHorse] = useState(null)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   
   // Form fields
   const [name, setName] = useState('')
@@ -61,10 +63,8 @@ export default function OwnerHorses() {
     const payload = {
       name,
       age: parseInt(age, 10),
-      gender,
       breed,
-      color,
-      status: 'ready'
+      healthStatus: 'ELIGIBLE'
     }
 
     try {
@@ -83,7 +83,8 @@ export default function OwnerHorses() {
         currentJockey: null
       }
       setHorses([...horses, newHorse])
-      alert('✅ Đăng ký ngựa mới thành công!')
+      setSuccessMessage('Đăng ký ngựa mới thành công!')
+      setShowSuccessPopup(true)
     } catch (err) {
       console.warn('Đăng ký ngựa qua API lỗi, tạo cục bộ:', err.message)
       // Fallback: Create locally
@@ -97,7 +98,8 @@ export default function OwnerHorses() {
         lastRace: 'Mới đăng ký'
       }
       setHorses([...horses, localNew])
-      alert('⚠️ Đăng ký ngựa thành công (Dữ liệu lưu tạm thời)')
+      setSuccessMessage('Đăng ký ngựa thành công (Dữ liệu lưu tạm thời)')
+      setShowSuccessPopup(true)
     }
 
     setNewHorseModal(false)
@@ -120,8 +122,8 @@ export default function OwnerHorses() {
     
     try {
       await ownerService.registerHorseToRace({
-        horseId: selectedHorse.id,
-        raceScheduleId: selectedRaceId
+        horseId: Number(selectedHorse.id),
+        raceScheduleId: Number(selectedRaceId)
       })
       
       setHorses(horses.map(h => {
@@ -218,6 +220,31 @@ export default function OwnerHorses() {
           </table>
         </div>
       </div>
+
+      {/* Modal: Success Popup */}
+      {showSuccessPopup && (
+        <div className="owner-modal-overlay" style={{ zIndex: 10000 }}>
+          <div className="owner-modal" style={{ maxWidth: '400px', textAlign: 'center', padding: '30px' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto', display: 'block' }}>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <h3 style={{ color: '#d4af37', marginBottom: '15px', fontSize: '22px', fontWeight: 'bold' }}>Thành công!</h3>
+            <p style={{ color: '#ccc', marginBottom: '25px', lineHeight: '1.6', fontSize: '15px' }}>
+              {successMessage}
+            </p>
+            <button 
+              onClick={() => setShowSuccessPopup(false)}
+              className="owner-btn owner-btn--gold"
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal: New Horse Form */}
       {newHorseModal && (
