@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { ownerHorses as initialHorses, ownerRaces } from '../../../data/ownerMockData'
 import * as ownerService from '../../../services/ownerService'
+import { useAuth } from '../../../contexts/AuthContext'
+import { registrations as adminInitialRegistrations } from '../../../data/adminMockData'
+import * as tournamentService from '../../../services/tournamentService'
 
 export default function OwnerHorses() {
   const [horses, setHorses] = useState([])
@@ -20,10 +23,44 @@ export default function OwnerHorses() {
   
   // Registration Form fields
   const [selectedRaceId, setSelectedRaceId] = useState('')
+  const [availableRaces, setAvailableRaces] = useState([])
+  const [loadingRaces, setLoadingRaces] = useState(false)
+  const [medicalCertificate, setMedicalCertificate] = useState('')
 
-  // ── Fetch horses from API on mount ──
+  // New Horse Attachment states
+  const [birthCertificate, setBirthCertificate] = useState('')
+  const [horseImage, setHorseImage] = useState('')
+
+  const handleFileChange = (e, setter) => {
+    const file = e.target.files[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setter(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const { user } = useAuth()
+
+  // ── Fetch/Load horses ──
   useEffect(() => {
+    if (!user) return
+
     async function loadHorses() {
+      const storageKey = `owner_horses_${user.email || 'giathanh.owner@gmail.com'}`
+      const stored = localStorage.getItem(storageKey)
+      if (stored) {
+        try {
+          setHorses(JSON.parse(stored))
+          setLoading(false)
+          return
+        } catch (e) {
+          console.error('Failed to parse owner_horses from localStorage:', e)
+        }
+      }
+
       try {
         setLoading(true)
         const data = await ownerService.getOwnerHorses()
@@ -45,16 +82,25 @@ export default function OwnerHorses() {
           color:         h.color ?? 'Hạt dẻ'
         }))
         setHorses(formatted)
+        localStorage.setItem(storageKey, JSON.stringify(formatted))
       } catch (err) {
         console.warn('API getOwnerHorses lỗi, dùng dữ liệu giả lập:', err.message)
         // Fallback to initial mock data during dev
         setHorses(initialHorses)
+        localStorage.setItem(storageKey, JSON.stringify(initialHorses))
       } finally {
         setLoading(false)
       }
     }
     loadHorses()
-  }, [])
+  }, [user])
+
+  useEffect(() => {
+    if (user && horses.length > 0) {
+      const storageKey = `owner_horses_${user.email || 'giathanh.owner@gmail.com'}`
+      localStorage.setItem(storageKey, JSON.stringify(horses))
+    }
+  }, [horses, user])
 
   const handleAddHorse = async (e) => {
     e.preventDefault()
@@ -80,10 +126,12 @@ export default function OwnerHorses() {
         races:         0,
         earnings:      '0 VND',
         status:        'ready',
-        currentJockey: null
+        currentJockey: null,
+        birthCertificateUrl: birthCertificate || '',
+        horseImageUrl: horseImage || ''
       }
       setHorses([...horses, newHorse])
-      setSuccessMessage('Đăng ký ngựa mới thành công!')
+      setSuccessMessage('Thêm ngựa mới thành công!')
       setShowSuccessPopup(true)
     } catch (err) {
       console.warn('Đăng ký ngựa qua API lỗi, tạo cục bộ:', err.message)
@@ -95,30 +143,113 @@ export default function OwnerHorses() {
         races: 0,
         earnings: '0 VND',
         currentJockey: null,
-        lastRace: 'Mới đăng ký'
+        lastRace: 'Mới đăng ký',
+        birthCertificateUrl: birthCertificate || '',
+        horseImageUrl: horseImage || ''
       }
       setHorses([...horses, localNew])
-      setSuccessMessage('Đăng ký ngựa thành công (Dữ liệu lưu tạm thời)')
+      setSuccessMessage('Thêm ngựa mới thành công (Dữ liệu lưu tạm thời)')
       setShowSuccessPopup(true)
     }
 
     setNewHorseModal(false)
     setName('')
     setAge('')
+    setBirthCertificate('')
+    setHorseImage('')
   }
 
-  const openRegisterModal = (horse) => {
-    setSelectedHorse(horse)
-    const availableRaces = ownerRaces.filter(r => r.status === 'upcoming')
-    if (availableRaces.length > 0) {
-      setSelectedRaceId(availableRaces[0].id)
+  const handleToggleStatus = async (horseId, currentStatus) => {
+    const nextStatus = currentStatus === 'ready' ? 'resting' : 'ready'
+    try {
+      await ownerService.updateOwnerHorse(horseId, { status: nextStatus })
+      setHorses(horses.map(h => h.id === horseId ? { ...h, status: nextStatus } : h))
+      alert('Cập nhật trạng thái ngựa thành công!')
+    } catch (e) {
+      console.warn('API updateOwnerHorse lỗi, xử lý cục bộ:', e.message)
+      setHorses(horses.map(h => h.id === horseId ? { ...h, status: nextStatus } : h))
+      alert('Cập nhật trạng thái ngựa thành công (Lưu tạm thời)')
     }
+  }
+
+  const openRegisterModal = async (horse) => {
+    setSelectedHorse(horse)
     setRegisterModal(true)
+    setLoadingRaces(true)
+    
+    try {
+      const tournamentsList = await tournamentService.getTournaments()
+      const activeTournaments = tournamentsList.filter(t => t.status === 'ACTIVE')
+      
+      const allSchedules = []
+      for (const tour of activeTournaments) {
+        try {
+          const scheduleRes = await tournamentService.getTournamentSchedule(tour.id)
+          const schedules = Array.isArray(scheduleRes) ? scheduleRes : scheduleRes?.data ?? []
+          
+          schedules.forEach(s => {
+            if (s.status === 'PENDING') {
+              allSchedules.push({
+                id: s.id,
+                name: s.name,
+                tournamentName: tour.name,
+                distance: '1600m',
+                prizePool: '500,000,000 VND'
+              })
+            }
+          })
+        } catch (err) {
+          console.warn(`Lỗi load tournament ${tour.id}:`, err)
+        }
+      }
+
+      if (allSchedules.length > 0) {
+        setAvailableRaces(allSchedules)
+        setSelectedRaceId(String(allSchedules[0].id))
+      } else {
+        // Fallback
+        const storedRaces = localStorage.getItem('owner_races')
+        const currentRaces = storedRaces ? JSON.parse(storedRaces) : ownerRaces
+        const fallbacks = currentRaces.filter(r => r.status === 'upcoming')
+        setAvailableRaces(fallbacks)
+        if (fallbacks.length > 0) {
+          setSelectedRaceId(String(fallbacks[0].id))
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi load giải đấu:', e)
+      const storedRaces = localStorage.getItem('owner_races')
+      const currentRaces = storedRaces ? JSON.parse(storedRaces) : ownerRaces
+      const fallbacks = currentRaces.filter(r => r.status === 'upcoming')
+      setAvailableRaces(fallbacks)
+      if (fallbacks.length > 0) {
+        setSelectedRaceId(String(fallbacks[0].id))
+      }
+    } finally {
+      setLoadingRaces(false)
+    }
   }
 
   const handleRegisterToRace = async (e) => {
     e.preventDefault()
     if (!selectedHorse || !selectedRaceId) return
+
+    const storedRaces = localStorage.getItem('owner_races')
+    const currentRaces = storedRaces ? JSON.parse(storedRaces) : ownerRaces
+    const raceObj = availableRaces.find(r => String(r.id) === String(selectedRaceId))
+    const raceName = raceObj ? raceObj.name : 'Đua Tốc Độ Mùa Hè 2026'
+
+    const newReg = {
+      id: `REG-${Math.floor(500 + Math.random() * 500)}`,
+      horse: selectedHorse.name,
+      owner: user?.name || 'Lý Gia Thành',
+      race: raceName,
+      submitted: new Date().toISOString().split('T')[0],
+      status: 'pending',
+      birthCertificateUrl: selectedHorse.birthCertificateUrl || '',
+      horseImageUrl: selectedHorse.horseImageUrl || '',
+      medicalCertificateUrl: medicalCertificate || ''
+    }
     
     try {
       await ownerService.registerHorseToRace({
@@ -132,6 +263,27 @@ export default function OwnerHorses() {
         }
         return h
       }))
+
+      // Sync mock registrations and races
+      const storedRegs = localStorage.getItem('mock_registrations')
+      const currentRegs = storedRegs ? JSON.parse(storedRegs) : adminInitialRegistrations
+      localStorage.setItem('mock_registrations', JSON.stringify([newReg, ...currentRegs]))
+
+      const updatedRaces = currentRaces.map(r => {
+        if (String(r.id) === String(selectedRaceId)) {
+          return {
+            ...r,
+            status: 'registered',
+            registeredHorse: selectedHorse.name
+          }
+        }
+        return r
+      })
+      localStorage.setItem('owner_races', JSON.stringify(updatedRaces))
+
+      // Dispatch event to sync immediately in this window
+      window.dispatchEvent(new Event('storage'))
+
       alert(`✅ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu!`)
     } catch (err) {
       console.warn('Đăng ký giải đấu qua API lỗi, xử lý cục bộ:', err.message)
@@ -142,9 +294,31 @@ export default function OwnerHorses() {
         }
         return h
       }))
+
+      // Sync mock registrations and races (in case of API error)
+      const storedRegs = localStorage.getItem('mock_registrations')
+      const currentRegs = storedRegs ? JSON.parse(storedRegs) : adminInitialRegistrations
+      localStorage.setItem('mock_registrations', JSON.stringify([newReg, ...currentRegs]))
+
+      const updatedRaces = currentRaces.map(r => {
+        if (String(r.id) === String(selectedRaceId)) {
+          return {
+            ...r,
+            status: 'registered',
+            registeredHorse: selectedHorse.name
+          }
+        }
+        return r
+      })
+      localStorage.setItem('owner_races', JSON.stringify(updatedRaces))
+
+      // Dispatch event to sync immediately in this window
+      window.dispatchEvent(new Event('storage'))
+
       alert(`⚠️ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu (Lưu tạm thời)`)
     }
     
+    setMedicalCertificate('')
     setRegisterModal(false)
   }
 
@@ -165,7 +339,7 @@ export default function OwnerHorses() {
           <p className="owner-page-sub">Danh sách các chiến mã thuộc trang trại của bạn.</p>
         </div>
         <button className="owner-btn owner-btn--gold" onClick={() => setNewHorseModal(true)}>
-          + Đăng Ký Ngựa Mới
+          + Thêm Ngựa Mới
         </button>
       </div>
 
@@ -204,14 +378,28 @@ export default function OwnerHorses() {
                   </td>
                   <td>{horse.currentJockey || 'Chưa chỉ định'}</td>
                   <td>
-                    <div className="owner-table-actions">
-                      <button 
-                        className="owner-btn owner-btn--outline owner-btn--sm"
-                        disabled={horse.status === 'registered'}
-                        onClick={() => openRegisterModal(horse)}
-                      >
-                        Đăng ký giải đấu
-                      </button>
+                    <div className="owner-table-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {horse.status === 'registered' ? (
+                        <span style={{ color: '#666', fontSize: '13px', fontStyle: 'italic', paddingLeft: '8px' }}>
+                          Đã đăng ký
+                        </span>
+                      ) : (
+                        <>
+                          <button 
+                            className="owner-btn owner-btn--outline owner-btn--sm"
+                            onClick={() => openRegisterModal(horse)}
+                          >
+                            Đăng ký giải đấu
+                          </button>
+                          <button 
+                            className="owner-btn owner-btn--ghost owner-btn--sm"
+                            onClick={() => handleToggleStatus(horse.id, horse.status)}
+                            style={{ borderColor: 'rgba(255,255,255,0.1)', color: '#aaa' }}
+                          >
+                            {horse.status === 'ready' ? 'Nghỉ dưỡng' : 'Kích hoạt'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -251,7 +439,7 @@ export default function OwnerHorses() {
         <div className="owner-modal-overlay">
           <div className="owner-modal">
             <div className="owner-modal-head">
-              <h2>Đăng ký tài khoản ngựa tham gia hệ thống</h2>
+              <h2>Thêm ngựa mới</h2>
               <button className="owner-modal-close" onClick={() => setNewHorseModal(false)}>×</button>
             </div>
             <form onSubmit={handleAddHorse}>
@@ -305,6 +493,37 @@ export default function OwnerHorses() {
                       onChange={(e) => setColor(e.target.value)}
                     />
                   </div>
+
+                  <div className="owner-form-group" style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px' }}>
+                    <div>
+                      <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Giấy khai sinh (Ảnh)</label>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(e, setBirthCertificate)}
+                        style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
+                      />
+                      {birthCertificate && (
+                        <div style={{ marginTop: '8px' }}>
+                          <img src={birthCertificate} alt="Khai sinh Preview" style={{ width: '100px', height: '60px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Ảnh chiến mã</label>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(e, setHorseImage)}
+                        style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
+                      />
+                      {horseImage && (
+                        <div style={{ marginTop: '8px' }}>
+                          <img src={horseImage} alt="Ảnh ngựa Preview" style={{ width: '100px', height: '60px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="owner-modal-footer">
@@ -312,7 +531,7 @@ export default function OwnerHorses() {
                   Hủy
                 </button>
                 <button type="submit" className="owner-btn owner-btn--gold">
-                  Đăng Ký
+                  Thêm Ngựa
                 </button>
               </div>
             </form>
@@ -337,21 +556,40 @@ export default function OwnerHorses() {
                     style={{ width: '100%', marginTop: 8 }}
                     value={selectedRaceId}
                     onChange={(e) => setSelectedRaceId(e.target.value)}
+                    disabled={loadingRaces}
                   >
-                    {ownerRaces.filter(r => r.status === 'upcoming').map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} - ({r.distance} | Thưởng: {r.prizePool})
-                      </option>
-                    ))}
-                    {ownerRaces.filter(r => r.status === 'upcoming').length === 0 && (
+                    {loadingRaces ? (
+                      <option value="">Đang tải danh sách từ máy chủ...</option>
+                    ) : (
+                      availableRaces.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} - ({r.tournamentName || 'Giải đấu'})
+                        </option>
+                      ))
+                    )}
+                    {!loadingRaces && availableRaces.length === 0 && (
                       <option value="">Không có giải đấu nào đang mở đăng ký</option>
                     )}
                   </select>
                 </div>
-                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: 16, borderRadius: 12, fontSize: 13 }}>
+                <div className="owner-form-group full" style={{ marginBottom: 16 }}>
+                  <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Giấy kiểm tra y tế (Ảnh chứng nhận)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setMedicalCertificate)}
+                    style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
+                  />
+                  {medicalCertificate && (
+                    <div style={{ marginTop: '8px' }}>
+                      <img src={medicalCertificate} alt="Y tế Preview" style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: 16, borderRadius: 12, fontSize: 13, marginBottom: 16 }}>
                   <p style={{ margin: '0 0 8px' }}><strong>Lưu ý đăng ký:</strong></p>
                   <ul style={{ margin: 0, paddingLeft: 20, color: '#aaa', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <li>Phí tham gia giải đấu: 10,000,000 VND sẽ trừ vào tài khoản stable.</li>
                     <li>Chiến mã cần ở trạng thái Sẵn sàng và không có chấn thương.</li>
                     <li>Ban tổ chức sẽ phê duyệt hồ sơ trong vòng 24 giờ.</li>
                   </ul>

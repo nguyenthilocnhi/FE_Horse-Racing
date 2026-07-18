@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   dashboardStats,
   recentActivities,
-  registrations as defaultRegistrations,
   resultReports as defaultResultReports,
   complaints as defaultComplaints
 } from '../../../data/adminMockData'
@@ -14,19 +13,11 @@ import './Dashboard.css'
 export default function Dashboard() {
   const navigate = useNavigate()
 
-  const [pendingRegCount, setPendingRegCount] = useState(0)
   const [pendingAccountCount, setPendingAccountCount] = useState(0)
   const [pendingResultCount, setPendingResultCount] = useState(0)
   const [pendingComplaintCount, setPendingComplaintCount] = useState(0)
 
   useEffect(() => {
-    // Registrations count
-    const storedReg = localStorage.getItem('mock_registrations')
-    const regs = storedReg ? JSON.parse(storedReg) : defaultRegistrations
-    if (!storedReg) {
-      localStorage.setItem('mock_registrations', JSON.stringify(defaultRegistrations))
-    }
-    setPendingRegCount(regs.filter(r => r.status === 'pending').length)
 
     // Accounts count
     async function fetchAccounts() {
@@ -99,15 +90,6 @@ export default function Dashboard() {
         <div className="admin-card">
           <div className="admin-card-head"><h3>Chờ xử lý</h3></div>
           <div className="admin-card-body dashboard-pending-list">
-            <div 
-              className="dashboard-pending-item"
-              onClick={() => navigate('/admin/registrations')}
-              style={{ cursor: 'pointer', transition: 'transform 0.2s, background-color 0.2s' }}
-            >
-              <span>Ngựa đăng ký chờ duyệt</span>
-              <StatusBadge status="pending" />
-              <strong>{pendingRegCount}</strong>
-            </div>
             <div 
               className="dashboard-pending-item"
               onClick={() => navigate('/admin/users')}

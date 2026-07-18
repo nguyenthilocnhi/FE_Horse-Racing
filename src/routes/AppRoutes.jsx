@@ -16,7 +16,6 @@ import UserManagement from '../pages/admin/Users/UserManagement'
 import TournamentManagement from '../pages/admin/Tournaments/TournamentManagement'
 import RaceManagement from '../pages/admin/Races/RaceManagement'
 import RegistrationApproval from '../pages/admin/Registrations/RegistrationApproval'
-import RefereeAssignment from '../pages/admin/Referees/RefereeAssignment'
 import ResultApproval from '../pages/admin/Results/ResultApproval'
 import RankingManagement from '../pages/admin/Rankings/RankingManagement'
 import ViolationManagement from '../pages/admin/Violations/ViolationManagement'
@@ -26,7 +25,6 @@ import PaymentManagement from '../pages/admin/Payments/PaymentManagement'
 import NotificationManagement from '../pages/admin/Notifications/NotificationManagement'
 import ReportsAnalytics from '../pages/admin/Reports/ReportsAnalytics'
 import JockeyManagement from '../pages/admin/Jockeys/JockeyManagement'
-import HorseManagement from '../pages/admin/Horses/HorseManagement'
 import PredictionManagement from '../pages/admin/Predictions/PredictionManagement'
 import SpectatorLayout from '../layouts/SpectatorLayout'
 import SpectatorDashboard from '../pages/spectator/Dashboard/SpectatorDashboard'
@@ -133,10 +131,8 @@ export default function AppRoutes() {
         <Route path="/admin/users" element={<UserManagement />} />
         <Route path="/admin/tournaments" element={<TournamentManagement />} />
         <Route path="/admin/races" element={<RaceManagement />} />
-        <Route path="/admin/horses" element={<HorseManagement />} />
         <Route path="/admin/jockeys" element={<JockeyManagement />} />
         <Route path="/admin/registrations" element={<RegistrationApproval />} />
-        <Route path="/admin/referees" element={<RefereeAssignment />} />
         <Route path="/admin/results" element={<ResultApproval />} />
         <Route path="/admin/predictions" element={<PredictionManagement />} />
         <Route path="/admin/rankings" element={<RankingManagement />} />

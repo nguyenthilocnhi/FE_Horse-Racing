@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { registrations as initialRegistrations } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import './RegistrationApproval.css'
@@ -24,7 +24,24 @@ export default function RegistrationApproval() {
     localStorage.setItem('mock_registrations', JSON.stringify(initialRegistrations))
     return initialRegistrations
   })
+
+  useEffect(() => {
+    const syncRegs = () => {
+      const stored = localStorage.getItem('mock_registrations')
+      if (stored) {
+        try {
+          setRegistrations(JSON.parse(stored))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+    window.addEventListener('storage', syncRegs)
+    return () => window.removeEventListener('storage', syncRegs)
+  }, [])
+
   const [selectedReg, setSelectedReg] = useState(null)
+  const [zoomedImg, setZoomedImg] = useState(null)
   
   // Checklist state for selected registration
   const [checklist, setChecklist] = useState({
@@ -65,6 +82,78 @@ export default function RegistrationApproval() {
     })
     setRegistrations(updated)
     localStorage.setItem('mock_registrations', JSON.stringify(updated))
+
+    // ── Update the owner's horse status inside localStorage ──
+    const targetReg = registrations.find(r => r.id === id)
+    if (targetReg) {
+      const horseName = targetReg.horse
+      // Search all owner horses in localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (key && key.startsWith('owner_horses_')) {
+          try {
+            const ownerHorses = JSON.parse(localStorage.getItem(key) || '[]')
+            let modified = false
+            const nextOwnerHorses = ownerHorses.map(h => {
+              if (h.name === horseName) {
+                modified = true
+                return { ...h, status: newStatus === 'approved' ? 'ready' : 'resting' }
+              }
+              return h
+            })
+            if (modified) {
+              localStorage.setItem(key, JSON.stringify(nextOwnerHorses))
+            }
+          } catch (e) {
+            console.error('Lỗi khi cập nhật trạng thái ngựa của owner trong localStorage:', e)
+          }
+        }
+      }
+
+      // Also update the matching race status in owner_races inside localStorage
+      const storedRaces = localStorage.getItem('owner_races')
+      if (storedRaces) {
+        try {
+          const currentRaces = JSON.parse(storedRaces)
+          const updatedRaces = currentRaces.map(r => {
+            if (r.registeredHorse === horseName) {
+              return {
+                ...r,
+                status: newStatus === 'approved' ? 'registered' : 'upcoming',
+                registeredHorse: newStatus === 'approved' ? horseName : null
+              }
+            }
+            return r
+          })
+          localStorage.setItem('owner_races', JSON.stringify(updatedRaces))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+
+      // ── Send a notification to the owner ──
+      const notifs = JSON.parse(localStorage.getItem('owner_notifications') || '[]')
+      const timestamp = new Date().toLocaleString('vi-VN')
+      if (newStatus === 'approved') {
+        notifs.unshift({
+          id: `NOTIF-${Date.now()}`,
+          title: 'Đăng ký được phê duyệt 💚',
+          message: `Chiến mã "${horseName}" đăng ký tham gia giải đấu "${targetReg.race}" đã được duyệt thành công! Ngựa đủ điều kiện tham gia.`,
+          type: 'success',
+          timestamp
+        })
+      } else if (newStatus === 'rejected') {
+        notifs.unshift({
+          id: `NOTIF-${Date.now()}`,
+          title: 'Đăng ký bị từ chối ❌',
+          message: `Yêu cầu đăng ký chiến mã "${horseName}" tham gia giải đấu "${targetReg.race}" đã bị từ chối xét duyệt.`,
+          type: 'danger',
+          timestamp
+        })
+      }
+      localStorage.setItem('owner_notifications', JSON.stringify(notifs))
+    }
+
     alert(newStatus === 'approved' ? 'Đã duyệt đăng ký thành công!' : newStatus === 'rejected' ? 'Đã từ chối đăng ký!' : 'Đã trả hồ sơ về hàng chờ!')
   }
 
@@ -188,6 +277,65 @@ export default function RegistrationApproval() {
                 <dd><StatusBadge status={selectedReg.status} /></dd>
               </dl>
 
+              {/* Document Previews */}
+              <div style={{ marginBottom: '20px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h5 style={{ margin: '0 0 12px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d4af37' }}>Tài liệu đính kèm</h5>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  
+                  {/* Horse Image */}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Ảnh ngựa</div>
+                    {selectedReg.horseImageUrl ? (
+                      <img 
+                        src={selectedReg.horseImageUrl} 
+                        alt="Ảnh chiến mã" 
+                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onClick={() => setZoomedImg(selectedReg.horseImageUrl)}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                        Chưa có
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Birth Certificate */}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Khai sinh</div>
+                    {selectedReg.birthCertificateUrl ? (
+                      <img 
+                        src={selectedReg.birthCertificateUrl} 
+                        alt="Giấy khai sinh" 
+                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onClick={() => setZoomedImg(selectedReg.birthCertificateUrl)}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                        Chưa có
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Medical Certificate */}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Giấy y tế</div>
+                    {selectedReg.medicalCertificateUrl ? (
+                      <img 
+                        src={selectedReg.medicalCertificateUrl} 
+                        alt="Chứng nhận y tế" 
+                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onClick={() => setZoomedImg(selectedReg.medicalCertificateUrl)}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
+                        Chưa có
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
               {selectedReg.status === 'pending' && (
                 <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)', marginBottom: '20px' }}>
                   <h5 style={{ margin: '0 0 10px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d4af37' }}>Checklist xác minh</h5>
@@ -259,6 +407,38 @@ export default function RegistrationApproval() {
           </div>
         )}
       </div>
+
+      {/* Lightbox Zoom Overlay */}
+      {zoomedImg && (
+        <div 
+          onClick={() => setZoomedImg(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.95)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            cursor: 'zoom-out'
+          }}
+        >
+          <img 
+            src={zoomedImg} 
+            alt="Phóng to tài liệu" 
+            style={{ 
+              maxWidth: '90%', 
+              maxHeight: '90%', 
+              objectFit: 'contain', 
+              borderRadius: '8px', 
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)' 
+            }} 
+          />
+        </div>
+      )}
     </div>
   )
 }

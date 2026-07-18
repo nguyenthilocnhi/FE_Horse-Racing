@@ -20,7 +20,6 @@ export default function TournamentManagement() {
         venue: t.location || '',
         startDate: t.startDate || '',
         endDate: t.endDate || '',
-        prize: '1.5 Tỷ VND',
         status: t.status ? t.status.toLowerCase() : 'draft',
         races: t.races || 0
       }))
@@ -50,7 +49,6 @@ export default function TournamentManagement() {
     venue: '',
     startDate: '',
     endDate: '',
-    prize: '',
     status: 'draft'
   })
 
@@ -62,7 +60,6 @@ export default function TournamentManagement() {
       venue: '',
       startDate: '',
       endDate: '',
-      prize: '1.5 Tỷ VND',
       status: 'draft'
     })
     setShowForm(true)
@@ -76,7 +73,6 @@ export default function TournamentManagement() {
       venue: t.venue,
       startDate: t.startDate,
       endDate: t.endDate,
-      prize: t.prize,
       status: t.status
     })
   }
@@ -249,7 +245,6 @@ export default function TournamentManagement() {
                     <th>Địa điểm</th>
                     <th>Thời gian</th>
                     <th>Races</th>
-                    <th>Giải thưởng</th>
                     <th>Trạng thái</th>
                     <th>Thao tác</th>
                   </tr>
@@ -262,7 +257,6 @@ export default function TournamentManagement() {
                       <td>{t.venue}</td>
                       <td>{t.startDate} → {t.endDate}</td>
                       <td>{t.races} races</td>
-                      <td>{t.prize}</td>
                       <td><StatusBadge status={t.status} /></td>
                       <td>
                         <div className="admin-table-actions">
@@ -288,7 +282,7 @@ export default function TournamentManagement() {
                   ))}
                   {filteredTournaments.length === 0 && (
                     <tr>
-                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy giải đấu phù hợp</td>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy giải đấu phù hợp</td>
                     </tr>
                   )}
                 </tbody>

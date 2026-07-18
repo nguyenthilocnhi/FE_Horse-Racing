@@ -1,10 +1,25 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ownerRaces as initialRaces } from '../../../data/ownerMockData'
 
 export default function OwnerRaces() {
-  const [races, setRaces] = useState(initialRaces)
+  const [races, setRaces] = useState(() => {
+    const stored = localStorage.getItem('owner_races')
+    if (stored) {
+      try {
+        return JSON.parse(stored)
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    return initialRaces
+  })
+
   const [selectedRace, setSelectedRace] = useState(null)
   const [detailsModal, setDetailsModal] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem('owner_races', JSON.stringify(races))
+  }, [races])
 
   const handleConfirmReady = (raceId) => {
     setRaces(races.map(r => {

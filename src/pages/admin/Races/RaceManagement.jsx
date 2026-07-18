@@ -15,6 +15,8 @@ export default function RaceManagement() {
 
   const [showForm, setShowForm] = useState(false)
   const [editingRace, setEditingRace] = useState(null)
+  const [selectedTournamentFilter, setSelectedTournamentFilter] = useState('')
+  const [refereesList, setRefereesList] = useState([])
   
   const { searchQuery = '' } = useOutletContext() || {}
 
@@ -25,7 +27,8 @@ export default function RaceManagement() {
     date: '',
     time: '',
     distance: '1600m',
-    status: 'scheduled'
+    status: 'scheduled',
+    refereeId: ''
   })
 
   // Round Arrangement State
@@ -70,6 +73,8 @@ export default function RaceManagement() {
               distance: r.distance || '1600m',
               status: statusVal,
               horses: r.raceParticipationList?.length || 0,
+              refereeId: r.refereeId || r.referee?.id || '',
+              refereeName: r.refereeName || r.referee?.fullName || '',
               rawRace: r
             }
           })
@@ -80,9 +85,10 @@ export default function RaceManagement() {
       }
       setRaces(allRaces)
 
-      // 3. Fetch Jockeys & Horses for arranging lanes
-      const jockeyList = await adminAccountService.getAllAccounts()
-      setJockeysList((jockeyList || []).filter(u => u.role === 'JOCKEY'))
+      // 3. Fetch Jockeys, Referees & Horses for arranging lanes
+      const allAccounts = await adminAccountService.getAllAccounts()
+      setJockeysList((allAccounts || []).filter(u => u.role === 'JOCKEY'))
+      setRefereesList((allAccounts || []).filter(u => u.role === 'REFEREE' || u.role === 'RACE_REFEREE'))
       
       const horseList = await horseService.getHorses()
       setHorsesList(horseList || [])
@@ -100,9 +106,16 @@ export default function RaceManagement() {
 
   const filteredRaces = races.filter(race => {
     const q = searchQuery.toLowerCase()
-    return race.name.toLowerCase().includes(q) || 
-           race.tournament.toLowerCase().includes(q) ||
-           race.id.toLowerCase().includes(q)
+    const matchesSearch = 
+      race.name.toLowerCase().includes(q) || 
+      race.tournament.toLowerCase().includes(q) ||
+      race.id.toLowerCase().includes(q)
+      
+    const matchesTournament = selectedTournamentFilter
+      ? race.tournamentId?.toString() === selectedTournamentFilter.toString()
+      : true
+      
+    return matchesSearch && matchesTournament
   })
 
   // Initialize rounds for a race if not exists
@@ -193,7 +206,8 @@ export default function RaceManagement() {
       date: '',
       time: '',
       distance: '1600m',
-      status: 'scheduled'
+      status: 'scheduled',
+      refereeId: ''
     })
     setShowForm(true)
   }
@@ -206,7 +220,8 @@ export default function RaceManagement() {
       date: race.date,
       time: race.time,
       distance: race.distance,
-      status: race.status
+      status: race.status,
+      refereeId: race.refereeId?.toString() || ''
     })
     setShowForm(true)
   }
@@ -250,7 +265,8 @@ export default function RaceManagement() {
         await tournamentService.updateRaceSchedule(editingRace.tournamentId, editingRace.id, {
           startTime: startStr,
           endTime: endStr,
-          participationIds: editingRace.rawRace?.participationIds || []
+          participationIds: editingRace.rawRace?.participationIds || [],
+          refereeId: formData.refereeId ? parseInt(formData.refereeId) : null
         })
         alert('Cập nhật cuộc đua thành công!')
       } else {
@@ -260,7 +276,8 @@ export default function RaceManagement() {
           raceDate: formData.date,
           location: selectedT?.location || 'Sân đua chính',
           startTime: startStr,
-          endTime: endStr
+          endTime: endStr,
+          refereeId: formData.refereeId ? parseInt(formData.refereeId) : null
         })
         alert('Tạo cuộc đua thành công!')
       }
@@ -306,6 +323,23 @@ export default function RaceManagement() {
         >
           + Tạo race
         </button>
+      </div>
+
+      <div className="admin-filters-bar" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '600' }}>Lọc theo Giải đấu</label>
+          <select 
+            className="admin-select"
+            value={selectedTournamentFilter}
+            onChange={(e) => setSelectedTournamentFilter(e.target.value)}
+            style={{ minWidth: '220px', padding: '8px 12px', fontSize: '13px' }}
+          >
+            <option value="">-- Tất cả giải đấu --</option>
+            {tournaments.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {showForm && (
@@ -393,6 +427,23 @@ export default function RaceManagement() {
               />
             </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: 'span 2' }}>
+              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Phân công Trọng tài</label>
+              <select 
+                className="admin-select"
+                value={formData.refereeId}
+                onChange={(e) => setFormData({ ...formData, refereeId: e.target.value })}
+                style={{ width: '100%' }}
+              >
+                <option value="">-- Chưa phân công --</option>
+                {refereesList.map(r => (
+                  <option key={r.id} value={r.id}>
+                    {r.fullName || r.name || r.userName} (Kinh nghiệm: {r.experienceYears || '0'} năm)
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', gridColumn: 'span 2', marginTop: '12px' }}>
               <button 
                 type="button" 
@@ -415,53 +466,75 @@ export default function RaceManagement() {
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải lịch trình cuộc đua...</div>
       ) : (
-        <div className="race-cards-grid">
-          {filteredRaces.map((race) => (
-            <div key={race.id} className="admin-card race-card-item">
-              <div className="race-card-top">
-                <span className="race-card-id">#{race.id}</span>
-                <StatusBadge status={race.status} />
-              </div>
-              <h3>{race.name}</h3>
-              <p className="race-card-tournament">{race.tournament}</p>
-              <div className="race-card-meta">
-                <span>📅 {race.date} · ⏰ {race.time}</span>
-                <span>📏 Cự ly: {race.distance}</span>
-              </div>
-              <div className="race-card-horses">
-                <strong>{race.horses}</strong>
-                <span>ngựa tham gia</span>
-              </div>
-              <div className="admin-table-actions">
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--ghost admin-btn--sm"
-                  onClick={() => handleOpenEdit(race)}
-                >
-                  Sửa
-                </button>
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--outline admin-btn--sm"
-                  onClick={() => openArrangement(race)}
-                >
-                  Sắp xếp cuốc/vòng
-                </button>
-                {race.status === 'scheduled' && (
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--danger admin-btn--sm"
-                    onClick={() => handleCancelRace(race.id, race.tournamentId)}
-                  >
-                    Hủy
-                  </button>
+        <div className="admin-card">
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Tên cuộc đua</th>
+                  <th>Giải đấu</th>
+                  <th>Trọng tài</th>
+                  <th>Thời gian</th>
+                  <th>Cự ly</th>
+                  <th>Ngựa tham gia</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRaces.map((race) => (
+                  <tr key={race.id}>
+                    <td>#{race.id}</td>
+                    <td><strong className="race-name" style={{ color: '#fff' }}>{race.name}</strong></td>
+                    <td style={{ color: '#d4af37' }}>{race.tournament}</td>
+                    <td style={{ color: race.refereeName ? '#fff' : '#666' }}>
+                      👤 {race.refereeName || 'Chưa phân công'}
+                    </td>
+                    <td>📅 {race.date} · ⏰ {race.time}</td>
+                    <td>{race.distance}</td>
+                    <td>
+                      <strong style={{ color: '#d4af37', marginRight: '4px' }}>{race.horses}</strong>
+                      <span className="text-muted" style={{ fontSize: '12px' }}>ngựa</span>
+                    </td>
+                    <td><StatusBadge status={race.status} /></td>
+                    <td>
+                      <div className="admin-table-actions">
+                        <button 
+                          type="button" 
+                          className="admin-btn admin-btn--ghost admin-btn--sm"
+                          onClick={() => handleOpenEdit(race)}
+                        >
+                          Sửa
+                        </button>
+                        <button 
+                          type="button" 
+                          className="admin-btn admin-btn--outline admin-btn--sm"
+                          onClick={() => openArrangement(race)}
+                        >
+                          Sắp xếp cuốc/vòng
+                        </button>
+                        {race.status === 'scheduled' && (
+                          <button 
+                            type="button" 
+                            className="admin-btn admin-btn--danger admin-btn--sm"
+                            onClick={() => handleCancelRace(race.id, race.tournamentId)}
+                          >
+                            Hủy
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRaces.length === 0 && (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy cuộc đua phù hợp</td>
+                  </tr>
                 )}
-              </div>
-            </div>
-          ))}
-          {filteredRaces.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy cuộc đua phù hợp</div>
-          )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

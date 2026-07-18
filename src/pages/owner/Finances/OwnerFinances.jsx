@@ -6,12 +6,14 @@ export default function OwnerFinances() {
   const [filterType, setFilterType] = useState('all') // all, income, expense
 
   const totalIncome = txns.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-  const totalExpense = txns.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
-  const netEarnings = totalIncome - totalExpense
+  const totalWithdrawn = txns.filter(t => t.category === 'withdrawal' || t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const walletBalance = totalIncome - totalWithdrawn
 
   const filteredTxns = txns.filter(t => {
     if (filterType === 'all') return true
-    return t.type === filterType
+    if (filterType === 'income') return t.type === 'income'
+    if (filterType === 'expense') return t.category === 'withdrawal' || t.type === 'expense'
+    return true
   })
 
   return (
@@ -19,24 +21,24 @@ export default function OwnerFinances() {
       <div className="owner-page-head">
         <div>
           <h1 className="owner-page-title">Hồ sơ Tài chính Stable 🪙</h1>
-          <p className="owner-page-sub">Theo dõi tiền thưởng thi đấu, ngân sách trả lương jockey và chi phí đăng ký giải đấu.</p>
+          <p className="owner-page-sub">Theo dõi tiền thưởng thi đấu thắng giải và lịch sử rút tiền về tài khoản ngân hàng liên kết.</p>
         </div>
       </div>
 
       {/* Finance Summary Cards */}
       <div className="owner-stat-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 28 }}>
         <div className="owner-stat-card">
-          <span>Tổng thu nhập thưởng</span>
+          <span>Tổng tiền thưởng nhận</span>
           <strong style={{ color: '#4ade80' }}>+{totalIncome.toLocaleString()} VND</strong>
         </div>
         <div className="owner-stat-card">
-          <span>Tổng chi trả phí</span>
-          <strong style={{ color: '#f87171' }}>-{totalExpense.toLocaleString()} VND</strong>
+          <span>Tổng tiền đã rút</span>
+          <strong style={{ color: '#f87171' }}>-{totalWithdrawn.toLocaleString()} VND</strong>
         </div>
         <div className="owner-stat-card">
-          <span>Lợi nhuận ròng</span>
-          <strong style={{ color: netEarnings >= 0 ? '#4ade80' : '#f87171' }}>
-            {netEarnings >= 0 ? '+' : ''}{netEarnings.toLocaleString()} VND
+          <span>Số dư ví hiện tại</span>
+          <strong style={{ color: '#4ade80' }}>
+            {walletBalance.toLocaleString()} VND
           </strong>
         </div>
       </div>
@@ -56,13 +58,13 @@ export default function OwnerFinances() {
               className={`owner-btn owner-btn--sm ${filterType === 'income' ? 'owner-btn--gold' : 'owner-btn--ghost'}`}
               onClick={() => setFilterType('income')}
             >
-              Khoản thu
+              Tiền thưởng
             </button>
             <button 
               className={`owner-btn owner-btn--sm ${filterType === 'expense' ? 'owner-btn--gold' : 'owner-btn--ghost'}`}
               onClick={() => setFilterType('expense')}
             >
-              Khoản chi
+              Rút tiền
             </button>
           </div>
         </div>
@@ -86,9 +88,9 @@ export default function OwnerFinances() {
                   <td style={{ color: '#fff', fontWeight: 500 }}>{txn.description}</td>
                   <td>
                     <span className={`owner-badge owner-badge--${
-                      txn.category === 'prize_money' ? 'green' : txn.category === 'jockey_fee' ? 'red' : 'gray'
+                      txn.category === 'prize_money' ? 'green' : 'red'
                     }`}>
-                      {txn.category === 'prize_money' ? 'Tiền thưởng' : txn.category === 'jockey_fee' ? 'Phí Jockey' : txn.category === 'registration_fee' ? 'Lệ phí giải' : 'Y tế/Bảo dưỡng'}
+                      {txn.category === 'prize_money' ? 'Tiền thưởng' : 'Rút tiền'}
                     </span>
                   </td>
                   <td style={{ color: txn.type === 'income' ? '#4ade80' : '#f87171', fontWeight: 600, fontSize: 14 }}>

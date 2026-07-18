@@ -22,11 +22,11 @@ export const ownerProfile = {
 
 export const ownerStats = [
   { label: 'Số ngựa sở hữu', value: 8, unit: 'con' },
-  { label: 'Jockey đang thuê', value: 3, unit: 'người' },
+  { label: 'Jockey liên kết', value: 3, unit: 'người' },
   { label: 'Tỷ lệ thắng', value: '35.2', unit: '%' },
-  { label: 'Tổng thu nhập', value: '820,000,000', unit: 'đ' },
-  { label: 'Số dư ví', value: '2,500,000,000', unit: 'đ' },
-  { label: 'Thứ hạng stable', value: '#5', unit: '' },
+  { label: 'Tổng tiền thưởng', value: '280,000,000', unit: 'đ' },
+  { label: 'Tổng tiền đã rút', value: '150,000,000', unit: 'đ' },
+  { label: 'Số dư ví', value: '130,000,000', unit: 'đ' },
 ]
 
 export const ownerHorses = [
@@ -234,43 +234,35 @@ export const ownerRaces = [
 export const financialLog = [
   {
     id: 'TXN-001',
-    date: '2026-06-01',
-    type: 'income',
-    amount: 200000000,
-    category: 'prize_money',
-    description: 'Tiền thưởng Hạng 1 - Grand Prix Quốc Gia (Ngựa: Xích Thố)',
+    date: '2026-06-05',
+    type: 'expense',
+    amount: 50000000,
+    category: 'withdrawal',
+    description: 'Rút tiền về tài khoản ngân hàng liên kết',
   },
   {
     id: 'TXN-002',
     date: '2026-06-01',
-    type: 'expense',
-    amount: 15000000,
-    category: 'jockey_fee',
-    description: 'Chi trả phí jockey Nguyễn Hoàng Tuấn giải Grand Prix Quốc Gia',
+    type: 'income',
+    amount: 200000000,
+    category: 'prize_money',
+    description: 'Nhận tiền thưởng Hạng 1 - Grand Prix Quốc Gia (Ngựa: Xích Thố)',
   },
   {
     id: 'TXN-003',
-    date: '2026-05-28',
+    date: '2026-05-20',
     type: 'expense',
-    amount: 10000000,
-    category: 'registration_fee',
-    description: 'Phí đăng ký giải Đua Tốc Độ Mùa Hè 2026 cho ngựa Bạch Long',
+    amount: 100000000,
+    category: 'withdrawal',
+    description: 'Rút tiền về tài khoản ngân hàng liên kết',
   },
   {
     id: 'TXN-004',
-    date: '2026-05-15',
-    type: 'expense',
-    amount: 5000000,
-    category: 'maintenance',
-    description: 'Phí chăm sóc y tế định kỳ cho ngựa Hắc Phong',
-  },
-  {
-    id: 'TXN-005',
     date: '2026-05-10',
     type: 'income',
     amount: 80000000,
     category: 'prize_money',
-    description: 'Tiền thưởng Hạng 2 - Cúp Spring Classic (Ngựa: Bạch Long)',
+    description: 'Nhận tiền thưởng Hạng 2 - Cúp Spring Classic (Ngựa: Bạch Long)',
   },
 ]
 
