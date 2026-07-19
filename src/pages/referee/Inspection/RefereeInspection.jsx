@@ -21,6 +21,10 @@ export default function RefereeInspection() {
   const [races, setRaces] = useState(mockRaces.filter(r => r.status === 'scheduled' || r.status === 'ongoing'))
   const [selectedRace, setSelectedRace] = useState(null)
   const [vettingData, setVettingData] = useState(INITIAL_VETTING_DATA)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [pendingRaceId, setPendingRaceId] = useState(null)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   const handleToggleCheck = (raceId, horseId, field) => {
     setVettingData(prev => ({
@@ -37,15 +41,23 @@ export default function RefereeInspection() {
     const allPassed = list.every(h => h.medical && h.gear && h.weight)
     
     if (!allPassed) {
-      if (!window.confirm('Cảnh báo: Có ngựa đua chưa vượt qua toàn bộ tiêu chuẩn kiểm tra! Bạn vẫn muốn phê duyệt bắt đầu cuộc đua?')) {
-        return
-      }
+      setPendingRaceId(raceId)
+      setShowConfirmModal(true)
+      return
     }
 
+    proceedApproveRaceStart(raceId)
+  }
+
+  const proceedApproveRaceStart = (raceId) => {
     // Update race status to ongoing
     setRaces(races.map(r => r.id === raceId ? { ...r, status: 'ongoing' } : r))
-    alert(`🟢 Xác nhận: Cuộc đua "${mockRaces.find(r => r.id === raceId)?.name}" đã được phê duyệt sẵn sàng xuất phát!`);
+    const raceName = mockRaces.find(r => r.id === raceId)?.name || 'Cuộc đua'
+    setSuccessMessage(`Xác nhận: Cuộc đua "${raceName}" đã được phê duyệt sẵn sàng xuất phát!`)
+    setShowSuccessModal(true)
     setSelectedRace(null)
+    setShowConfirmModal(false)
+    setPendingRaceId(null)
   }
 
   return (
@@ -200,6 +212,85 @@ export default function RefereeInspection() {
           )}
         </div>
       </div>
+      {/* Warning Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '440px', border: '1px solid rgba(239, 68, 68, 0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div className="admin-card-head" style={{ borderBottom: 'none', padding: '20px 24px 10px' }}>
+              <h3 style={{ color: '#ef4444', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚠️ Cảnh báo an toàn
+              </h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => { setShowConfirmModal(false); setPendingRaceId(null); }}>✕</button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '10px 24px 20px' }}>
+              <p style={{ color: '#ddd', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
+                Có ngựa đua chưa vượt qua toàn bộ tiêu chuẩn kiểm tra! Bạn vẫn muốn phê duyệt bắt đầu cuộc đua?
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost" 
+                  onClick={() => { setShowConfirmModal(false); setPendingRaceId(null); }}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--danger"
+                  style={{ background: '#ef4444', borderColor: '#ef4444', color: '#fff' }}
+                  onClick={() => proceedApproveRaceStart(pendingRaceId)}
+                >
+                  Vẫn bắt đầu
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Success Confirmation Modal */}
+      {showSuccessModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '30px', border: '1px solid rgba(74, 222, 128, 0.25)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto', display: 'block' }}>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <h3 style={{ color: '#4ade80', marginBottom: '15px', fontSize: '20px', fontWeight: 'bold' }}>Phê duyệt thành công!</h3>
+            <p style={{ color: '#ccc', marginBottom: '25px', lineHeight: '1.6', fontSize: '14px' }}>
+              {successMessage}
+            </p>
+            <button 
+              onClick={() => setShowSuccessModal(false)}
+              className="admin-btn"
+              style={{ width: '100%', justifyContent: 'center', background: '#3b82f6', borderColor: '#3b82f6', color: '#fff', padding: '10px 20px', borderRadius: '12px' }}
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
