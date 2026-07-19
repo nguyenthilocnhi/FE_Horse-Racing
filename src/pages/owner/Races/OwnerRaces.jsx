@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { ownerRaces as initialRaces } from '../../../data/ownerMockData'
+import { toast } from '../../../utils/toast'
 
 export default function OwnerRaces() {
   const [races, setRaces] = useState(() => {
@@ -28,7 +29,7 @@ export default function OwnerRaces() {
       }
       return r
     }))
-    alert('Đã xác nhận chiến mã sẵn sàng thi đấu!')
+    toast.success('Đã xác nhận chiến mã sẵn sàng thi đấu!')
   }
 
   const openDetails = (race) => {
