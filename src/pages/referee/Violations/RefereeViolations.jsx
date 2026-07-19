@@ -22,6 +22,11 @@ export default function RefereeViolations() {
   const [violationType, setViolationType] = useState('')
   const [severity, setSeverity] = useState('medium')
   const [details, setDetails] = useState('')
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [pendingViolation, setPendingViolation] = useState(null)
+  const [selectedViolation, setSelectedViolation] = useState(null)
 
   const handleAddViolation = (e) => {
     e.preventDefault()
@@ -41,8 +46,15 @@ export default function RefereeViolations() {
       details: details
     }
 
-    setViolations([newViolation, ...violations])
-    alert(`⚠️ Đã lập biên bản vi phạm ${newViolation.id} thành công! Nội dung đã chuyển đến Ban trọng tài và BTC.`);
+    setPendingViolation(newViolation)
+    setShowConfirmModal(true)
+  }
+
+  const proceedAddViolation = () => {
+    if (!pendingViolation) return
+    setViolations([pendingViolation, ...violations])
+    setSuccessMessage(`Đã lập biên bản vi phạm ${pendingViolation.id} thành công! Nội dung đã chuyển đến Ban trọng tài và BTC.`)
+    setShowSuccessModal(true)
     
     // Reset form
     setSelectedRace('')
@@ -50,6 +62,8 @@ export default function RefereeViolations() {
     setViolationType('')
     setSeverity('medium')
     setDetails('')
+    setShowConfirmModal(false)
+    setPendingViolation(null)
   }
 
   return (
@@ -208,7 +222,17 @@ export default function RefereeViolations() {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: '#666' }}>Trạng thái xử lý:</span>
-                    <StatusBadge status={v.status} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <StatusBadge status={v.status} />
+                      <button 
+                        type="button" 
+                        className="admin-btn admin-btn--ghost admin-btn--sm"
+                        style={{ fontSize: '11px', padding: '2px 8px', borderColor: 'rgba(255,255,255,0.1)' }}
+                        onClick={() => setSelectedViolation(v)}
+                      >
+                        Chi tiết
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -217,6 +241,152 @@ export default function RefereeViolations() {
         </div>
 
       </div>
+
+      {/* Confirm Action Modal */}
+      {showConfirmModal && pendingViolation && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '440px', border: '1px solid rgba(245, 158, 11, 0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div className="admin-card-head" style={{ borderBottom: 'none', padding: '20px 24px 10px' }}>
+              <h3 style={{ color: '#f59e0b', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ⚠️ Xác nhận lập biên bản
+              </h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => { setShowConfirmModal(false); setPendingViolation(null); }}>✕</button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '10px 24px 20px' }}>
+              <p style={{ color: '#ddd', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
+                Bạn có chắc chắn muốn lập biên bản vi phạm cho <strong>{pendingViolation.entity}</strong> thuộc cuộc đua <strong>{pendingViolation.race}</strong> không? Biên bản sau khi gửi sẽ được chuyển trực tiếp tới BTC.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost" 
+                  onClick={() => { setShowConfirmModal(false); setPendingViolation(null); }}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className="admin-btn"
+                  style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
+                  onClick={proceedAddViolation}
+                >
+                  Lập biên bản
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '30px', border: '1px solid rgba(74, 222, 128, 0.25)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div style={{ marginBottom: '20px' }}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto', display: 'block' }}>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <h3 style={{ color: '#4ade80', marginBottom: '15px', fontSize: '20px', fontWeight: 'bold' }}>Lập biên bản thành công!</h3>
+            <p style={{ color: '#ccc', marginBottom: '25px', lineHeight: '1.6', fontSize: '14px' }}>
+              {successMessage}
+            </p>
+            <button 
+              onClick={() => setShowSuccessModal(false)}
+              className="admin-btn"
+              style={{ width: '100%', justifyContent: 'center', background: '#3b82f6', borderColor: '#3b82f6', color: '#fff', padding: '10px 20px', borderRadius: '12px' }}
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Violation Detail Modal */}
+      {selectedViolation && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '480px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div className="admin-card-head">
+              <h3>Chi tiết biên bản #{selectedViolation.id}</h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedViolation(null)}>✕</button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Loại vi phạm</span>
+                  <strong style={{ color: '#fff' }}>{selectedViolation.type}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Mức độ</span>
+                  <span style={{ 
+                    fontWeight: 'bold',
+                    color: selectedViolation.severity === 'high' ? '#f87171' : selectedViolation.severity === 'medium' ? '#fbbf24' : '#60a5fa' 
+                  }}>
+                    {selectedViolation.severity === 'high' ? 'Cao (Đình chỉ)' : selectedViolation.severity === 'medium' ? 'Trung bình (Trừ điểm)' : 'Thấp (Cảnh cáo)'}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Đối tượng</span>
+                  <strong style={{ color: '#fff' }}>{selectedViolation.entity}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Trận đua</span>
+                  <strong style={{ color: '#fff' }}>{selectedViolation.race}</strong>
+                </div>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Ngày lập</span>
+                  <span style={{ color: '#ccc' }}>{selectedViolation.date}</span>
+                </div>
+                <div>
+                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái duyệt</span>
+                  <StatusBadge status={selectedViolation.status} />
+                </div>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '14px', marginTop: '4px' }}>
+                <span style={{ color: '#666', display: 'block', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase' }}>Chi tiết sự việc & Bằng chứng</span>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', color: '#ccc', fontSize: '13px', lineHeight: '1.6', minHeight: '80px', whiteSpace: 'pre-wrap' }}>
+                  {selectedViolation.details || 'Không có mô tả chi tiết.'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                <button type="button" className="admin-btn admin-btn--gold" style={{ width: '100%' }} onClick={() => setSelectedViolation(null)}>Đóng</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
