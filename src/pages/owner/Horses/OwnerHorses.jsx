@@ -4,6 +4,7 @@ import * as ownerService from '../../../services/ownerService'
 import { useAuth } from '../../../contexts/AuthContext'
 import { registrations as adminInitialRegistrations } from '../../../data/adminMockData'
 import * as tournamentService from '../../../services/tournamentService'
+import { toast } from '../../../utils/toast'
 
 export default function OwnerHorses() {
   const [horses, setHorses] = useState([])
@@ -13,14 +14,14 @@ export default function OwnerHorses() {
   const [selectedHorse, setSelectedHorse] = useState(null)
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
-  
+
   // Form fields
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
   const [gender, setGender] = useState('Đực')
   const [breed, setBreed] = useState('Thoroughbred')
   const [color, setColor] = useState('Hạt dẻ')
-  
+
   // Registration Form fields
   const [selectedRaceId, setSelectedRaceId] = useState('')
   const [availableRaces, setAvailableRaces] = useState([])
@@ -66,20 +67,20 @@ export default function OwnerHorses() {
         const data = await ownerService.getOwnerHorses()
         // API response format validation
         const list = Array.isArray(data) ? data : data?.data ?? data?.content ?? []
-        
+
         // Map API fields (stable-owner attributes) if needed
         const formatted = list.map(h => ({
-          id:            h.id ?? h.horseId ?? `HRS-00${Math.floor(Math.random() * 1000)}`,
-          name:          h.name ?? h.fullName ?? 'Chưa đặt tên',
-          breed:         h.breed ?? 'Thoroughbred',
-          age:           h.age ?? 3,
-          gender:        h.gender ?? 'Đực',
-          wins:          h.wins ?? 0,
-          races:         h.racesCount ?? h.races ?? 0,
-          earnings:      h.earnings ?? '0 VND',
-          status:        h.status ?? 'ready',
+          id: h.id ?? h.horseId ?? `HRS-00${Math.floor(Math.random() * 1000)}`,
+          name: h.name ?? h.fullName ?? 'Chưa đặt tên',
+          breed: h.breed ?? 'Thoroughbred',
+          age: h.age ?? 3,
+          gender: h.gender ?? 'Đực',
+          wins: h.wins ?? 0,
+          races: h.racesCount ?? h.races ?? 0,
+          earnings: h.earnings ?? '0 VND',
+          status: h.status ?? 'ready',
           currentJockey: h.jockeyName ?? null,
-          color:         h.color ?? 'Hạt dẻ'
+          color: h.color ?? 'Hạt dẻ'
         }))
         setHorses(formatted)
         localStorage.setItem(storageKey, JSON.stringify(formatted))
@@ -105,7 +106,7 @@ export default function OwnerHorses() {
   const handleAddHorse = async (e) => {
     e.preventDefault()
     if (!name || !age) return
-    
+
     const payload = {
       name,
       age: parseInt(age, 10),
@@ -116,16 +117,16 @@ export default function OwnerHorses() {
     try {
       const data = await ownerService.createOwnerHorse(payload)
       const newHorse = {
-        id:            data?.id ?? data?.horseId ?? `HRS-00${horses.length + 1}`,
-        name:          data?.name ?? name,
-        age:           data?.age ?? parseInt(age, 10),
-        gender:        data?.gender ?? gender,
-        breed:         data?.breed ?? breed,
-        color:         data?.color ?? color,
-        wins:          0,
-        races:         0,
-        earnings:      '0 VND',
-        status:        'ready',
+        id: data?.id ?? data?.horseId ?? `HRS-00${horses.length + 1}`,
+        name: data?.name ?? name,
+        age: data?.age ?? parseInt(age, 10),
+        gender: data?.gender ?? gender,
+        breed: data?.breed ?? breed,
+        color: data?.color ?? color,
+        wins: 0,
+        races: 0,
+        earnings: '0 VND',
+        status: 'ready',
         currentJockey: null,
         birthCertificateUrl: birthCertificate || '',
         horseImageUrl: horseImage || ''
@@ -133,6 +134,7 @@ export default function OwnerHorses() {
       setHorses([...horses, newHorse])
       setSuccessMessage('Thêm ngựa mới thành công!')
       setShowSuccessPopup(true)
+      toast.success('Đăng ký chiến mã mới thành công!')
     } catch (err) {
       console.warn('Đăng ký ngựa qua API lỗi, tạo cục bộ:', err.message)
       // Fallback: Create locally
@@ -150,6 +152,7 @@ export default function OwnerHorses() {
       setHorses([...horses, localNew])
       setSuccessMessage('Thêm ngựa mới thành công (Dữ liệu lưu tạm thời)')
       setShowSuccessPopup(true)
+      toast.warning('Đăng ký chiến mã mới thành công (Lưu tạm thời)')
     }
 
     setNewHorseModal(false)
@@ -164,11 +167,11 @@ export default function OwnerHorses() {
     try {
       await ownerService.updateOwnerHorse(horseId, { status: nextStatus })
       setHorses(horses.map(h => h.id === horseId ? { ...h, status: nextStatus } : h))
-      alert('Cập nhật trạng thái ngựa thành công!')
+      toast.success('Cập nhật trạng thái ngựa thành công!')
     } catch (e) {
       console.warn('API updateOwnerHorse lỗi, xử lý cục bộ:', e.message)
       setHorses(horses.map(h => h.id === horseId ? { ...h, status: nextStatus } : h))
-      alert('Cập nhật trạng thái ngựa thành công (Lưu tạm thời)')
+      toast.warning('Cập nhật trạng thái ngựa thành công (Lưu tạm thời)')
     }
   }
 
@@ -176,17 +179,17 @@ export default function OwnerHorses() {
     setSelectedHorse(horse)
     setRegisterModal(true)
     setLoadingRaces(true)
-    
+
     try {
       const tournamentsList = await tournamentService.getTournaments()
       const activeTournaments = tournamentsList.filter(t => t.status === 'ACTIVE')
-      
+
       const allSchedules = []
       for (const tour of activeTournaments) {
         try {
           const scheduleRes = await tournamentService.getTournamentSchedule(tour.id)
           const schedules = Array.isArray(scheduleRes) ? scheduleRes : scheduleRes?.data ?? []
-          
+
           schedules.forEach(s => {
             if (s.status === 'PENDING') {
               allSchedules.push({
@@ -250,13 +253,13 @@ export default function OwnerHorses() {
       horseImageUrl: selectedHorse.horseImageUrl || '',
       medicalCertificateUrl: medicalCertificate || ''
     }
-    
+
     try {
       await ownerService.registerHorseToRace({
         horseId: Number(selectedHorse.id),
         raceScheduleId: Number(selectedRaceId)
       })
-      
+
       setHorses(horses.map(h => {
         if (h.id === selectedHorse.id) {
           return { ...h, status: 'registered' }
@@ -284,7 +287,7 @@ export default function OwnerHorses() {
       // Dispatch event to sync immediately in this window
       window.dispatchEvent(new Event('storage'))
 
-      alert(`✅ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu!`)
+      toast.success(`Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu!`)
     } catch (err) {
       console.warn('Đăng ký giải đấu qua API lỗi, xử lý cục bộ:', err.message)
       // Fallback
@@ -315,9 +318,9 @@ export default function OwnerHorses() {
       // Dispatch event to sync immediately in this window
       window.dispatchEvent(new Event('storage'))
 
-      alert(`⚠️ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu (Lưu tạm thời)`)
+      toast.warning(`Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu (Lưu tạm thời)`)
     }
-    
+
     setMedicalCertificate('')
     setRegisterModal(false)
   }
@@ -370,9 +373,8 @@ export default function OwnerHorses() {
                   <td>{horse.age} tuổi / {horse.gender}</td>
                   <td>{horse.wins} Thắng / {horse.races} Đua</td>
                   <td>
-                    <span className={`owner-badge owner-badge--${
-                      horse.status === 'ready' ? 'green' : horse.status === 'registered' ? 'gold' : 'gray'
-                    }`}>
+                    <span className={`owner-badge owner-badge--${horse.status === 'ready' ? 'green' : horse.status === 'registered' ? 'gold' : 'gray'
+                      }`}>
                       {horse.status === 'ready' ? 'Sẵn sàng' : horse.status === 'registered' ? 'Đã đăng ký' : 'Đang nghỉ dưỡng'}
                     </span>
                   </td>
@@ -385,13 +387,13 @@ export default function OwnerHorses() {
                         </span>
                       ) : (
                         <>
-                          <button 
+                          <button
                             className="owner-btn owner-btn--outline owner-btn--sm"
                             onClick={() => openRegisterModal(horse)}
                           >
                             Đăng ký giải đấu
                           </button>
-                          <button 
+                          <button
                             className="owner-btn owner-btn--ghost owner-btn--sm"
                             onClick={() => handleToggleStatus(horse.id, horse.status)}
                             style={{ borderColor: 'rgba(255,255,255,0.1)', color: '#aaa' }}
@@ -423,7 +425,7 @@ export default function OwnerHorses() {
             <p style={{ color: '#ccc', marginBottom: '25px', lineHeight: '1.6', fontSize: '15px' }}>
               {successMessage}
             </p>
-            <button 
+            <button
               onClick={() => setShowSuccessPopup(false)}
               className="owner-btn owner-btn--gold"
               style={{ width: '100%', justifyContent: 'center' }}
@@ -497,8 +499,8 @@ export default function OwnerHorses() {
                   <div className="owner-form-group" style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '12px' }}>
                     <div>
                       <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Giấy khai sinh (Ảnh)</label>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => handleFileChange(e, setBirthCertificate)}
                         style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
@@ -511,8 +513,8 @@ export default function OwnerHorses() {
                     </div>
                     <div>
                       <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Ảnh chiến mã</label>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={(e) => handleFileChange(e, setHorseImage)}
                         style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
@@ -551,8 +553,8 @@ export default function OwnerHorses() {
               <div className="owner-modal-body">
                 <div className="owner-form-group full" style={{ marginBottom: 16 }}>
                   <label className="owner-label">Chọn Giải Đấu đang mở</label>
-                  <select 
-                    className="owner-select" 
+                  <select
+                    className="owner-select"
                     style={{ width: '100%', marginTop: 8 }}
                     value={selectedRaceId}
                     onChange={(e) => setSelectedRaceId(e.target.value)}
@@ -574,8 +576,8 @@ export default function OwnerHorses() {
                 </div>
                 <div className="owner-form-group full" style={{ marginBottom: 16 }}>
                   <label className="owner-label" style={{ display: 'block', marginBottom: '8px' }}>Giấy kiểm tra y tế (Ảnh chứng nhận)</label>
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     accept="image/*"
                     onChange={(e) => handleFileChange(e, setMedicalCertificate)}
                     style={{ display: 'block', width: '100%', fontSize: '12px', color: '#aaa' }}
