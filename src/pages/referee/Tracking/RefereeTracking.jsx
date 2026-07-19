@@ -1,7 +1,55 @@
 import React, { useState, useEffect } from 'react'
 import { races as mockRaces } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import * as raceService from '../../../services/raceService'
+import * as tournamentService from '../../../services/tournamentService'
 import './RefereeTracking.css'
+
+function convertTimeToFinishTimeFormat(timeStr) {
+  if (!timeStr) return "00:00:00.0000000"
+  
+  if (/^\d{2}:\d{2}:\d{2}\.\d+$/.test(timeStr)) {
+    return timeStr
+  }
+
+  let minutes = 0
+  let seconds = 0
+  let milliseconds = 0
+
+  const mMatch = timeStr.match(/(\d+)\s*m/)
+  if (mMatch) {
+    minutes = parseInt(mMatch[1], 10)
+  }
+
+  const sMatch = timeStr.match(/(\d+(\.\d+)?)\s*s/)
+  if (sMatch) {
+    const secVal = parseFloat(sMatch[1])
+    seconds = Math.floor(secVal)
+    milliseconds = Math.round((secVal % 1) * 1000)
+  } else {
+    const parts = timeStr.split(':')
+    if (parts.length > 1) {
+      minutes = parseInt(parts[0], 10)
+      const secVal = parseFloat(parts[1])
+      seconds = Math.floor(secVal)
+      milliseconds = Math.round((secVal % 1) * 1000)
+    } else {
+      const secVal = parseFloat(timeStr)
+      if (!isNaN(secVal)) {
+        seconds = Math.floor(secVal)
+        milliseconds = Math.round((secVal % 1) * 1000)
+      }
+    }
+  }
+
+  const pad = (num, size) => {
+    let s = num.toString()
+    while (s.length < size) s = "0" + s
+    return s
+  }
+
+  return `00:${pad(minutes, 2)}:${pad(seconds, 2)}.${pad(milliseconds, 3)}0000`
+}
 
 const MOCK_RUNNERS_DATA = {
   'R-1042': [
@@ -13,6 +61,11 @@ const MOCK_RUNNERS_DATA = {
   'R-1043': [
     { lane: 1, horse: 'Midnight Star', jockey: 'M. Rodriguez', progress: 0, rank: '', time: '' },
     { lane: 2, horse: 'Velvet Thunder', jockey: 'S. Nakamura', progress: 0, rank: '', time: '' }
+  ],
+  'R-1040': [
+    { lane: 1, horse: 'Aurelius', jockey: 'L. Anderson', progress: 100, rank: '1', time: '1m 32.5s' },
+    { lane: 2, horse: 'Midnight Star', jockey: 'M. Rodriguez', progress: 100, rank: '2', time: '1m 34.0s' },
+    { lane: 3, horse: 'Velvet Thunder', jockey: 'S. Nakamura', progress: 100, rank: '3', time: '1m 35.8s' }
   ]
 }
 
@@ -26,6 +79,77 @@ export default function RefereeTracking() {
   const [confirmed, setConfirmed] = useState(false)
   const [notes, setNotes] = useState('')
   const [successModal, setSuccessModal] = useState(false)
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const fetchRaces = async () => {
+    setLoading(true)
+    try {
+      const tourns = await tournamentService.getTournaments()
+      const activeOrCompletedTourns = (tourns || []).filter(t => t.status === 'ACTIVE' || t.status === 'COMPLETED' || t.status === 'ONGOING' || t.status?.toLowerCase() === 'active' || t.status?.toLowerCase() === 'ongoing')
+      
+      let allRaces = []
+      let newRunnersData = { ...MOCK_RUNNERS_DATA }
+
+      for (const t of activeOrCompletedTourns) {
+        try {
+          const res = await tournamentService.getTournamentSchedule(t.id)
+          const schedules = res?.data || res || []
+          
+          schedules.forEach(r => {
+            let status = 'scheduled'
+            if (r.status === 'RUNNING' || r.status === 'ONGOING' || r.status === 'ongoing') status = 'ongoing'
+            else if (r.status === 'COMPLETED' || r.status === 'completed') status = 'completed'
+            
+            if (status === 'ongoing' || status === 'completed') {
+              const raceIdStr = r.id.toString()
+              allRaces.push({
+                id: raceIdStr,
+                name: r.raceName || r.name || `Race #${r.id}`,
+                tournament: t.name || 'Giải đấu',
+                distance: r.distance || '1600m',
+                time: r.startTime?.split('T')[1]?.substring(0, 5) || '',
+                status: status,
+                rawRace: r
+              })
+
+              if (r.raceParticipationList && r.raceParticipationList.length > 0) {
+                newRunnersData[raceIdStr] = r.raceParticipationList.map((p, idx) => {
+                  const mockItem = MOCK_RUNNERS_DATA[raceIdStr]?.[idx] || {}
+                  return {
+                    lane: p.laneNumber || (idx + 1),
+                    horse: p.horse?.name || p.horseName || mockItem.horse || 'Chiến mã',
+                    jockey: p.jockey?.fullName || p.jockeyName || mockItem.jockey || 'Jockey',
+                    progress: status === 'completed' ? 100 : 0,
+                    rank: p.rankPosition?.toString() || mockItem.rank || '',
+                    time: p.finishTime || mockItem.time || '',
+                    participationId: p.id
+                  }
+                })
+              }
+            }
+          })
+        } catch (err) {
+          console.error(err)
+        }
+      }
+
+      if (allRaces.length > 0) {
+        setRaces(allRaces)
+        setRunners(newRunnersData)
+      }
+    } catch (err) {
+      console.error("Failed to fetch races:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRaces()
+  }, [])
 
   // Simulation loop
   useEffect(() => {
@@ -115,18 +239,43 @@ export default function RefereeTracking() {
     // Validate that ranks and times are filled
     const incomplete = list.some(r => !r.rank || !r.time)
     if (incomplete) {
-      alert('Vui lòng điền đầy đủ Thứ tự xếp hạng và Thời gian hoàn thành cho mọi làn chạy!')
+      setErrorMessage('Vui lòng điền đầy đủ Thứ tự xếp hạng và Thời gian hoàn thành cho mọi làn chạy!')
+      setShowErrorModal(true)
       return
     }
 
     if (!confirmed) {
-      alert('Vui lòng đánh dấu vào hộp xác nhận kết quả trước khi gửi!')
+      setErrorMessage('Vui lòng đánh dấu vào hộp xác nhận kết quả trước khi gửi!')
+      setShowErrorModal(true)
       return
     }
 
-    // Mark race as completed locally
-    setRaces(races.map(r => r.id === selectedRace.id ? { ...r, status: 'completed' } : r))
-    setSuccessModal(true)
+    setShowSubmitConfirm(true)
+  }
+
+  const proceedSubmitReport = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      const refereeId = user.id || 1
+      
+      const payload = {
+        refereeId: Number(refereeId),
+        results: selectedRunners.map((r, i) => ({
+          participationId: Number(r.participationId || r.lane || (i + 1)),
+          rankPosition: Number(r.rank),
+          finishTime: convertTimeToFinishTimeFormat(r.time)
+        }))
+      }
+
+      await raceService.submitRaceResults(selectedRace.id, payload)
+
+      // Mark race as completed locally
+      setRaces(races.map(r => r.id === selectedRace.id ? { ...r, status: 'completed' } : r))
+      setSuccessModal(true)
+      setShowSubmitConfirm(false)
+    } catch (err) {
+      alert('Không thể nộp kết quả cuộc đua: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   const handleCloseSuccessModal = () => {
@@ -369,6 +518,82 @@ export default function RefereeTracking() {
               onClick={handleCloseSuccessModal}
             >
               Hoàn thành
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Submit Confirmation Modal */}
+      {showSubmitConfirm && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '440px', border: '1px solid rgba(16, 185, 129, 0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
+            <div className="admin-card-head" style={{ borderBottom: 'none', padding: '20px 24px 10px' }}>
+              <h3 style={{ color: '#10b981', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                📝 Xác nhận gửi biên bản
+              </h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setShowSubmitConfirm(false)}>✕</button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '10px 24px 20px' }}>
+              <p style={{ color: '#ddd', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
+                Bạn có chắc chắn muốn xác nhận kết quả xếp hạng và gửi biên bản cuộc đua <strong>{selectedRace?.name}</strong> này không? Sau khi gửi, kết quả sẽ được lưu và không thể tự chỉnh sửa.
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost" 
+                  onClick={() => setShowSubmitConfirm(false)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className="admin-btn"
+                  style={{ background: '#10b981', borderColor: '#10b981', color: '#fff' }}
+                  onClick={proceedSubmitReport}
+                >
+                  Xác nhận & Gửi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Error / Validation Warning Modal */}
+      {showErrorModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.8)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 10000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '400px', border: '1px solid rgba(239, 68, 68, 0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)', padding: '24px', textAlign: 'center' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <span style={{ fontSize: '48px', color: '#ef4444' }}>⚠️</span>
+            </div>
+            <h3 style={{ color: '#ef4444', marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>Yêu cầu thông tin</h3>
+            <p style={{ color: '#ccc', marginBottom: '20px', lineHeight: '1.6', fontSize: '13px' }}>
+              {errorMessage}
+            </p>
+            <button 
+              onClick={() => setShowErrorModal(false)}
+              className="admin-btn"
+              style={{ width: '100%', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', padding: '10px 20px', borderRadius: '12px' }}
+            >
+              Đồng ý
             </button>
           </div>
         </div>
