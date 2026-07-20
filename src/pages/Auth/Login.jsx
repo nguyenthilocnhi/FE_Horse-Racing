@@ -7,326 +7,108 @@ function getLoginErrorMessage(error) {
     return 'Không thể kết nối máy chủ backend. Vui lòng kiểm tra lại kết nối mạng hoặc máy chủ.'
   }
 
-  const status = error.response.status
-  const response = error.response.data
-
-  if (status >= 500) {
+  if (error.response.status >= 500) {
     return 'Máy chủ backend đang gặp sự cố (500). Vui lòng thử lại sau.'
   }
 
-  // Backend Spring Boot trả lỗi validation 400
-  if (status === 400) {
-    if (response?.errors?.length > 0) {
-      return response.errors[0].defaultMessage
-    }
-
-    return response?.message || 'Dữ liệu đăng nhập không hợp lệ.'
-  }
-
-  if (status === 401) {
-    return 'Email hoặc mật khẩu không đúng.'
-  }
-
-  return response?.message || 'Đăng nhập thất bại.'
+  return error.response.data?.message || 'Email hoặc mật khẩu không đúng.'
 }
-
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
   const { login } = useAuth()
   const navigate = useNavigate()
 
-
   async function handleSubmit(e) {
     e.preventDefault()
-
     setError('')
-
-
-    // Validate input
-    const cleanEmail = email.trim()
-
-    if (!cleanEmail) {
-      setError('Vui lòng nhập email.')
-      return
-    }
-
-    if (!password) {
-      setError('Vui lòng nhập mật khẩu.')
-      return
-    }
-
-
     setLoading(true)
 
     try {
-
-      // gửi email đã loại bỏ khoảng trắng
-      const data = await login({
-        email: cleanEmail,
-        password
-      })
-
-
-      console.log('LOGIN RESPONSE:', data)
-
-
-      // Backend có thể trả:
-      // {
-      //    token,
-      //    role
-      // }
-      //
-      // hoặc:
-      //
-      // {
-      //    token,
-      //    user:{
-      //       role
-      //    }
-      // }
-
-      let role = data.user?.role || data.role
-      if (typeof role === 'string') {
-        role = role.replace(/^ROLE_/i, '').toUpperCase()
+      const data = await login({ email, password })
+      const role = data.user?.role
+      if (role === 'ADMIN') {
+        navigate('/admin')
+      } else if (role === 'JOCKEY') {
+        navigate('/jockey')
+      } else if (role === 'REFEREE' || role === 'RACE_REFEREE') {
+        navigate('/referee')
+      } else if (role === 'SPECTATOR') {
+        navigate('/spectator')
+      } else if (role === 'OWNER' || role === 'HORSE_OWNER' || role === 'HORSE OWNER') {
+        navigate('/owner')
+      } else {
+        navigate('/')
       }
-
-
-      switch (role) {
-
-        case 'ADMIN':
-          navigate('/admin', { replace: true })
-          break
-
-        case 'JOCKEY':
-          navigate('/jockey', { replace: true })
-          break
-
-        case 'REFEREE':
-        case 'RACE_REFEREE':
-          navigate('/referee', { replace: true })
-          break
-
-        case 'SPECTATOR':
-          navigate('/spectator', { replace: true })
-          break
-
-        case 'OWNER':
-        case 'HORSE_OWNER':
-        case 'HORSE OWNER':
-          navigate('/owner', { replace: true })
-          break
-
-        default:
-          navigate('/', { replace: true })
-      }
-
-
     } catch (err) {
-
-      console.error('LOGIN ERROR:', err)
-
-      setError(
-        getLoginErrorMessage(err)
-      )
-
+      setError(getLoginErrorMessage(err))
     } finally {
-
       setLoading(false)
-
     }
   }
 
-
   return (
     <div className="auth-shell">
-
       <div className="auth-panel auth-image-panel">
-
         <img
           src="https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=1200&q=80"
           alt="Ngựa đang phi"
         />
-
-
         <div className="auth-image-overlay">
-
-          <span className="hero-label">
-            HORSIE
-          </span>
-
-          <h2>
-            Trải nghiệm đua ngựa đỉnh cao
-          </h2>
-
-          <p>
-            Tham gia cộng đồng yêu thích môn thể thao đua ngựa
-          </p>
-
+          <span className="hero-label">HORSIE</span>
+          <h2>Trải nghiệm đua ngựa đỉnh cao</h2>
+          <p>Tham gia cộng đồng yêu thích môn thể thao đua ngựa</p>
         </div>
-
       </div>
-
-
 
       <div className="auth-panel auth-admin">
-
-
         <div className="auth-panel-head">
-
-          <span className="hero-label">
-            Tài khoản
-          </span>
-
-          <h2>
-            Đăng nhập
-          </h2>
-
+          <span className="hero-label">Tài khoản</span>
+          <h2>Đăng nhập</h2>
         </div>
 
-
-
         <form onSubmit={handleSubmit}>
-
-
-          {
-            error &&
-            (
-              <p className="auth-error">
-                {error}
-              </p>
-            )
-          }
-
-
-
+          {error && <p className="auth-error">{error}</p>}
           <div className="form-group">
-
             <input
-              type="email"
               value={email}
-              onChange={
-                e => setEmail(e.target.value)
-              }
+              onChange={e => setEmail(e.target.value)}
               placeholder="Email"
               className="input-field"
-              autoComplete="email"
             />
-
           </div>
-
-
-
           <div className="form-group">
-
             <input
-              type="password"
               value={password}
-              onChange={
-                e => setPassword(e.target.value)
-              }
+              onChange={e => setPassword(e.target.value)}
               placeholder="Mật khẩu"
+              type="password"
               className="input-field"
-              autoComplete="current-password"
             />
-
           </div>
-
-
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{
-              marginBottom: '14px'
-            }}
-          >
-
-            {
-              loading
-                ? 'Đang đăng nhập...'
-                : 'Đăng nhập'
-            }
-
+          <button type="submit" className="btn btn-primary" disabled={loading} style={{ marginBottom: '14px' }}>
+            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
 
-
-
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '10px',
-              fontSize: '13px'
-            }}
-          >
-
-            <Link
-              to="/reset-password"
-              style={{
-                color: '#d4af37',
-                textDecoration: 'none',
-                fontWeight: '500'
-              }}
-            >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', fontSize: '13px' }}>
+            <Link to="/reset-password" style={{ color: '#d4af37', textDecoration: 'none', fontWeight: '500' }}>
               Quên mật khẩu?
             </Link>
-
-
-            <Link
-              to="/register"
-              style={{
-                color: '#aaa',
-                textDecoration: 'none'
-              }}
-            >
+            <Link to="/register" style={{ color: '#aaa', textDecoration: 'none' }}>
               Đăng ký tài khoản
             </Link>
-
-
           </div>
 
-
-
-
-          <div
-            style={{
-              marginTop: '20px',
-              textAlign: 'center',
-              fontSize: '13px',
-              borderTop: '1px solid rgba(255,255,255,0.05)',
-              paddingTop: '14px'
-            }}
-          >
-
-            <Link
-              to="/"
-              style={{
-                color: '#d4af37',
-                textDecoration: 'none',
-                fontWeight: '500'
-              }}
-            >
+          <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '13px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '14px' }}>
+            <Link to="/" style={{ color: '#d4af37', textDecoration: 'none', fontWeight: '500' }}>
               ← Quay về trang chủ
             </Link>
-
           </div>
-
-
         </form>
-
-
       </div>
-
-
     </div>
   )
 }

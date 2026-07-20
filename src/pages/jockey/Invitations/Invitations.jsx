@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../../contexts/AuthContext'
-import * as tournamentService from '../../../services/tournamentService'
+import { getMyInvitations, respondToInvitation } from '../../../services/jockeyService'
+import { invitations as initialInvitations } from '../../../data/jockeyMockData'
 import './Invitations.css'
 
 const STATUS_LABELS = {
@@ -24,7 +24,7 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
             <span className="inv-horse-icon">🐴</span>
             <div>
               <div className="inv-horse-name">{inv.horseName}</div>
-              <div className="inv-horse-sub">{inv.owner}</div>
+              <div className="inv-horse-sub">{inv.owner} · {inv.horseAge} tuổi</div>
             </div>
             <span className={`jockey-badge ${STATUS_LABELS[inv.status].cls}`}>
               {STATUS_LABELS[inv.status].label}
@@ -57,7 +57,7 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
           </div>
           <div className="jockey-detail-row">
             <span className="jockey-detail-label">Thù lao jockey</span>
-            <span className="jockey-detail-value" style={{ color: '#d4af37' }}>{inv.fee}</span>
+            <span className="jockey-detail-value" style={{ color: '#00d4aa' }}>{inv.fee}</span>
           </div>
           <div className="jockey-detail-row">
             <span className="jockey-detail-label">Hạn phản hồi</span>
@@ -105,94 +105,72 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
 }
 
 export default function Invitations() {
-  const { user } = useAuth()
   const [data, setData] = useState([])
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
   const [selected, setSelected] = useState(null)
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let cancelled = false
-    async function loadInvitations() {
-      try {
-        setLoading(true)
-        if (!user?.id) return
-        
-        const tournaments = await tournamentService.getTournaments()
-        if (cancelled || !Array.isArray(tournaments)) {
-          setLoading(false)
-          return
-        }
-        
-        const list = []
-        const promises = tournaments.map(async (t) => {
-          try {
-            const schedule = await tournamentService.getTournamentSchedule(t.id)
-            if (Array.isArray(schedule)) {
-              schedule.forEach(race => {
-                const participations = race.participations || race.raceParticipations || [];
-                participations.forEach(p => {
-                  const jockeyId = p.jockeyId || p.jockey?.id;
-                  if (jockeyId === user?.id) {
-                    const status = (p.status || '').toLowerCase();
-                    const storedStatus = localStorage.getItem(`jockey_invitation_accept_${p.id}`);
-                    
-                    let mappedStatus = 'pending';
-                    if (storedStatus) {
-                      mappedStatus = storedStatus;
-                    } else if (status === 'accepted' || status === 'confirmed' || status === 'approved') {
-                      mappedStatus = 'accepted';
-                    } else if (status === 'declined' || status === 'rejected') {
-                      mappedStatus = 'declined';
-                    }
-                    
-                    list.push({
-                      id: p.id,
-                      raceId: `R-${race.id}`,
-                      raceName: race.raceName || race.name || 'Cuộc đua',
-                      tournamentName: t.name || 'Giải đấu',
-                      horseName: p.horseName || p.horse?.name || 'Ngựa thi đấu',
-                      owner: p.ownerName || p.horse?.owner?.fullName || p.horse?.owner?.name || 'Chủ ngựa',
-                      ownerContact: p.ownerPhone || p.horse?.owner?.phone || 'Chưa rõ',
-                      raceDate: race.raceDate ? new Date(race.raceDate).toLocaleDateString() : 'Chưa rõ',
-                      raceTime: race.startTime ? new Date(race.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Chưa rõ',
-                      venue: t.location || t.venue || 'Trường đua',
-                      distance: race.distance || '1000m',
-                      prizePool: t.prizePool || t.prize || 'Chưa rõ',
-                      fee: p.jockeyFee || p.fee || '1,000,000đ',
-                      deadline: race.registrationDeadline ? new Date(race.registrationDeadline).toLocaleDateString() : 'Chưa rõ',
-                      status: mappedStatus,
-                      notes: p.notes || ''
-                    });
-                  }
-                });
-              });
-            }
-          } catch (_) {}
-        })
-        
-        await Promise.all(promises)
-        if (!cancelled) {
-          setData(list)
-        }
-      } catch (err) {
-        console.warn("Failed to load invitations:", err)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    loadInvitations()
-    return () => { cancelled = true }
-  }, [user?.id])
+    fetchInvitations()
+  }, [])
 
-  function handleAccept(id) {
-    setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'accepted' } : inv))
-    localStorage.setItem(`jockey_invitation_accept_${id}`, 'accepted')
+  const fetchInvitations = async () => {
+    try {
+      setLoading(true)
+      const res = await getMyInvitations()
+      const fetchedData = res?.data || res || []
+      const mapped = fetchedData.map(p => {
+        let mappedStatus = 'pending'
+        if (p.jockeyInvitationStatus === 'ACCEPTED') mappedStatus = 'accepted'
+        if (p.jockeyInvitationStatus === 'REJECTED') mappedStatus = 'declined'
+
+        return {
+          id: p.id,
+          raceId: `R-${p.raceSchedule?.id || ''}`,
+          raceName: p.raceSchedule?.name || 'Vòng đấu',
+          tournamentName: p.raceSchedule?.tournament?.name || 'Giải đấu',
+          horseName: p.horse?.name || 'Không rõ',
+          horseAge: p.horse?.age || 3,
+          owner: p.horse?.horseOwner?.fullName || p.horse?.horseOwner?.email || 'Chủ ngựa',
+          venue: 'Saigon Racecourse',
+          distance: '1000m',
+          raceDate: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleDateString('vi-VN') : '',
+          raceTime: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '',
+          prizePool: '200,000,000 VND',
+          fee: '15,000,000 VND',
+          deadline: p.raceSchedule?.startTime ? new Date(new Date(p.raceSchedule.startTime).getTime() - 86400000).toLocaleDateString('vi-VN') : '',
+          ownerContact: p.horse?.horseOwner?.phone || p.horse?.horseOwner?.email || '',
+          notes: '',
+          status: mappedStatus
+        }
+      })
+      setData(mapped)
+    } catch (err) {
+      console.error(err)
+      setData(initialInvitations)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleDecline(id) {
-    setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'declined' } : inv))
-    localStorage.setItem(`jockey_invitation_accept_${id}`, 'declined')
+  async function handleAccept(id) {
+    try {
+      await respondToInvitation(id, true)
+      setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'accepted' } : inv))
+      alert('Đã chấp nhận lời mời!')
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Có lỗi xảy ra')
+    }
+  }
+
+  async function handleDecline(id) {
+    try {
+      await respondToInvitation(id, false)
+      setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'declined' } : inv))
+      alert('Đã từ chối lời mời!')
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Có lỗi xảy ra')
+    }
   }
 
   const tabs = [
@@ -203,14 +181,6 @@ export default function Invitations() {
   ]
 
   const filtered = tab === 'all' ? data : data.filter((i) => i.status === tab)
-
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-        Đang tải lời mời thi đấu...
-      </div>
-    )
-  }
 
   return (
     <div>
@@ -235,7 +205,11 @@ export default function Invitations() {
       </div>
 
       <div className="jockey-card">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="jockey-empty">
+            <span className="jockey-empty-text">Đang tải lời mời...</span>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="jockey-empty">
             <span className="jockey-empty-icon">✉</span>
             <span className="jockey-empty-text">Không có lời mời nào trong mục này.</span>
@@ -274,7 +248,7 @@ export default function Invitations() {
                   </div>
                   <div className="inv-meta-item">
                     <span>💰 Thù lao</span>
-                    <strong style={{ color: '#d4af37' }}>{inv.fee}</strong>
+                    <strong style={{ color: '#00d4aa' }}>{inv.fee}</strong>
                   </div>
                 </div>
 
@@ -328,4 +302,3 @@ export default function Invitations() {
     </div>
   )
 }
-

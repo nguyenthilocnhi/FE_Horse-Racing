@@ -29,15 +29,3 @@ export async function getMyPredictions() {
   const res = await apiClient.get('/predictions/my')
   return res.data
 }
-
-/** Lấy lịch sử dự đoán của spectator */
-export async function getPredictionHistory(spectatorId) {
-  const res = await apiClient.get(`/predictions/spectators/${spectatorId}`)
-  return res.data
-}
-
-/** Hủy dự đoán của spectator */
-export async function cancelPrediction(predictionId, payload) {
-  const res = await apiClient.post(`/predictions/${predictionId}/cancel`, payload)
-  return res.data
-}

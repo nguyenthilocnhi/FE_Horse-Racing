@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import { ownerJockeys as initialJockeys, ownerHorses } from '../../../data/ownerMockData'
-import { toast } from '../../../utils/toast'
 
 export default function OwnerJockeys() {
   const [jockeys, setJockeys] = useState(initialJockeys)
   const [hireModal, setHireModal] = useState(false)
   const [selectedJockey, setSelectedJockey] = useState(null)
-  const [cancelJockeyId, setCancelJockeyId] = useState(null)
   
   // Hiring Form fields
   const [selectedHorseId, setSelectedHorseId] = useState('')
@@ -41,25 +39,17 @@ export default function OwnerJockeys() {
       return j
     }))
 
-    toast.success(`Gửi lời mời thành công đến Jockey ${selectedJockey.name}!`)
+    alert(`Gửi lời mời thành công đến Jockey ${selectedJockey.name}!`)
     setHireModal(false)
   }
 
   const handleCancelInvite = (jockeyId) => {
-    setCancelJockeyId(jockeyId)
-  }
-
-  const handleConfirmCancel = () => {
-    if (!cancelJockeyId) return
-    const jockeyName = jockeys.find(j => j.id === cancelJockeyId)?.name || 'Jockey'
     setJockeys(jockeys.map(j => {
-      if (j.id === cancelJockeyId) {
+      if (j.id === jockeyId) {
         return { ...j, status: 'available', assignedHorse: null }
       }
       return j
     }))
-    toast.success(`Đã hủy thành công lời mời đối với Jockey ${jockeyName}!`)
-    setCancelJockeyId(null)
   }
 
   return (
@@ -217,39 +207,6 @@ export default function OwnerJockeys() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Cancel Invitation Modal */}
-      {cancelJockeyId && (
-        <div className="owner-modal-overlay" style={{ zIndex: 10000 }}>
-          <div className="owner-modal" style={{ maxWidth: '420px', padding: '10px' }}>
-            <div className="owner-modal-head" style={{ borderBottom: 'none' }}>
-              <h2 style={{ fontSize: '18px', color: '#ff4d4f' }}>Xác nhận hủy lời mời</h2>
-              <button className="owner-modal-close" onClick={() => setCancelJockeyId(null)}>×</button>
-            </div>
-            <div className="owner-modal-body">
-              <p style={{ color: '#ccc', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
-                Bạn có chắc chắn muốn hủy lời mời hợp đồng đối với Jockey <strong>{jockeys.find(j => j.id === cancelJockeyId)?.name}</strong>? Chiến mã liên kết sẽ được giải phóng trạng thái chờ.
-              </p>
-            </div>
-            <div className="owner-modal-footer" style={{ borderTop: 'none' }}>
-              <button 
-                type="button" 
-                className="owner-btn owner-btn--ghost" 
-                onClick={() => setCancelJockeyId(null)}
-              >
-                Hủy bỏ
-              </button>
-              <button 
-                type="button" 
-                className="owner-btn owner-btn--danger"
-                onClick={handleConfirmCancel}
-              >
-                Đồng ý hủy
-              </button>
-            </div>
           </div>
         </div>
       )}

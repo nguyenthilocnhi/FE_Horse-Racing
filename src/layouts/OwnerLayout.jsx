@@ -2,7 +2,6 @@ import React from 'react'
 import { Outlet } from 'react-router-dom'
 import OwnerSidebar from '../components/owner/OwnerSidebar'
 import OwnerHeader from '../components/owner/OwnerHeader'
-import ToastContainer from '../components/owner/ToastContainer'
 import { ownerRaces } from '../data/ownerMockData'
 import '../styles/owner-layout.css'
 import '../styles/owner-common.css'
@@ -19,7 +18,6 @@ export default function OwnerLayout() {
           <Outlet />
         </div>
       </div>
-      <ToastContainer />
     </div>
   )
 }

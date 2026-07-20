@@ -12,6 +12,8 @@ const STATUS_MAP = {
   completed: 'gray',
   cancelled: 'red',
   scheduled: 'blue',
+  delayed: 'gold',
+  running: 'green',
   investigating: 'gold',
   resolved: 'green',
   reviewing: 'gold',
@@ -45,6 +47,8 @@ const STATUS_LABELS = {
   completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
   scheduled: 'Đã lên lịch',
+  delayed: 'Bị hoãn',
+  running: 'Đang chạy',
   investigating: 'Đang điều tra',
   resolved: 'Đã xử lý',
   reviewing: 'Đang xem xét',
@@ -63,9 +67,9 @@ const STATUS_LABELS = {
 }
 
 export function StatusBadge({ status }) {
-  const key = status?.toLowerCase() || ''
-  const variant = STATUS_MAP[key] || 'gray'
-  const label = STATUS_LABELS[key] || status
+  const normalizedStatus = status ? status.toString().toLowerCase() : ''
+  const variant = STATUS_MAP[normalizedStatus] || 'gray'
+  const label = STATUS_LABELS[normalizedStatus] || status
   return <span className={`admin-badge admin-badge--${variant}`}>{label}</span>
 }
 

@@ -131,7 +131,7 @@ export default function OwnerDashboard() {
                     <td style={{ color: '#fff' }}>{txn.description}</td>
                     <td>
                       <span className={`owner-badge owner-badge--${txn.type === 'income' ? 'green' : 'red'}`}>
-                        {txn.category === 'prize_money' ? 'Tiền thưởng' : 'Rút tiền'}
+                        {txn.category === 'prize_money' ? 'Tiền thưởng' : txn.category === 'jockey_fee' ? 'Phí Jockey' : 'Khác'}
                       </span>
                     </td>
                     <td style={{ color: txn.type === 'income' ? '#4ade80' : '#f87171', fontWeight: 600 }}>

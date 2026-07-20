@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../../contexts/AuthContext'
-import * as tournamentService from '../../../services/tournamentService'
+import React, { useState } from 'react'
+import { myRaces } from '../../../data/jockeyMockData'
 import './MyRaces.css'
 
 const STATUS_MAP = {
@@ -69,7 +68,7 @@ function RaceDetailModal({ race, onClose }) {
             <>
               <div className="jockey-detail-row">
                 <span className="jockey-detail-label">Thời gian hoàn thành</span>
-                <span className="jockey-detail-value" style={{ color: '#d4af37' }}>{race.result.time}</span>
+                <span className="jockey-detail-value" style={{ color: '#00d4aa' }}>{race.result.time}</span>
               </div>
               <div className="jockey-detail-row">
                 <span className="jockey-detail-label">Điểm nhận được</span>
@@ -87,100 +86,11 @@ function RaceDetailModal({ race, onClose }) {
 }
 
 export default function MyRaces() {
-  const { user } = useAuth()
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
 
-  useEffect(() => {
-    let cancelled = false
-    async function loadRaces() {
-      try {
-        setLoading(true)
-        if (!user?.id) return
-        
-        const tournaments = await tournamentService.getTournaments()
-        if (cancelled || !Array.isArray(tournaments)) {
-          setLoading(false)
-          return
-        }
-        
-        const list = []
-        const promises = tournaments.map(async (t) => {
-          try {
-            const schedule = await tournamentService.getTournamentSchedule(t.id)
-            if (Array.isArray(schedule)) {
-              schedule.forEach(race => {
-                const participations = race.participations || race.raceParticipations || [];
-                const raceResults = race.results || race.raceResults || [];
-                
-                participations.forEach(p => {
-                  const jockeyId = p.jockeyId || p.jockey?.id;
-                  if (jockeyId === user?.id) {
-                    const status = (p.status || '').toUpperCase();
-                    if (status === 'ACCEPTED' || status === 'CONFIRMED' || status === 'APPROVED') {
-                      const matchedResult = raceResults.find(resItem => resItem.participationId === p.id);
-                      const isCompleted = race.status === 'COMPLETED' || !!matchedResult;
-                      
-                      const raceDateObj = race.raceDate ? new Date(race.raceDate) : null;
-                      
-                      let raceStatus = 'upcoming';
-                      if (isCompleted) {
-                        raceStatus = 'completed';
-                      } else if (race.status === 'ONGOING' || race.status === 'RUNNING') {
-                        raceStatus = 'ongoing';
-                      } else if (race.status === 'CANCELLED') {
-                        raceStatus = 'cancelled';
-                      }
-                      
-                      list.push({
-                        id: `RACE-${race.id}`,
-                        name: race.raceName || race.name || 'Cuộc đua',
-                        tournament: t.name || 'Giải đấu',
-                        venue: t.location || t.venue || 'Trường đua',
-                        date: race.raceDate ? new Date(race.raceDate).toLocaleDateString() : 'Chưa rõ',
-                        time: race.startTime ? new Date(race.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Chưa rõ',
-                        rawDate: raceDateObj,
-                        distance: race.distance || '1000m',
-                        horse: p.horseName || p.horse?.name || 'Ngựa thi đấu',
-                        owner: p.ownerName || p.horse?.owner?.fullName || p.horse?.owner?.name || 'Chủ ngựa',
-                        startGate: p.startGate || p.gateNumber || 'Chưa xếp',
-                        weight: p.jockeyWeight || p.weight || '54',
-                        status: raceStatus,
-                        result: matchedResult ? {
-                          position: matchedResult.rankPosition || matchedResult.rank || 0,
-                          time: matchedResult.finishTime || 'N/A',
-                          points: p.pointsEarned || p.points || 0
-                        } : null
-                      });
-                    }
-                  }
-                });
-              });
-            }
-          } catch (_) {}
-        })
-        
-        await Promise.all(promises)
-        if (!cancelled) {
-          setData(list)
-        }
-      } catch (err) {
-        console.warn("Failed to load race schedules:", err)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    loadRaces()
-    return () => { cancelled = true }
-  }, [user?.id])
-
-  const upcomingRaces = data.filter((r) => r.status === 'upcoming' || r.status === 'ongoing')
-  upcomingRaces.sort((a, b) => (a.rawDate || 0) - (b.rawDate || 0))
-
-  const filtered = data.filter((r) => {
+  const filtered = myRaces.filter((r) => {
     const matchTab = tab === 'all' || r.status === tab
     const matchSearch = r.name.toLowerCase().includes(search.toLowerCase()) ||
       r.horse.toLowerCase().includes(search.toLowerCase()) ||
@@ -194,14 +104,6 @@ export default function MyRaces() {
     { key: 'completed', label: '✓ Đã xong' },
   ]
 
-  if (loading) {
-    return (
-      <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-        Đang tải lịch đua...
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="jockey-page-head">
@@ -212,44 +114,42 @@ export default function MyRaces() {
       </div>
 
       {/* Schedule timeline for upcoming */}
-      {upcomingRaces.length > 0 && (
+      {myRaces.filter((r) => r.status === 'upcoming').length > 0 && (
         <div className="jockey-card" style={{ marginBottom: 24 }}>
           <div className="jockey-card-head">
             <h3>📅 Lịch thi đấu sắp tới</h3>
           </div>
           <div className="jockey-card-body">
             <div className="schedule-timeline">
-              {upcomingRaces.map((r) => {
-                const day = r.rawDate ? r.rawDate.getDate() : '?'
-                const month = r.rawDate ? r.rawDate.getMonth() + 1 : '?'
-                return (
-                  <div key={r.id} className="schedule-item">
-                    <div className="schedule-date-col">
-                      <div className="schedule-day">{day}</div>
-                      <div className="schedule-month">Th{month}</div>
+              {myRaces.filter((r) => r.status === 'upcoming').map((r) => (
+                <div key={r.id} className="schedule-item">
+                  <div className="schedule-date-col">
+                    <div className="schedule-day">{new Date(r.date).getDate()}</div>
+                    <div className="schedule-month">
+                      Th{new Date(r.date).getMonth() + 1}
                     </div>
-                    <div className="schedule-dot" />
-                    <div className="schedule-info">
-                      <strong>{r.name}</strong>
-                      <span>{r.tournament}</span>
-                      <div className="schedule-meta">
-                        <span>⏰ {r.time}</span>
-                        <span>📍 {r.venue}</span>
-                        <span>🐴 {r.horse}</span>
-                        <span>📏 {r.distance}</span>
-                        <span>🚦 Cổng #{r.startGate}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="jockey-btn jockey-btn--outline jockey-btn--sm"
-                      onClick={() => setSelected(r)}
-                    >
-                      Chi tiết
-                    </button>
                   </div>
-                )
-              })}
+                  <div className="schedule-dot" />
+                  <div className="schedule-info">
+                    <strong>{r.name}</strong>
+                    <span>{r.tournament}</span>
+                    <div className="schedule-meta">
+                      <span>⏰ {r.time}</span>
+                      <span>📍 {r.venue}</span>
+                      <span>🐴 {r.horse}</span>
+                      <span>📏 {r.distance}</span>
+                      <span>🚦 Cổng #{r.startGate}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="jockey-btn jockey-btn--outline jockey-btn--sm"
+                    onClick={() => setSelected(r)}
+                  >
+                    Chi tiết
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -312,7 +212,7 @@ export default function MyRaces() {
                       </td>
                       <td>{r.distance}</td>
                       <td>
-                        <span style={{ color: '#d4af37' }}>🐴 {r.horse}</span>
+                        <span style={{ color: '#00d4aa' }}>🐴 {r.horse}</span>
                         <div style={{ fontSize: 11, color: '#555' }}>{r.owner}</div>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -324,7 +224,7 @@ export default function MyRaces() {
                             <div style={{ fontWeight: 700, color: r.result.position <= 3 ? '#d4af37' : '#ccc' }}>
                               {POS_LABEL[r.result.position] || `#${r.result.position}`}
                             </div>
-                            <div style={{ fontSize: 11, color: '#d4af37' }}>+{r.result.points} pts</div>
+                            <div style={{ fontSize: 11, color: '#00d4aa' }}>+{r.result.points} pts</div>
                           </div>
                         ) : (
                           <span style={{ color: '#444' }}>—</span>
@@ -364,4 +264,3 @@ export default function MyRaces() {
     </div>
   )
 }
-

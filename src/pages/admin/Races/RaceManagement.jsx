@@ -1,24 +1,120 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import { races as initialRaces, tournaments as initialTournaments, mockJockeys } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
-import * as tournamentService from '../../../services/tournamentService'
-import * as horseService from '../../../services/horseService'
-import * as adminAccountService from '../../../services/adminAccountService'
+import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule } from '../../../services/tournamentService'
+import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
 import './RaceManagement.css'
+
+// Default horses if localStorage is empty
+const FALLBACK_HORSES = [
+  { id: 1, name: 'Aurelius' },
+  { id: 2, name: 'Midnight Star' },
+  { id: 3, name: 'Velvet Thunder' },
+  { id: 4, name: 'Storm Rider' },
+  { id: 5, name: 'Thunder Bolt' },
+  { id: 6, name: 'Golden Eagle' },
+  { id: 7, name: 'Shadow Dancer' },
+  { id: 8, name: 'Pegasus' }
+]
 
 export default function RaceManagement() {
   const [races, setRaces] = useState([])
   const [tournaments, setTournaments] = useState([])
-  const [jockeysList, setJockeysList] = useState([])
-  const [horsesList, setHorsesList] = useState([])
-  const [loading, setLoading] = useState(false)
-
   const [showForm, setShowForm] = useState(false)
   const [editingRace, setEditingRace] = useState(null)
-  const [selectedTournamentFilter, setSelectedTournamentFilter] = useState('')
-  const [refereesList, setRefereesList] = useState([])
+  const [delayingRace, setDelayingRace] = useState(null)
+  const [delayForm, setDelayForm] = useState({ reason: '', newStartTime: '', newEndTime: '' })
+  const [isProcessing, setIsProcessing] = useState(false)
   
+  const [localSearchQuery, setLocalSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortOrder, setSortOrder] = useState('newest')
+
   const { searchQuery = '' } = useOutletContext() || {}
+
+  const fetchData = async () => {
+    try {
+      const tourRes = await getAllTournaments()
+      const fetchedTournaments = tourRes.data || tourRes || []
+      setTournaments(fetchedTournaments)
+
+      if (fetchedTournaments && fetchedTournaments.length > 0) {
+        const allRaces = []
+        for (const t of fetchedTournaments) {
+          try {
+            const scheduleRes = await getTournamentSchedule(t.id)
+            const schedules = scheduleRes.data || []
+            const formattedSchedules = schedules.map(s => ({
+              id: `R-${s.id}`,
+              originalId: s.id,
+              name: s.name,
+              tournament: t.name,
+              tournamentId: t.id,
+              date: s.raceDate || (s.startTime ? s.startTime.split('T')[0] : 'N/A'),
+              time: s.startTime ? s.startTime.split('T')[1].substring(0, 5) : '00:00',
+              distance: '1600m', // Default
+              status: s.status ? s.status.toLowerCase() : 'pending',
+              horses: 0 // Default
+            }))
+            allRaces.push(...formattedSchedules)
+          } catch (err) {
+            console.error(`Error fetching schedules for tournament ${t.id}`, err)
+          }
+        }
+        setRaces(allRaces)
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const filteredRaces = races
+    .filter(race => {
+      const globalQ = searchQuery.toLowerCase()
+      const localQ = localSearchQuery.toLowerCase()
+      
+      const matchesGlobal = !globalQ || 
+        race.name.toLowerCase().includes(globalQ) || 
+        (race.tournament && race.tournament.toLowerCase().includes(globalQ)) ||
+        race.id.toLowerCase().includes(globalQ)
+        
+      const matchesLocal = !localQ || 
+        race.name.toLowerCase().includes(localQ) || 
+        (race.tournament && race.tournament.toLowerCase().includes(localQ)) ||
+        race.id.toLowerCase().includes(localQ)
+        
+      const matchesStatus = statusFilter === 'all' || (race.status && race.status.toLowerCase() === statusFilter.toLowerCase())
+      
+      return matchesGlobal && matchesLocal && matchesStatus
+    })
+    .sort((a, b) => {
+      if (sortOrder === 'newest') {
+        return new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`)
+      } else if (sortOrder === 'oldest') {
+        return new Date(`${a.date}T${a.time || '00:00'}`) - new Date(`${b.date}T${b.time || '00:00'}`)
+      } else if (sortOrder === 'az') {
+        return a.name.localeCompare(b.name)
+      }
+      return 0
+    })
+  
+  // Horses list (load from localStorage if available)
+  const [horsesList, setHorsesList] = useState(FALLBACK_HORSES)
+  useEffect(() => {
+    const stored = localStorage.getItem('mock_horses')
+    if (stored) {
+      try {
+        setHorsesList(JSON.parse(stored))
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  }, [])
 
   // Create/Edit Race Form state
   const [formData, setFormData] = useState({
@@ -26,111 +122,29 @@ export default function RaceManagement() {
     tournamentId: '',
     date: '',
     time: '',
-    distance: '1600m',
-    status: 'scheduled',
-    refereeId: ''
+    endTime: '',
+    status: 'scheduled'
   })
 
   // Round Arrangement State
   const [arrangingRace, setArrangingRace] = useState(null)
-  const [rounds, setRounds] = useState({}) // maps raceId -> list of rounds
+  const [rounds, setRounds] = useState({}) // maps raceId -> list of rounds (each round has lanes)
   const [activeRoundIndex, setActiveRoundIndex] = useState(0)
-
-  const fetchAllData = async () => {
-    setLoading(true)
-    try {
-      // 1. Fetch Tournaments
-      const tourns = await tournamentService.getTournaments()
-      const mappedTournaments = (tourns || []).map(t => ({
-        id: t.id,
-        name: t.name || '',
-        location: t.location || '',
-        startDate: t.startDate || '',
-        endDate: t.endDate || '',
-        status: t.status ? t.status.toLowerCase() : 'draft'
-      }))
-      setTournaments(mappedTournaments)
-
-      // 2. Fetch schedules for each tournament
-      let allRaces = []
-      for (const t of mappedTournaments) {
-        try {
-          const res = await tournamentService.getTournamentSchedule(t.id)
-          const schedules = res?.data || res || []
-          const mappedRaces = schedules.map(r => {
-            let statusVal = 'scheduled'
-            if (r.status === 'RUNNING' || r.status === 'ONGOING') statusVal = 'ongoing'
-            else if (r.status === 'COMPLETED') statusVal = 'completed'
-            else if (r.status === 'CANCELLED') statusVal = 'cancelled'
-
-            return {
-              id: r.id?.toString() || '',
-              name: r.raceName || r.name || `Race #${r.id}`,
-              tournament: t.name,
-              tournamentId: t.id,
-              date: r.raceDate || r.startTime?.split('T')[0] || '',
-              time: r.startTime?.split('T')[1]?.substring(0, 5) || '',
-              distance: r.distance || '1600m',
-              status: statusVal,
-              horses: r.raceParticipationList?.length || 0,
-              refereeId: r.refereeId || r.referee?.id || '',
-              refereeName: r.refereeName || r.referee?.fullName || '',
-              rawRace: r
-            }
-          })
-          allRaces = [...allRaces, ...mappedRaces]
-        } catch (err) {
-          console.error(`Failed to load schedules for tournament ${t.id}:`, err)
-        }
-      }
-      setRaces(allRaces)
-
-      // 3. Fetch Jockeys, Referees & Horses for arranging lanes
-      const allAccounts = await adminAccountService.getAllAccounts()
-      setJockeysList((allAccounts || []).filter(u => u.role === 'JOCKEY'))
-      setRefereesList((allAccounts || []).filter(u => u.role === 'REFEREE' || u.role === 'RACE_REFEREE'))
-      
-      const horseList = await horseService.getHorses()
-      setHorsesList(horseList || [])
-
-    } catch (err) {
-      console.error("Failed to load races/tournaments data:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchAllData()
-  }, [])
-
-  const filteredRaces = races.filter(race => {
-    const q = searchQuery.toLowerCase()
-    const matchesSearch = 
-      race.name.toLowerCase().includes(q) || 
-      race.tournament.toLowerCase().includes(q) ||
-      race.id.toLowerCase().includes(q)
-      
-    const matchesTournament = selectedTournamentFilter
-      ? race.tournamentId?.toString() === selectedTournamentFilter.toString()
-      : true
-      
-    return matchesSearch && matchesTournament
-  })
 
   // Initialize rounds for a race if not exists
   const openArrangement = (race) => {
     setArrangingRace(race)
     setActiveRoundIndex(0)
     
+    // If this race doesn't have rounds in state yet, initialize with default rounds
     if (!rounds[race.id]) {
       const initialRoundsForRace = [
         {
           name: 'Vòng loại 1',
           lanes: Array.from({ length: 8 }, (_, i) => ({
             lane: i + 1,
-            horseId: '',
-            jockeyId: ''
+            horseId: i < 4 ? horsesList[i]?.id || '' : '',
+            jockeyId: i < 4 ? mockJockeys[i]?.id || '' : ''
           }))
         },
         {
@@ -200,14 +214,14 @@ export default function RaceManagement() {
   // Handlers for Race Form
   const handleOpenAdd = () => {
     setEditingRace(null)
+    const activeTournaments = tournaments.filter(t => t.status === 'ACTIVE')
     setFormData({
       name: '',
-      tournamentId: tournaments[0]?.id?.toString() || '',
+      tournamentId: activeTournaments[0]?.id || '',
       date: '',
       time: '',
-      distance: '1600m',
-      status: 'scheduled',
-      refereeId: ''
+      endTime: '',
+      status: 'scheduled'
     })
     setShowForm(true)
   }
@@ -216,79 +230,194 @@ export default function RaceManagement() {
     setEditingRace(race)
     setFormData({
       name: race.name,
-      tournamentId: race.tournamentId?.toString() || '',
+      tournamentId: race.tournamentId || '',
       date: race.date,
       time: race.time,
-      distance: race.distance,
-      status: race.status,
-      refereeId: race.refereeId?.toString() || ''
+      endTime: '',
+      status: race.status
     })
     setShowForm(true)
   }
 
-  const handleCancelRace = async (id, tournamentId) => {
+  const handleCancelRace = (id) => {
     if (window.confirm('Bạn có chắc chắn muốn hủy cuộc đua này?')) {
-      try {
-        await tournamentService.cancelRaceSchedule(tournamentId, id)
-        alert('Hủy cuộc đua thành công!')
-        fetchAllData()
-      } catch (err) {
-        alert('Không thể hủy cuộc đua: ' + (err.response?.data?.message || err.message))
+      setRaces(races.map(r => 
+        r.id === id ? { ...r, status: 'cancelled' } : r
+      ))
+    }
+  }
+
+  const handleStartRace = async (race) => {
+    if (!window.confirm(`Bạn có chắc muốn BẮT ĐẦU cuộc đua: ${race.name}?`)) return
+    setIsProcessing(true)
+    try {
+      await startRace(race.originalId, { conditionsConfirmed: true })
+      alert('Đã bắt đầu cuộc đua!')
+      fetchData()
+    } catch (err) {
+      alert('Lỗi bắt đầu cuộc đua: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handlePublish = async (race) => {
+    if (!window.confirm(`Xác nhận CÔNG BỐ KẾT QUẢ cuộc đua: ${race.name}?`)) return
+    setIsProcessing(true)
+    try {
+      await publishRaceResult(race.originalId)
+      alert('Đã công bố kết quả!')
+      fetchData()
+    } catch (err) {
+      alert('Lỗi công bố kết quả: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleReopenPrediction = async (race) => {
+    if (!window.confirm(`Mở lại cổng dự đoán cho cuộc đua: ${race.name}?`)) return
+    setIsProcessing(true)
+    try {
+      await reopenPrediction(race.originalId, true)
+      alert('Đã mở lại dự đoán!')
+    } catch (err) {
+      alert('Lỗi mở dự đoán: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const submitDelayRace = async (e) => {
+    e.preventDefault()
+    if (!delayForm.reason) {
+      alert('Vui lòng nhập lý do hoãn!')
+      return
+    }
+    setIsProcessing(true)
+    try {
+      let payload = { reason: delayForm.reason }
+      if (delayForm.newStartTime && delayForm.newEndTime) {
+        payload.newStartTime = new Date(delayForm.newStartTime).toISOString()
+        payload.newEndTime = new Date(delayForm.newEndTime).toISOString()
       }
+      await delayRace(delayingRace.originalId, payload)
+      alert('Đã hoãn cuộc đua thành công!')
+      setDelayingRace(null)
+      fetchData()
+    } catch (err) {
+      alert('Lỗi hoãn cuộc đua: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleSaveRace = async (e) => {
     e.preventDefault()
-    if (!formData.name || !formData.tournamentId || !formData.date || !formData.time) {
+    if (!formData.name || !formData.tournamentId || !formData.date || !formData.time || !formData.endTime) {
       alert('Vui lòng điền đầy đủ thông tin cuộc đua!')
       return
     }
 
-    const startStr = `${formData.date}T${formData.time}:00`
-    
-    // Construct local end time strictly on the same date to satisfy backend validation
-    const [hours, minutes] = formData.time.split(':').map(Number)
-    let endHours = hours + 2
-    if (endHours >= 24) {
-      endHours = 23
+    if (formData.name.trim().length < 4) {
+      alert('Tên cuộc đua phải có ít nhất 4 kí tự')
+      return
     }
-    const endHoursStr = String(endHours).padStart(2, '0')
-    const endMinutesStr = String(minutes).padStart(2, '0')
-    const endStr = `${formData.date}T${endHoursStr}:${endMinutesStr}:00`
 
     const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
+    if (selectedT && selectedT.startDate && selectedT.endDate) {
+      const tStart = new Date(selectedT.startDate)
+      tStart.setHours(0, 0, 0, 0)
+      const tEnd = new Date(selectedT.endDate)
+      tEnd.setHours(23, 59, 59, 999)
 
-    try {
-      if (editingRace) {
-        // Edit mode
-        await tournamentService.updateRaceSchedule(editingRace.tournamentId, editingRace.id, {
-          startTime: startStr,
-          endTime: endStr,
-          participationIds: editingRace.rawRace?.participationIds || [],
-          refereeId: formData.refereeId ? parseInt(formData.refereeId) : null
-        })
-        alert('Cập nhật cuộc đua thành công!')
-      } else {
-        // Add mode
-        await tournamentService.createRaceSchedule(formData.tournamentId, {
+      const raceDateObj = new Date(formData.date)
+      raceDateObj.setHours(0, 0, 0, 0)
+
+      if (raceDateObj < tStart || raceDateObj > tEnd) {
+        alert('Ngày đua không nằm trong thời gian bắt đầu và thời gian kết thúc của giải đấu')
+        return
+      }
+
+      const raceStartObj = new Date(`${formData.date}T${formData.time}`)
+      const raceEndObj = new Date(`${formData.date}T${formData.endTime}`)
+
+      if (raceStartObj < tStart || raceStartObj > tEnd) {
+        alert('Giờ xuất phát không nằm trong thời gian bắt đầu và thời gian kết thúc của giải đấu')
+        return
+      }
+
+      if (raceEndObj < tStart || raceEndObj > tEnd) {
+        alert('Giờ kết thúc không nằm trong thời gian bắt đầu và thời gian kết thúc của giải đấu')
+        return
+      }
+
+      if (raceStartObj >= raceEndObj) {
+        alert('Giờ kết thúc phải sau giờ xuất phát')
+        return
+      }
+    }
+
+    if (editingRace) {
+      try {
+        const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
+        const payload = {
           name: formData.name,
           raceDate: formData.date,
-          location: selectedT?.location || 'Sân đua chính',
-          startTime: startStr,
-          endTime: endStr,
-          refereeId: formData.refereeId ? parseInt(formData.refereeId) : null
-        })
-        alert('Tạo cuộc đua thành công!')
+          location: selectedT ? selectedT.location : "Trường đua",
+          startTime: `${formData.date}T${formData.time}:00.000Z`,
+          endTime: `${formData.date}T${formData.endTime}:00.000Z`,
+          status: formData.status.toUpperCase()
+        }
+        await updateRaceSchedule(formData.tournamentId, editingRace.originalId, payload)
+
+        setRaces(races.map(r => 
+          r.id === editingRace.id ? { ...r, ...formData, status: formData.status } : r
+        ))
+        setShowForm(false)
+        alert('Cập nhật cuộc đua thành công!')
+      } catch (error) {
+        console.error(error)
+        alert('Có lỗi xảy ra khi cập nhật cuộc đua!')
       }
-      setShowForm(false)
-      fetchAllData()
-    } catch (err) {
-      alert('Thao tác thất bại: ' + (err.response?.data?.message || err.message))
+    } else {
+      try {
+        const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
+        const payload = {
+          name: formData.name,
+          raceDate: formData.date,
+          location: selectedT ? selectedT.location : "Trường đua",
+          startTime: `${formData.date}T${formData.time}:00.000Z`,
+          endTime: `${formData.date}T${formData.endTime}:00.000Z`,
+          status: formData.status.toUpperCase()
+        }
+        
+        const result = await createRaceSchedule(formData.tournamentId, payload)
+        
+        const newRace = {
+          id: `R-${result.id}`,
+          originalId: result.id,
+          name: result.name,
+          tournament: selectedT?.name,
+          tournamentId: selectedT?.id,
+          date: result.raceDate,
+          time: result.startTime ? result.startTime.split('T')[1].substring(0, 5) : formData.time,
+          distance: '1600m', // Default
+          status: result.status ? result.status.toLowerCase() : formData.status,
+          horses: 0
+        }
+        setRaces([newRace, ...races])
+        setShowForm(false)
+        alert('Tạo cuộc đua thành công!')
+      } catch (error) {
+        console.error(error)
+        alert('Có lỗi xảy ra khi tạo cuộc đua!')
+      }
     }
   }
 
   const handleSaveArrangement = () => {
+    // Calculate total horses assigned in this arrangement across rounds
     if (!arrangingRace) return
     const raceId = arrangingRace.id
     const raceRounds = rounds[raceId] || []
@@ -306,7 +435,7 @@ export default function RaceManagement() {
     ))
 
     setArrangingRace(null)
-    alert('Sắp xếp vòng đua và làn chạy đã được lưu thành công (tạm thời)!')
+    alert('Sắp xếp vòng đua và cuốc đua đã được lưu thành công!')
   }
 
   return (
@@ -325,21 +454,37 @@ export default function RaceManagement() {
         </button>
       </div>
 
-      <div className="admin-filters-bar" style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', fontWeight: '600' }}>Lọc theo Giải đấu</label>
-          <select 
-            className="admin-select"
-            value={selectedTournamentFilter}
-            onChange={(e) => setSelectedTournamentFilter(e.target.value)}
-            style={{ minWidth: '220px', padding: '8px 12px', fontSize: '13px' }}
-          >
-            <option value="">-- Tất cả giải đấu --</option>
-            {tournaments.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        </div>
+      <div className="admin-filters" style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+        <input 
+          type="text" 
+          className="admin-input" 
+          placeholder="Tìm theo tên hoặc địa điểm..." 
+          value={localSearchQuery}
+          onChange={(e) => setLocalSearchQuery(e.target.value)}
+          style={{ flex: 1, maxWidth: '300px' }}
+        />
+        <select 
+          className="admin-select"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">Tất cả Trạng thái</option>
+          <option value="pending">Chờ xử lý (Pending)</option>
+          <option value="delayed">Bị hoãn (Delayed)</option>
+          <option value="running">Đang chạy (Running)</option>
+          <option value="ongoing">Đang diễn ra (Ongoing)</option>
+          <option value="completed">Đã hoàn thành (Completed)</option>
+          <option value="cancelled">Đã hủy (Cancelled)</option>
+        </select>
+        <select 
+          className="admin-select"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+        >
+          <option value="newest">Sắp xếp: Mới nhất</option>
+          <option value="oldest">Sắp xếp: Cũ nhất</option>
+          <option value="az">Sắp xếp: Từ A đến Z</option>
+        </select>
       </div>
 
       {showForm && (
@@ -359,7 +504,6 @@ export default function RaceManagement() {
               <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Tên cuộc đua (Race name)</label>
               <input 
                 required
-                disabled={!!editingRace}
                 className="admin-input" 
                 placeholder="Ví dụ: Derby nước rút..." 
                 value={formData.name}
@@ -372,34 +516,13 @@ export default function RaceManagement() {
               <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thuộc Giải đấu</label>
               <select 
                 className="admin-select"
-                disabled={!!editingRace}
                 value={formData.tournamentId}
                 onChange={(e) => setFormData({ ...formData, tournamentId: e.target.value })}
                 style={{ width: '100%' }}
               >
-                <option value="">Chọn giải đấu...</option>
-                {tournaments.map(t => (
+                {tournaments.filter(t => t.status === 'ACTIVE').map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
-              </select>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Cự ly chạy</label>
-              <select 
-                className="admin-select"
-                disabled={!!editingRace}
-                value={formData.distance}
-                onChange={(e) => setFormData({ ...formData, distance: e.target.value })}
-                style={{ width: '100%' }}
-              >
-                <option value="1000m">1000m</option>
-                <option value="1200m">1200m</option>
-                <option value="1400m">1400m</option>
-                <option value="1600m">1600m</option>
-                <option value="1800m">1800m</option>
-                <option value="2000m">2000m</option>
-                <option value="2400m">2400m</option>
               </select>
             </div>
 
@@ -427,20 +550,30 @@ export default function RaceManagement() {
               />
             </div>
 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giờ kết thúc</label>
+              <input 
+                required
+                type="time"
+                className="admin-input"
+                value={formData.endTime}
+                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                style={{ width: '100%' }}
+              />
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', gridColumn: 'span 2' }}>
-              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Phân công Trọng tài</label>
+              <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái</label>
               <select 
                 className="admin-select"
-                value={formData.refereeId}
-                onChange={(e) => setFormData({ ...formData, refereeId: e.target.value })}
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 style={{ width: '100%' }}
               >
-                <option value="">-- Chưa phân công --</option>
-                {refereesList.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.fullName || r.name || r.userName} (Kinh nghiệm: {r.experienceYears || '0'} năm)
-                  </option>
-                ))}
+                <option value="scheduled">Đã lên lịch (Scheduled)</option>
+                <option value="ongoing">Đang diễn ra (Ongoing)</option>
+                <option value="completed">Đã hoàn thành (Completed)</option>
+                <option value="cancelled">Đã hủy (Cancelled)</option>
               </select>
             </div>
 
@@ -463,77 +596,140 @@ export default function RaceManagement() {
         </div>
       )}
 
-      {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải lịch trình cuộc đua...</div>
-      ) : (
-        <div className="admin-card">
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Mã</th>
-                  <th>Tên cuộc đua</th>
-                  <th>Giải đấu</th>
-                  <th>Trọng tài</th>
-                  <th>Thời gian</th>
-                  <th>Cự ly</th>
-                  <th>Ngựa tham gia</th>
-                  <th>Trạng thái</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRaces.map((race) => (
-                  <tr key={race.id}>
-                    <td>#{race.id}</td>
-                    <td><strong className="race-name" style={{ color: '#fff' }}>{race.name}</strong></td>
-                    <td style={{ color: '#d4af37' }}>{race.tournament}</td>
-                    <td style={{ color: race.refereeName ? '#fff' : '#666' }}>
-                      👤 {race.refereeName || 'Chưa phân công'}
-                    </td>
-                    <td>📅 {race.date} · ⏰ {race.time}</td>
-                    <td>{race.distance}</td>
-                    <td>
-                      <strong style={{ color: '#d4af37', marginRight: '4px' }}>{race.horses}</strong>
-                      <span className="text-muted" style={{ fontSize: '12px' }}>ngựa</span>
-                    </td>
-                    <td><StatusBadge status={race.status} /></td>
-                    <td>
-                      <div className="admin-table-actions">
-                        <button 
-                          type="button" 
-                          className="admin-btn admin-btn--ghost admin-btn--sm"
-                          onClick={() => handleOpenEdit(race)}
-                        >
-                          Sửa
-                        </button>
-                        <button 
-                          type="button" 
-                          className="admin-btn admin-btn--outline admin-btn--sm"
-                          onClick={() => openArrangement(race)}
-                        >
-                          Sắp xếp cuốc/vòng
-                        </button>
-                        {race.status === 'scheduled' && (
-                          <button 
-                            type="button" 
-                            className="admin-btn admin-btn--danger admin-btn--sm"
-                            onClick={() => handleCancelRace(race.id, race.tournamentId)}
-                          >
-                            Hủy
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {filteredRaces.length === 0 && (
-                  <tr>
-                    <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>Không tìm thấy cuộc đua phù hợp</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      <div className="race-cards-grid">
+        {filteredRaces.map((race) => (
+          <div key={race.id} className="admin-card race-card-item">
+            <div className="race-card-top">
+              <span className="race-card-id">{race.id}</span>
+              <StatusBadge status={race.status} />
+            </div>
+            <h3>{race.name}</h3>
+            <p className="race-card-tournament">{race.tournament}</p>
+            <div className="race-card-meta">
+              <span>📅 {race.date} · ⏰ {race.time}</span>
+              <span>📏 Cự ly: {race.distance}</span>
+            </div>
+            {/* 
+            <div className="race-card-horses">
+              <strong>{race.horses}</strong>
+              <span>ngựa tham gia</span>
+            </div>
+            */}
+            <div className="admin-table-actions">
+              <button 
+                type="button" 
+                className="admin-btn admin-btn--ghost admin-btn--sm"
+                onClick={() => handleOpenEdit(race)}
+              >
+                Sửa
+              </button>
+              <button 
+                type="button" 
+                className="admin-btn admin-btn--outline admin-btn--sm"
+                onClick={() => openArrangement(race)}
+              >
+                Sắp xếp cuốc/vòng
+              </button>
+              {race.status === 'scheduled' && (
+                <>
+                  <button 
+                    type="button" 
+                    className="admin-btn admin-btn--outline admin-btn--sm"
+                    style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                    onClick={() => handleStartRace(race)}
+                    disabled={isProcessing}
+                  >
+                    Bắt đầu
+                  </button>
+                  <button 
+                    type="button" 
+                    className="admin-btn admin-btn--danger admin-btn--sm"
+                    onClick={() => {
+                      setDelayingRace(race)
+                      setDelayForm({ reason: '', newStartTime: '', newEndTime: '' })
+                    }}
+                    disabled={isProcessing}
+                  >
+                    Hoãn
+                  </button>
+                </>
+              )}
+
+              {race.status === 'delayed' && (
+                <>
+                  <button 
+                    type="button" 
+                    className="admin-btn admin-btn--outline admin-btn--sm"
+                    style={{ borderColor: '#a855f7', color: '#a855f7' }}
+                    onClick={() => handleReopenPrediction(race)}
+                    disabled={isProcessing}
+                  >
+                    Mở lại dự đoán
+                  </button>
+                </>
+              )}
+
+              {race.status === 'completed' && (
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--gold admin-btn--sm"
+                  onClick={() => handlePublish(race)}
+                  disabled={isProcessing}
+                >
+                  Công bố KQ
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Delay Modal */}
+      {delayingRace && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div className="admin-card" style={{ width: '400px', border: '1px solid #ef4444' }}>
+            <div className="admin-card-head" style={{ borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+              <h3 style={{ color: '#ef4444' }}>Hoãn cuộc đua: {delayingRace.name}</h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setDelayingRace(null)}>✕</button>
+            </div>
+            <form onSubmit={submitDelayRace} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label className="text-muted" style={{ fontSize: '12px' }}>Lý do hoãn (*)</label>
+                <textarea
+                  className="admin-input"
+                  required
+                  value={delayForm.reason}
+                  onChange={e => setDelayForm({ ...delayForm, reason: e.target.value })}
+                  style={{ width: '100%', minHeight: '60px', marginTop: '4px' }}
+                />
+              </div>
+              <div>
+                <label className="text-muted" style={{ fontSize: '12px' }}>Thời gian dự kiến bắt đầu (Tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  className="admin-input"
+                  value={delayForm.newStartTime}
+                  onChange={e => setDelayForm({ ...delayForm, newStartTime: e.target.value })}
+                  style={{ width: '100%', marginTop: '4px' }}
+                />
+              </div>
+              <div>
+                <label className="text-muted" style={{ fontSize: '12px' }}>Thời gian dự kiến kết thúc (Tùy chọn)</label>
+                <input
+                  type="datetime-local"
+                  className="admin-input"
+                  value={delayForm.newEndTime}
+                  onChange={e => setDelayForm({ ...delayForm, newEndTime: e.target.value })}
+                  style={{ width: '100%', marginTop: '4px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setDelayingRace(null)}>Hủy</button>
+                <button type="submit" className="admin-btn admin-btn--danger" disabled={isProcessing}>Xác nhận Hoãn</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -555,7 +751,7 @@ export default function RaceManagement() {
             <div className="admin-card-head" style={{ flexShrink: 0 }}>
               <div>
                 <h3>Thiết lập vòng đua & làn chạy</h3>
-                <span style={{ fontSize: '12px', color: '#d4af37' }}>{arrangingRace.name} (ID: {arrangingRace.id})</span>
+                <span style={{ fontSize: '12px', color: '#d4af37' }}>{arrangingRace.name} ({arrangingRace.id})</span>
               </div>
               <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setArrangingRace(null)}>✕</button>
             </div>
@@ -646,8 +842,8 @@ export default function RaceManagement() {
                               style={{ width: '100%', minWidth: 'auto', padding: '6px 10px', fontSize: '12px' }}
                             >
                               <option value="">-- Chọn Jockey --</option>
-                              {jockeysList.map(j => (
-                                <option key={j.id} value={j.id}>{j.fullName || j.name || j.userName}</option>
+                              {mockJockeys.map(j => (
+                                <option key={j.id} value={j.id}>{j.name}</option>
                               ))}
                             </select>
                           </td>
@@ -660,7 +856,7 @@ export default function RaceManagement() {
             </div>
 
             <div className="admin-card-head" style={{ flexShrink: 0, justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', borderBottom: 'none' }}>
-              <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setArrangingRace(null)}>Hủy bộ</button>
+              <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setArrangingRace(null)}>Hủy bỏ</button>
               <button type="button" className="admin-btn admin-btn--gold" onClick={handleSaveArrangement}>Lưu sắp xếp</button>
             </div>
           </div>

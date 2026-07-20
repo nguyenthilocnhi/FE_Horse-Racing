@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import { violations as initialViolations } from '../../../data/adminMockData'
+import React, { useState, useEffect } from 'react'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
+import { getRaceParticipations, handleRuleViolation } from '../../../services/refereeService'
 import './RefereeViolations.css'
 
 const INFRACTION_TYPES = [
@@ -13,57 +14,108 @@ const INFRACTION_TYPES = [
 ]
 
 export default function RefereeViolations() {
-  const [violations, setViolations] = useState(initialViolations)
+  const [violations, setViolations] = useState([])
+  const [races, setRaces] = useState([])
+  const [participations, setParticipations] = useState([])
+  const [loadingParticipations, setLoadingParticipations] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Form state
   const [selectedRace, setSelectedRace] = useState('')
-  const [entityType, setEntityType] = useState('Jockey')
-  const [entityName, setEntityName] = useState('')
+  const [selectedParticipation, setSelectedParticipation] = useState('')
   const [violationType, setViolationType] = useState('')
   const [severity, setSeverity] = useState('medium')
   const [details, setDetails] = useState('')
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
-  const [pendingViolation, setPendingViolation] = useState(null)
-  const [selectedViolation, setSelectedViolation] = useState(null)
 
-  const handleAddViolation = (e) => {
+  useEffect(() => {
+    fetchRaces()
+  }, [])
+
+  const fetchRaces = async () => {
+    try {
+      const tRes = await getAllTournaments()
+      let allSchedules = []
+      const tList = Array.isArray(tRes) ? tRes : (tRes?.data || [])
+      for (const t of tList) {
+        const sRes = await getTournamentSchedule(t.id)
+        if (sRes?.data) {
+          allSchedules = [...allSchedules, ...sRes.data.map(r => ({...r, tournamentName: t.name}))]
+        }
+      }
+      setRaces(allSchedules)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleRaceChange = async (e) => {
+    const raceId = e.target.value
+    setSelectedRace(raceId)
+    setSelectedParticipation('')
+    setParticipations([])
+    if (raceId) {
+      try {
+        setLoadingParticipations(true)
+        const pRes = await getRaceParticipations(raceId)
+        if (pRes.data) {
+          setParticipations(pRes.data)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoadingParticipations(false)
+      }
+    }
+  }
+
+  const handleAddViolation = async (e) => {
     e.preventDefault()
-    if (!selectedRace || !entityName || !violationType) {
-      alert('Vui lòng điền đầy đủ các thông tin bắt buộc!')
+    if (!selectedRace || !violationType) {
+      alert('Vui lòng điền đầy đủ các thông tin bắt buộc (Cuộc đua và Loại vi phạm)!')
       return
     }
 
-    const newViolation = {
-      id: `VIO-${Math.floor(Math.random() * 900) + 100}`,
-      type: violationType,
-      entity: `${entityType}: ${entityName}`,
-      race: selectedRace,
-      date: new Date().toISOString().split('T')[0],
-      status: 'pending',
-      severity: severity,
-      details: details
+    try {
+      setIsSubmitting(true)
+      const payload = {
+        participationId: selectedParticipation ? parseInt(selectedParticipation) : null,
+        description: `${violationType}: ${details}`,
+        penalty: severity,
+        evidence: 'Ghi nhận trực tiếp từ trọng tài'
+      }
+
+      await handleRuleViolation(selectedRace, payload)
+
+      const raceName = races.find(r => r.id.toString() === selectedRace)?.name || selectedRace
+      const partInfo = participations.find(p => p.id.toString() === selectedParticipation)
+      const entityStr = partInfo ? `Ngựa: ${partInfo.horseName} - Nài: ${partInfo.jockeyName}` : 'Chưa xác định'
+
+      const newViolation = {
+        id: `VIO-${Math.floor(Math.random() * 9000) + 1000}`,
+        type: violationType,
+        entity: entityStr,
+        race: raceName,
+        date: new Date().toLocaleString('vi-VN'),
+        status: 'PENDING',
+        severity: severity
+      }
+
+      setViolations([newViolation, ...violations])
+      alert(`⚠️ Đã lập biên bản vi phạm thành công! Nội dung đã chuyển đến Ban trọng tài và BTC.`);
+      
+      // Reset form
+      setSelectedRace('')
+      setSelectedParticipation('')
+      setParticipations([])
+      setViolationType('')
+      setSeverity('medium')
+      setDetails('')
+    } catch (err) {
+      console.error(err)
+      alert('Lỗi nộp biên bản vi phạm: ' + (err.response?.data?.message || err.message))
+    } finally {
+      setIsSubmitting(false)
     }
-
-    setPendingViolation(newViolation)
-    setShowConfirmModal(true)
-  }
-
-  const proceedAddViolation = () => {
-    if (!pendingViolation) return
-    setViolations([pendingViolation, ...violations])
-    setSuccessMessage(`Đã lập biên bản vi phạm ${pendingViolation.id} thành công! Nội dung đã chuyển đến Ban trọng tài và BTC.`)
-    setShowSuccessModal(true)
-    
-    // Reset form
-    setSelectedRace('')
-    setEntityName('')
-    setViolationType('')
-    setSeverity('medium')
-    setDetails('')
-    setShowConfirmModal(false)
-    setPendingViolation(null)
   }
 
   return (
@@ -90,43 +142,33 @@ export default function RefereeViolations() {
                   className="admin-select"
                   style={{ width: '100%' }}
                   value={selectedRace}
-                  onChange={e => setSelectedRace(e.target.value)}
+                  onChange={handleRaceChange}
+                  disabled={isSubmitting}
                   required
                 >
                   <option value="">-- Chọn cuộc đua --</option>
-                  <option value="Derby Một Dặm">Derby Một Dặm</option>
-                  <option value="Đua nước rút">Đua nước rút</option>
-                  <option value="Sprint Classic">Sprint Classic</option>
-                  <option value="Cúp Nhà Vô Địch">Cúp Nhà Vô Địch</option>
+                  {races.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} ({r.tournamentName}) - {r.status}</option>
+                  ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '10px' }}>
-                <div>
-                  <label className="admin-form-label">Đối tượng vi phạm *</label>
-                  <select 
-                    className="admin-select"
-                    style={{ width: '100%' }}
-                    value={entityType}
-                    onChange={e => setEntityType(e.target.value)}
-                  >
-                    <option value="Jockey">👤 Jockey (Nài)</option>
-                    <option value="Horse">🏇 Ngựa đua</option>
-                    <option value="Stable">🏠 Chủ ngựa (Stable)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="admin-form-label">Tên đối tượng *</label>
-                  <input 
-                    type="text" 
-                    className="admin-input" 
-                    placeholder="Ví dụ: L. Anderson, Aurelius..."
-                    style={{ width: '100%' }}
-                    value={entityName}
-                    onChange={e => setEntityName(e.target.value)}
-                    required
-                  />
-                </div>
+              <div>
+                <label className="admin-form-label">Đối tượng vi phạm {loadingParticipations && '(Đang tải...)'}</label>
+                <select 
+                  className="admin-select"
+                  style={{ width: '100%' }}
+                  value={selectedParticipation}
+                  onChange={e => setSelectedParticipation(e.target.value)}
+                  disabled={!selectedRace || isSubmitting || loadingParticipations}
+                >
+                  <option value="">-- Chọn ngựa/nài vi phạm (Tùy chọn) --</option>
+                  {participations.map(p => (
+                    <option key={p.id} value={p.id}>
+                      Ngựa: {p.horseName || 'N/A'} - Nài: {p.jockeyName || 'N/A'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -136,6 +178,7 @@ export default function RefereeViolations() {
                   style={{ width: '100%' }}
                   value={violationType}
                   onChange={e => setViolationType(e.target.value)}
+                  disabled={isSubmitting}
                   required
                 >
                   <option value="">-- Chọn hành vi vi phạm --</option>
@@ -152,6 +195,7 @@ export default function RefereeViolations() {
                   style={{ width: '100%' }}
                   value={severity}
                   onChange={e => setSeverity(e.target.value)}
+                  disabled={isSubmitting}
                 >
                   <option value="low">Thấp (Cảnh cáo)</option>
                   <option value="medium">Trung bình (Trừ điểm)</option>
@@ -168,12 +212,13 @@ export default function RefereeViolations() {
                   placeholder="Ghi nhận cụ thể thời gian, vị trí trên sân đua, hoặc các quan sát trực tiếp từ trọng tài..."
                   value={details}
                   onChange={e => setDetails(e.target.value)}
+                  disabled={isSubmitting}
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-                <button type="submit" className="admin-btn admin-btn--gold" style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}>
-                  Lập Biên Bản & Gửi Báo Cáo
+                <button type="submit" className="admin-btn admin-btn--gold" style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }} disabled={isSubmitting}>
+                  {isSubmitting ? 'Đang gửi...' : 'Lập Biên Bản & Gửi Báo Cáo'}
                 </button>
               </div>
 
@@ -185,7 +230,7 @@ export default function RefereeViolations() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div className="admin-card">
             <div className="admin-card-head">
-              <h3>Nhật Ký Vi Phạm Đã Ghi Nhận</h3>
+              <h3>Nhật Ký Vi Phạm Đã Ghi Nhận (Phiên hiện tại)</h3>
             </div>
             <div className="admin-card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '550px', overflowY: 'auto' }}>
               {violations.map(v => (
@@ -201,7 +246,7 @@ export default function RefereeViolations() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <code style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>#{v.id}</code>
+                      <code style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>{v.id}</code>
                       <strong style={{ color: '#fff' }}>{v.type}</strong>
                     </div>
                     <span style={{ 
@@ -222,171 +267,18 @@ export default function RefereeViolations() {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '11px', color: '#666' }}>Trạng thái xử lý:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <StatusBadge status={v.status} />
-                      <button 
-                        type="button" 
-                        className="admin-btn admin-btn--ghost admin-btn--sm"
-                        style={{ fontSize: '11px', padding: '2px 8px', borderColor: 'rgba(255,255,255,0.1)' }}
-                        onClick={() => setSelectedViolation(v)}
-                      >
-                        Chi tiết
-                      </button>
-                    </div>
+                    <StatusBadge status={v.status} />
                   </div>
                 </div>
               ))}
+              {violations.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '30px', color: '#666' }}>Chưa có vi phạm nào được ghi nhận.</div>
+              )}
             </div>
           </div>
         </div>
 
       </div>
-
-      {/* Confirm Action Modal */}
-      {showConfirmModal && pendingViolation && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 10000
-        }}>
-          <div className="admin-card" style={{ width: '100%', maxWidth: '440px', border: '1px solid rgba(245, 158, 11, 0.3)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
-            <div className="admin-card-head" style={{ borderBottom: 'none', padding: '20px 24px 10px' }}>
-              <h3 style={{ color: '#f59e0b', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ⚠️ Xác nhận lập biên bản
-              </h3>
-              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => { setShowConfirmModal(false); setPendingViolation(null); }}>✕</button>
-            </div>
-            <div className="admin-card-body" style={{ padding: '10px 24px 20px' }}>
-              <p style={{ color: '#ddd', fontSize: '14px', lineHeight: '1.6', margin: '0 0 20px' }}>
-                Bạn có chắc chắn muốn lập biên bản vi phạm cho <strong>{pendingViolation.entity}</strong> thuộc cuộc đua <strong>{pendingViolation.race}</strong> không? Biên bản sau khi gửi sẽ được chuyển trực tiếp tới BTC.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--ghost" 
-                  onClick={() => { setShowConfirmModal(false); setPendingViolation(null); }}
-                >
-                  Hủy bỏ
-                </button>
-                <button 
-                  type="button" 
-                  className="admin-btn"
-                  style={{ background: '#f59e0b', borderColor: '#f59e0b', color: '#fff' }}
-                  onClick={proceedAddViolation}
-                >
-                  Lập biên bản
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 10000
-        }}>
-          <div className="admin-card" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', padding: '30px', border: '1px solid rgba(74, 222, 128, 0.25)', boxShadow: '0 20px 50px rgba(0,0,0,0.6)' }}>
-            <div style={{ marginBottom: '20px' }}>
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto', display: 'block' }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-              </svg>
-            </div>
-            <h3 style={{ color: '#4ade80', marginBottom: '15px', fontSize: '20px', fontWeight: 'bold' }}>Lập biên bản thành công!</h3>
-            <p style={{ color: '#ccc', marginBottom: '25px', lineHeight: '1.6', fontSize: '14px' }}>
-              {successMessage}
-            </p>
-            <button 
-              onClick={() => setShowSuccessModal(false)}
-              className="admin-btn"
-              style={{ width: '100%', justifyContent: 'center', background: '#3b82f6', borderColor: '#3b82f6', color: '#fff', padding: '10px 20px', borderRadius: '12px' }}
-            >
-              Đồng ý
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Violation Detail Modal */}
-      {selectedViolation && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.8)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 10000
-        }}>
-          <div className="admin-card" style={{ width: '100%', maxWidth: '480px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div className="admin-card-head">
-              <h3>Chi tiết biên bản #{selectedViolation.id}</h3>
-              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedViolation(null)}>✕</button>
-            </div>
-            <div className="admin-card-body" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Loại vi phạm</span>
-                  <strong style={{ color: '#fff' }}>{selectedViolation.type}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Mức độ</span>
-                  <span style={{ 
-                    fontWeight: 'bold',
-                    color: selectedViolation.severity === 'high' ? '#f87171' : selectedViolation.severity === 'medium' ? '#fbbf24' : '#60a5fa' 
-                  }}>
-                    {selectedViolation.severity === 'high' ? 'Cao (Đình chỉ)' : selectedViolation.severity === 'medium' ? 'Trung bình (Trừ điểm)' : 'Thấp (Cảnh cáo)'}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Đối tượng</span>
-                  <strong style={{ color: '#fff' }}>{selectedViolation.entity}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Trận đua</span>
-                  <strong style={{ color: '#fff' }}>{selectedViolation.race}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Ngày lập</span>
-                  <span style={{ color: '#ccc' }}>{selectedViolation.date}</span>
-                </div>
-                <div>
-                  <span style={{ color: '#666', display: 'block', marginBottom: '2px', fontSize: '11px', textTransform: 'uppercase' }}>Trạng thái duyệt</span>
-                  <StatusBadge status={selectedViolation.status} />
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '14px', marginTop: '4px' }}>
-                <span style={{ color: '#666', display: 'block', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase' }}>Chi tiết sự việc & Bằng chứng</span>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', color: '#ccc', fontSize: '13px', lineHeight: '1.6', minHeight: '80px', whiteSpace: 'pre-wrap' }}>
-                  {selectedViolation.details || 'Không có mô tả chi tiết.'}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button type="button" className="admin-btn admin-btn--gold" style={{ width: '100%' }} onClick={() => setSelectedViolation(null)}>Đóng</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -1,26 +1,82 @@
 import React, { useState, useEffect } from 'react'
+import { getMyParticipations } from '../../../services/ownerService'
 import { ownerRaces as initialRaces } from '../../../data/ownerMockData'
-import { toast } from '../../../utils/toast'
 
 export default function OwnerRaces() {
-  const [races, setRaces] = useState(() => {
-    const stored = localStorage.getItem('owner_races')
-    if (stored) {
-      try {
-        return JSON.parse(stored)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    return initialRaces
-  })
-
+  const [races, setRaces] = useState([])
+  const [loading, setLoading] = useState(true)
   const [selectedRace, setSelectedRace] = useState(null)
   const [detailsModal, setDetailsModal] = useState(false)
 
   useEffect(() => {
-    localStorage.setItem('owner_races', JSON.stringify(races))
-  }, [races])
+    fetchMyParticipations()
+  }, [])
+
+  const fetchMyParticipations = async () => {
+    try {
+      setLoading(true)
+      const res = await getMyParticipations()
+      const data = res?.data || res || []
+      
+      const mappedRaces = data.map(p => {
+        let mappedStatus = 'pending_jockey'
+        let displayLabel = 'Chờ nài ngựa'
+        let badgeColor = 'orange'
+
+        if (p.status === 'CONFIRMED') {
+          mappedStatus = 'registered'
+          displayLabel = 'Đã xếp lịch'
+          badgeColor = 'green'
+        } else if (p.status === 'REJECTED') {
+          mappedStatus = 'canceled'
+          displayLabel = 'Admin từ chối'
+          badgeColor = 'red'
+        } else {
+          // Admin chưa duyệt, xem xét trạng thái Jockey
+          if (p.jockeyInvitationStatus === 'ACCEPTED') {
+            mappedStatus = 'pending_admin'
+            displayLabel = 'Chờ Admin duyệt'
+            badgeColor = 'blue'
+          } else if (p.jockeyInvitationStatus === 'REJECTED') {
+            mappedStatus = 'jockey_rejected'
+            displayLabel = 'Nài ngựa từ chối'
+            badgeColor = 'red'
+          } else if (p.jockeyInvitationStatus === 'PENDING') {
+            mappedStatus = 'pending_jockey'
+            displayLabel = 'Chờ nài ngựa phản hồi'
+            badgeColor = 'orange'
+          } else {
+            mappedStatus = 'pending_confirmation'
+            displayLabel = 'Cần gán Jockey'
+            badgeColor = 'gray'
+          }
+        }
+        
+        return {
+          id: p.id,
+          name: p.raceSchedule?.name || 'Vòng đấu',
+          tournamentName: p.raceSchedule?.tournament?.name || 'Giải đấu',
+          date: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleDateString('vi-VN') : 'N/A',
+          time: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : 'N/A',
+          venue: 'Saigon Racecourse', // Hardcoded for now
+          distance: '1000m', // Hardcoded for now
+          registeredHorse: p.horse?.name || 'Không rõ',
+          assignedJockey: p.jockey ? (p.jockey.fullName || p.jockey.userName) : 'Chưa chỉ định',
+          prizePool: '200,000,000 VND',
+          status: mappedStatus,
+          displayLabel: displayLabel,
+          badgeColor: badgeColor,
+          result: null // Real result logic later
+        }
+      })
+      setRaces(mappedRaces)
+    } catch (error) {
+      console.error("Lỗi khi tải danh sách đăng ký:", error)
+      setRaces(initialRaces) // Fallback to mock data if error
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleConfirmReady = (raceId) => {
     setRaces(races.map(r => {
@@ -29,7 +85,7 @@ export default function OwnerRaces() {
       }
       return r
     }))
-    toast.success('Đã xác nhận chiến mã sẵn sàng thi đấu!')
+    alert('Đã xác nhận chiến mã sẵn sàng thi đấu!')
   }
 
   const openDetails = (race) => {
@@ -65,7 +121,11 @@ export default function OwnerRaces() {
               </tr>
             </thead>
             <tbody>
-              {races.filter(r => r.status !== 'completed').map((race) => (
+              {loading ? (
+                <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>Đang tải dữ liệu...</td></tr>
+              ) : races.filter(r => r.status !== 'completed').length === 0 ? (
+                <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>Bạn chưa có lịch thi đấu nào.</td></tr>
+              ) : races.filter(r => r.status !== 'completed').map((race) => (
                 <tr key={race.id}>
                   <td style={{ color: '#fff', fontWeight: 600 }}>
                     <div>{race.name}</div>
@@ -81,10 +141,8 @@ export default function OwnerRaces() {
                   <td>{race.assignedJockey || 'Chưa chỉ định'}</td>
                   <td style={{ color: '#4ade80' }}>{race.prizePool}</td>
                   <td>
-                    <span className={`owner-badge owner-badge--${
-                      race.status === 'pending_confirmation' ? 'red' : race.status === 'registered' ? 'green' : 'gray'
-                    }`}>
-                      {race.status === 'pending_confirmation' ? 'Cần xác nhận' : race.status === 'registered' ? 'Đã xếp lịch' : 'Mở đăng ký'}
+                    <span className={`owner-badge owner-badge--${race.badgeColor || 'gray'}`}>
+                      {race.displayLabel}
                     </span>
                   </td>
                   <td>
@@ -92,9 +150,9 @@ export default function OwnerRaces() {
                       <button className="owner-btn owner-btn--ghost owner-btn--sm" onClick={() => openDetails(race)}>
                         Chi tiết
                       </button>
-                      {race.status === 'pending_confirmation' && (
-                        <button className="owner-btn owner-btn--gold owner-btn--sm" onClick={() => handleConfirmReady(race.id)}>
-                          Xác nhận Sẵn sàng
+                      {race.status === 'jockey_rejected' && (
+                        <button className="owner-btn owner-btn--gold owner-btn--sm" onClick={() => alert('Vui lòng vào lại màn hình đăng ký để chọn nài ngựa khác!')}>
+                          Đổi Nài Ngựa
                         </button>
                       )}
                     </div>

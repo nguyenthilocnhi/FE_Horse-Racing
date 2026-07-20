@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { breadcrumbLabels } from '../../data/adminMockData'
+import * as horseService from '../../services/horseService'
 
 const NOTIFICATIONS = [
   { id: 1, title: '5 đăng ký chờ duyệt', time: '10 phút trước' },
@@ -19,16 +20,43 @@ function useClickOutside(ref, handler) {
   }, [ref, handler])
 }
 
-export default function AdminHeader({ searchQuery, setSearchQuery }) {
+export default function AdminHeader() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
+  
   const notifRef = useRef(null)
   const userRef = useRef(null)
+  const searchRef = useRef(null)
 
   useClickOutside(notifRef, () => setNotifOpen(false))
   useClickOutside(userRef, () => setUserOpen(false))
+  useClickOutside(searchRef, () => setSearchResults(null))
+
+  const handleSearch = async (e) => {
+    if (e.key === 'Enter') {
+      if (!query.trim()) {
+        setSearchResults(null)
+        return
+      }
+      setIsSearching(true)
+      try {
+        const response = await horseService.searchHorses(query.trim())
+        setSearchResults(response.data || [])
+      } catch (err) {
+        console.error('Search failed:', err)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+        setNotifOpen(false)
+        setUserOpen(false)
+      }
+    }
+  }
 
   const pageLabel = breadcrumbLabels[location.pathname] || 'Admin'
 
@@ -40,14 +68,33 @@ export default function AdminHeader({ searchQuery, setSearchQuery }) {
         <span>{pageLabel}</span>
       </nav>
 
-      <div className="admin-search">
+      <div className="admin-search" ref={searchRef} style={{ position: 'relative' }}>
         <span className="admin-search-icon">⌕</span>
         <input
           className="admin-search-input"
           placeholder="Tìm nhanh: user, giải đấu, race…"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleSearch}
         />
+        {searchResults !== null && (
+          <div className="admin-dropdown-menu admin-dropdown-menu--wide" style={{ top: '100%', left: 0, marginTop: '8px', right: 'auto', minWidth: '300px', display: 'block', backgroundColor: '#1a1a1a', border: '1px solid #333' }}>
+            <div className="admin-dropdown-head">Kết quả tìm kiếm ({searchResults.length})</div>
+            {isSearching ? (
+              <div className="admin-dropdown-item" style={{ color: '#aaa' }}>Đang tìm kiếm...</div>
+            ) : searchResults.length === 0 ? (
+              <div className="admin-dropdown-item" style={{ color: '#aaa' }}>Không tìm thấy kết quả.</div>
+            ) : (
+              searchResults.map(horse => (
+                <div key={horse.id} className="admin-notif-item" style={{ cursor: 'pointer' }} onClick={() => setSearchResults(null)}>
+                  <strong>{horse.name}</strong>
+                  <div style={{ fontSize: '11px', color: '#ccc' }}>Tuổi: {horse.age} | Giống: {horse.breed}</div>
+                  <div style={{ fontSize: '11px', color: '#d4af37' }}>Chủ: {horse.ownerName}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="admin-header-actions">

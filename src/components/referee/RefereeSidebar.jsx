@@ -5,6 +5,7 @@ const refereeNavItems = [
   { path: '/referee', label: 'Kiểm Tra Trước Đua', icon: '📋' },
   { path: '/referee/tracking', label: 'Giám Sát & Kết Quả', icon: '⏱' },
   { path: '/referee/violations', label: 'Ghi Nhận Vi Phạm', icon: '⚠️' },
+  { path: '/referee/profile', label: 'Hồ sơ', icon: '◎' },
 ]
 
 export default function RefereeSidebar() {

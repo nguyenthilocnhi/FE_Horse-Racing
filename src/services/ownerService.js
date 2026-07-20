@@ -9,7 +9,8 @@
  *   POST /owner/horses
  *   PUT  /owner/horses/{horseId}
  *   POST /owner/race-participations/register-horse
- *   POST /owner/race-participations/{participationId}/register-jockey
+ *   POST /owner/race-participations/{id}/register-jockey
+ *   GET /owner/race-participations
  */
 import apiClient from './apiClient'
 
@@ -25,8 +26,7 @@ export async function getOwnerHorses() {
 
 /**
  * Tạo ngựa mới.
- * @param {{ name: string, age: number, breed: string, 
- * healthStatus: 'ELIGIBLE'|'INJURED'|'RETIRED' }} payload
+ * @param {{ name, breed, age, weight, color, ... }} payload
  */
 export async function createOwnerHorse(payload) {
   const res = await apiClient.post('/owner/horses', payload)
@@ -40,6 +40,15 @@ export async function createOwnerHorse(payload) {
  */
 export async function updateOwnerHorse(horseId, payload) {
   const res = await apiClient.put(`/owner/horses/${horseId}`, payload)
+  return res.data
+}
+
+/**
+ * Xóa ngựa.
+ * @param {string|number} horseId
+ */
+export async function deleteOwnerHorse(horseId) {
+  const res = await apiClient.delete(`/owner/horses/${horseId}`)
   return res.data
 }
 
@@ -67,5 +76,13 @@ export async function assignJockeyToParticipation(participationId, payload) {
     `/owner/race-participations/${participationId}/register-jockey`,
     payload
   )
+  return res.data
+}
+
+/**
+ * Lấy lịch sử đăng ký tham gia cuộc đua của owner
+ */
+export async function getMyParticipations() {
+  const res = await apiClient.get('/owner/race-participations')
   return res.data
 }

@@ -14,12 +14,10 @@ import apiClient from './apiClient'
  */
 export async function getSpectatorProfile(id) {
   try {
-    const res = await apiClient.get('/spectators/me')
+    const res = await apiClient.get('/auth/me')
     return res.data
-  } catch {
-    // Fallback: lấy theo id
-    const res = await apiClient.get(`/spectators/${id}`)
-    return res.data
+  } catch (err) {
+    throw err
   }
 }
 

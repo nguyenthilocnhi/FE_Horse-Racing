@@ -24,6 +24,14 @@ import apiClient from './apiClient'
 // ─────────────────────────────────────────
 
 /**
+ * Lấy danh sách toàn bộ giải đấu
+ */
+export async function getAllTournaments() {
+  const res = await apiClient.get('/tournaments')
+  return res.data
+}
+
+/**
  * Tạo giải đấu mới.
  * @param {{ name, startDate, endDate, location, description, ... }} payload
  */
@@ -45,9 +53,10 @@ export async function updateTournament(id, payload) {
 /**
  * Hủy giải đấu.
  * @param {string|number} id
+ * @param {object} payload
  */
-export async function cancelTournament(id) {
-  const res = await apiClient.put(`/tournaments/${id}/cancel`)
+export async function cancelTournament(id, payload = { reason: 'Hủy giải đấu', forceCancel: true }) {
+  const res = await apiClient.put(`/tournaments/${id}/cancel`, payload)
   return res.data
 }
 
@@ -88,18 +97,6 @@ export async function updateRaceSchedule(tournamentId, scheduleId, payload) {
   const res = await apiClient.put(
     `/tournaments/${tournamentId}/race-schedules/${scheduleId}/schedule`,
     payload
-  )
-  return res.data
-}
-
-/**
- * Hủy lịch đua.
- * @param {string|number} tournamentId
- * @param {string|number} scheduleId
- */
-export async function cancelRaceSchedule(tournamentId, scheduleId) {
-  const res = await apiClient.put(
-    `/tournaments/${tournamentId}/race-schedules/${scheduleId}/cancel`
   )
   return res.data
 }
@@ -183,16 +180,3 @@ export async function updateRankings(tournamentId, payload) {
   )
   return res.data
 }
-
-/** Lấy danh sách giải đấu */
-export async function getTournaments() {
-  const res = await apiClient.get('/tournaments')
-  return res.data
-}
-
-/** Lấy bảng xếp hạng Jockey trong giải đấu */
-export async function getJockeyRankings(tournamentId) {
-  const res = await apiClient.get(`/tournaments/${tournamentId}/rankings/jockeys`)
-  return res.data
-}
-

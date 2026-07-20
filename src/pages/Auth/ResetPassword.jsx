@@ -21,30 +21,14 @@ export default function ResetPassword() {
         }
 
         setError('')
-        setSuccess('')
         setLoading(true)
 
         try {
-            const data = await authService.forgotPassword(email)
-            // Parse response message if it is stringified JSON
-            let cleanMsg = data?.message || 'Mã OTP đã được gửi đến email của bạn!'
-            if (typeof data === 'string' && data.includes('success')) {
-                try {
-                    const parsed = JSON.parse(data)
-                    cleanMsg = parsed.message
-                } catch (_) {}
-            }
+            const res = await authService.forgotPassword(email);
             setStep(2)
-            setSuccess(cleanMsg)
+            setSuccess(res.message || 'Mã xác minh (OTP) đã được gửi tới email của bạn.')
         } catch (err) {
-            let msg = err.response?.data?.message || err.response?.data || err.message || 'Gửi mã xác minh thất bại.'
-            if (typeof msg === 'string' && msg.includes('message')) {
-                try {
-                    const parsed = JSON.parse(msg)
-                    msg = parsed.message
-                } catch (_) {}
-            }
-            setError(msg)
+            setError(err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.')
         } finally {
             setLoading(false)
         }
@@ -71,33 +55,18 @@ export default function ResetPassword() {
         setLoading(true)
 
         try {
-            const payload = {
+            const res = await authService.resetPassword({
                 email,
                 otp: code,
                 newPassword: password,
                 confirmPassword
-            }
-            const data = await authService.resetPassword(payload)
-            let cleanMsg = data?.message || 'Đặt lại mật khẩu thành công!'
-            if (typeof data === 'string' && data.includes('success')) {
-                try {
-                    const parsed = JSON.parse(data)
-                    cleanMsg = parsed.message
-                } catch (_) {}
-            }
-            setSuccess(cleanMsg + ' Đang chuyển hướng đăng nhập...')
+            })
+            setSuccess(res.message || 'Chúc mừng! Đặt lại mật khẩu thành công. Đang chuyển hướng đăng nhập...')
             setTimeout(() => {
                 navigate('/login')
-            }, 2500)
+            }, 2000)
         } catch (err) {
-            let msg = err.response?.data?.message || err.response?.data || err.message || 'Đặt lại mật khẩu thất bại.'
-            if (typeof msg === 'string' && msg.includes('message')) {
-                try {
-                    const parsed = JSON.parse(msg)
-                    msg = parsed.message
-                } catch (_) {}
-            }
-            setError(msg)
+            setError(err.response?.data?.message || 'Mã xác minh không chính xác hoặc có lỗi xảy ra.')
         } finally {
             setLoading(false)
         }

@@ -52,9 +52,8 @@ export async function checkEmail(email) {
   return res.data
 }
 
-/** Lấy thông tin tài khoản đang đăng nhập */
-export async function getCurrentUser() {
+/** Lấy thông tin user hiện tại */
+export async function getMe() {
   const res = await apiClient.get('/auth/me')
   return res.data
 }
-

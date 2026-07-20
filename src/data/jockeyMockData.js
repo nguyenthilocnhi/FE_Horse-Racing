@@ -228,6 +228,8 @@ export const globalRankings = [
 
 export const jockeyNavItems = [
   { path: '/jockey', label: 'Tổng quan', icon: '◈' },
+  { path: '/jockey/tournaments', label: 'Giải đấu', icon: '🏆' },
+  { path: '/jockey/all-races', label: 'Cuộc đua', icon: '🏁' },
   { path: '/jockey/invitations', label: 'Lời mời thi đấu', icon: '✉' },
   { path: '/jockey/my-races', label: 'Cuộc đua của tôi', icon: '▶' },
   { path: '/jockey/results', label: 'Kết quả cá nhân', icon: '◉' },
@@ -237,6 +239,7 @@ export const jockeyNavItems = [
 
 export const jockeyBreadcrumbLabels = {
   '/jockey': 'Tổng quan',
+  '/jockey/tournaments': 'Giải đấu',
   '/jockey/invitations': 'Lời mời thi đấu',
   '/jockey/my-races': 'Cuộc đua của tôi',
   '/jockey/results': 'Kết quả cá nhân',

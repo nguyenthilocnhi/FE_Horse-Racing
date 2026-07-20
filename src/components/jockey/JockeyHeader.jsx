@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { jockeyBreadcrumbLabels } from '../../data/jockeyMockData'
-import * as tournamentService from '../../services/tournamentService'
+import { jockeyBreadcrumbLabels, jockeyNotifications } from '../../data/jockeyMockData'
+import * as horseService from '../../services/horseService'
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -20,55 +20,36 @@ export default function JockeyHeader() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [notifications, setNotifications] = useState([])
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
   const notifRef = useRef(null)
   const userRef = useRef(null)
+  const searchRef = useRef(null)
 
   useClickOutside(notifRef, () => setNotifOpen(false))
   useClickOutside(userRef, () => setUserOpen(false))
+  useClickOutside(searchRef, () => setSearchResults(null))
 
-  useEffect(() => {
-    let cancelled = false
-    async function loadNotifications() {
-      if (!user?.id) return
+  const handleSearch = async (e) => {
+    if (e.key === 'Enter') {
+      if (!query.trim()) {
+        setSearchResults(null)
+        return
+      }
+      setIsSearching(true)
       try {
-        const tournaments = await tournamentService.getTournaments()
-        if (cancelled || !Array.isArray(tournaments)) return
-        
-        const list = []
-        const promises = tournaments.map(async (t) => {
-          try {
-            const schedule = await tournamentService.getTournamentSchedule(t.id)
-            if (Array.isArray(schedule)) {
-              schedule.forEach(race => {
-                const participations = race.participations || race.raceParticipations || [];
-                participations.forEach(p => {
-                  const jockeyId = p.jockeyId || p.jockey?.id;
-                  const status = (p.status || '').toUpperCase();
-                  if (jockeyId === user.id && (status === 'PENDING' || status === 'PENDING_CONFIRMATION')) {
-                    list.push({
-                      id: p.id,
-                      title: `Lời mời đua ngựa ${p.horseName || p.horse?.name || 'mới'} từ ${p.ownerName || 'Chủ ngựa'}`,
-                      time: race.raceDate ? new Date(race.raceDate).toLocaleDateString() : 'Sắp tới'
-                    });
-                  }
-                });
-              });
-            }
-          } catch (_) {}
-        })
-        
-        await Promise.all(promises)
-        if (!cancelled) {
-          setNotifications(list.slice(0, 5))
-        }
+        const response = await horseService.searchHorses(query.trim())
+        setSearchResults(response.data || [])
       } catch (err) {
-        console.warn("Failed to load header notifications:", err)
+        console.error('Search failed:', err)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+        setNotifOpen(false)
+        setUserOpen(false)
       }
     }
-    loadNotifications()
-    return () => { cancelled = true }
-  }, [user?.id])
+  }
 
   const pageLabel = jockeyBreadcrumbLabels[location.pathname] || 'Jockey'
 
@@ -80,14 +61,33 @@ export default function JockeyHeader() {
         <span>{pageLabel}</span>
       </nav>
 
-      <div className="jockey-search">
+      <div className="jockey-search" ref={searchRef} style={{ position: 'relative' }}>
         <span className="jockey-search-icon">⌕</span>
         <input
           className="jockey-search-input"
-          placeholder="Tìm cuộc đua, lời mời, ngựa…"
+          placeholder="Tìm kiếm ngựa theo tên..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleSearch}
         />
+        {searchResults !== null && (
+          <div className="jockey-dropdown-menu jockey-dropdown-menu--wide" style={{ top: '100%', left: 0, marginTop: '8px', right: 'auto', minWidth: '300px', display: 'block' }}>
+            <div className="jockey-dropdown-head">Kết quả tìm kiếm ({searchResults.length})</div>
+            {isSearching ? (
+              <div className="jockey-dropdown-item" style={{ color: '#aaa' }}>Đang tìm kiếm...</div>
+            ) : searchResults.length === 0 ? (
+              <div className="jockey-dropdown-item" style={{ color: '#aaa' }}>Không tìm thấy kết quả.</div>
+            ) : (
+              searchResults.map(horse => (
+                <div key={horse.id} className="jockey-notif-item" style={{ cursor: 'pointer' }} onClick={() => setSearchResults(null)}>
+                  <strong>{horse.name}</strong>
+                  <div style={{ fontSize: '11px', color: '#ccc' }}>Tuổi: {horse.age} | Giống: {horse.breed}</div>
+                  <div style={{ fontSize: '11px', color: '#d4af37' }}>Chủ: {horse.ownerName}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="jockey-header-actions">
@@ -100,27 +100,21 @@ export default function JockeyHeader() {
             onClick={() => { setNotifOpen((v) => !v); setUserOpen(false) }}
           >
             🔔
-            {notifications.length > 0 && <span className="jockey-notif-badge" />}
+            <span className="jockey-notif-badge" />
           </button>
           {notifOpen && (
             <div className="jockey-dropdown-menu jockey-dropdown-menu--wide">
-              <div className="jockey-dropdown-head">Thông báo ({notifications.length})</div>
-              {notifications.length > 0 ? (
-                notifications.map((n) => (
-                  <div key={n.id} className="jockey-notif-item">
-                    <span className="jockey-notif-dot" />
-                    <div>
-                      <strong>{n.title}</strong>
-                      <span>{n.time}</span>
-                    </div>
+              <div className="jockey-dropdown-head">Thông báo</div>
+              {jockeyNotifications.map((n) => (
+                <div key={n.id} className="jockey-notif-item">
+                  <span className="jockey-notif-dot" />
+                  <div>
+                    <strong>{n.title}</strong>
+                    <span>{n.time}</span>
                   </div>
-                ))
-              ) : (
-                <div style={{ padding: '15px', color: '#666', textAlign: 'center', fontSize: 13 }}>
-                  Không có thông báo mới
                 </div>
-              )}
-              <Link to="/jockey/invitations" className="jockey-dropdown-item" onClick={() => setNotifOpen(false)}>
+              ))}
+              <Link to="/jockey/invitations" className="jockey-dropdown-item">
                 Xem tất cả thông báo →
               </Link>
             </div>
@@ -145,8 +139,8 @@ export default function JockeyHeader() {
           {userOpen && (
             <div className="jockey-dropdown-menu">
               <div className="jockey-dropdown-head">Tài khoản</div>
-              <Link to="/jockey/profile" className="jockey-dropdown-item" onClick={() => setUserOpen(false)}>Hồ sơ cá nhân</Link>
-              <Link to="/" className="jockey-dropdown-item" onClick={() => setUserOpen(false)}>Về trang chủ</Link>
+              <Link to="/jockey/profile" className="jockey-dropdown-item">Hồ sơ cá nhân</Link>
+              <Link to="/" className="jockey-dropdown-item">Về trang chủ</Link>
               <button type="button" className="jockey-dropdown-item" onClick={logout}>
                 Đăng xuất
               </button>
@@ -157,4 +151,3 @@ export default function JockeyHeader() {
     </header>
   )
 }
-

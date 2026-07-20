@@ -36,7 +36,7 @@ function LogoutModal({ onConfirm, onCancel }) {
           Bạn có chắc chắn muốn đăng xuất khỏi hệ thống Đua Ngựa?
         </p>
         <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <button
+          <button 
             type="button"
             onClick={onCancel}
             style={{
@@ -52,7 +52,7 @@ function LogoutModal({ onConfirm, onCancel }) {
           >
             Hủy
           </button>
-          <button
+          <button 
             type="button"
             onClick={onConfirm}
             style={{
@@ -114,41 +114,6 @@ export function AuthProvider({ children }) {
   }, [token])
 
   useEffect(() => {
-    let active = true
-    async function loadUser() {
-      if (token) {
-        try {
-          const userData = await authService.getCurrentUser()
-          if (active && userData) {
-            const userObj = {
-              id:        userData.id        ?? null,
-              username:  userData.userName  ?? userData.username ?? '',
-              name:      userData.fullName  ?? userData.name     ?? '',
-              email:     userData.email     ?? '',
-              phone:     userData.phone     ?? userData.phoneNumber ?? '',
-              role:      userData.role      ?? user?.role        ?? '',
-              balance:   userData.walletBalance ?? userData.balance ?? 0,
-              birthDate: userData.birthDate ?? null,
-              stableName: userData.stableName ?? '',
-              address:   userData.address    ?? '',
-              weight:    userData.weight ?? null,
-              height:    userData.height ?? null,
-              experienceYears: userData.experienceYears ?? null,
-              licenseNumber: userData.licenseNumber ?? '',
-              licenseExpiryDate: userData.licenseExpiryDate ?? null
-            }
-            setUser(userObj)
-          }
-        } catch (err) {
-          console.error("Failed to load user info from /auth/me:", err)
-        }
-      }
-    }
-    loadUser()
-    return () => { active = false }
-  }, [token])
-
-  useEffect(() => {
     if (user) localStorage.setItem('user', JSON.stringify(user))
     else localStorage.removeItem('user')
   }, [user])
@@ -157,17 +122,13 @@ export function AuthProvider({ children }) {
     const data = await authService.login(credentials)
     // Gộp tất cả thông tin từ data.user và response gốc để không bỏ sót field
     const raw = data.user ? { ...data, ...data.user } : data
-    
-    const inputEmail = credentials.email || credentials.userName || credentials.username || '';
-    const isEmailInput = inputEmail.includes('@');
-
     const userObj = raw.role ? {
       id:        raw.id        ?? raw.userId      ?? null,
-      username:  raw.userName  ?? raw.username    ?? (!isEmailInput ? inputEmail : ''),
+      username:  raw.userName  ?? raw.username    ?? '',
       name:      raw.fullName  ?? raw.name        ?? '',
-      email:     raw.email     ?? (isEmailInput ? inputEmail : ''),
+      email:     raw.email     ?? '',
       phone:     raw.phone     ?? raw.phoneNumber ?? '',
-      role:      String(raw.role).replace(/^ROLE_/i, '').toUpperCase(),
+      role:      raw.role,
       createdAt: raw.createdAt ?? raw.joinedAt    ?? raw.joined ?? null,
     } : null
     setToken(data.token)
@@ -199,9 +160,9 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{ token, user, login, logout }}>
       {children}
       {showLogoutModal && (
-        <LogoutModal
-          onConfirm={handleConfirmLogout}
-          onCancel={handleCancelLogout}
+        <LogoutModal 
+          onConfirm={handleConfirmLogout} 
+          onCancel={handleCancelLogout} 
         />
       )}
     </AuthContext.Provider>

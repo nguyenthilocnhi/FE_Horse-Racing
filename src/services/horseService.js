@@ -1,25 +1,30 @@
 /**
  * horseService.js
- * Quản lý thông tin ngựa (public / admin).
+ * Tìm kiếm và xem thông tin ngựa (public / admin).
  *
  * Endpoints:
- *   GET    /api/v1/horses
- *   POST   /api/v1/horses
- *   PUT    /api/v1/horses/{id}
- *   DELETE /api/v1/horses/{id}
- *   GET    /api/horses/search?keyword=...
+ *   GET /horses/search?keyword=...
+ *   GET /horses
+ *   GET /horses/{id}
+ *   POST /horses          (admin)
  */
 import apiClient from './apiClient'
 
 /** Lấy toàn bộ danh sách ngựa */
 export async function getHorses() {
-  const res = await apiClient.get('/v1/horses')
+  const res = await apiClient.get('/horses')
   return res.data
 }
 
 /** Lấy thông tin một con ngựa theo ID */
 export async function getHorse(id) {
   const res = await apiClient.get(`/v1/horses/${id}`)
+  return res.data
+}
+
+/** Lấy lịch sử thi đấu ngựa */
+export async function getHorseHistory(id) {
+  const res = await apiClient.get(`/v1/horses/${id}/history`)
   return res.data
 }
 
@@ -31,7 +36,7 @@ export async function searchHorses(keyword) {
   const res = await apiClient.get('/horses/search', {
     params: { keyword },
   })
-  return res.data?.data ?? res.data ?? []
+  return res.data
 }
 
 /**
@@ -39,7 +44,7 @@ export async function searchHorses(keyword) {
  * @param {object} payload
  */
 export async function createHorse(payload) {
-  const res = await apiClient.post('/v1/horses', payload)
+  const res = await apiClient.post('/horses', payload)
   return res.data
 }
 
@@ -49,15 +54,6 @@ export async function createHorse(payload) {
  * @param {object} payload
  */
 export async function updateHorse(id, payload) {
-  const res = await apiClient.put(`/v1/horses/${id}`, payload)
-  return res.data
-}
-
-/**
- * Xóa ngựa (Admin).
- * @param {string|number} id
- */
-export async function deleteHorse(id) {
-  const res = await apiClient.delete(`/v1/horses/${id}`)
+  const res = await apiClient.put(`/horses/${id}`, payload)
   return res.data
 }

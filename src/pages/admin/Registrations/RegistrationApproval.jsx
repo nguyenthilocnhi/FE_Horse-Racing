@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { getAllRegistrations, approveRegistration, rejectRegistration } from '../../../services/adminService'
 import { registrations as initialRegistrations } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import './RegistrationApproval.css'
@@ -12,36 +13,45 @@ const TABS = [
 
 export default function RegistrationApproval() {
   const [tab, setTab] = useState('pending')
-  const [registrations, setRegistrations] = useState(() => {
-    const stored = localStorage.getItem('mock_registrations')
-    if (stored) {
-      try {
-        return JSON.parse(stored)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    localStorage.setItem('mock_registrations', JSON.stringify(initialRegistrations))
-    return initialRegistrations
-  })
-
+  const [registrations, setRegistrations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedReg, setSelectedReg] = useState(null)
+  
   useEffect(() => {
-    const syncRegs = () => {
-      const stored = localStorage.getItem('mock_registrations')
-      if (stored) {
-        try {
-          setRegistrations(JSON.parse(stored))
-        } catch (e) {
-          console.error(e)
-        }
-      }
-    }
-    window.addEventListener('storage', syncRegs)
-    return () => window.removeEventListener('storage', syncRegs)
+    fetchRegistrations()
   }, [])
 
-  const [selectedReg, setSelectedReg] = useState(null)
-  const [zoomedImg, setZoomedImg] = useState(null)
+  const fetchRegistrations = async () => {
+    try {
+      setLoading(true)
+      const res = await getAllRegistrations()
+      const data = res?.data || res || []
+      const mapped = data.map(p => {
+        let s = 'pending'
+        if (p.status === 'CONFIRMED') s = 'approved'
+        if (p.status === 'REJECTED') s = 'rejected'
+        
+        return {
+          id: p.id,
+          horse: p.horse?.name || 'Không rõ',
+          owner: p.horse?.horseOwner?.fullName || p.horse?.horseOwner?.email || 'N/A',
+          race: p.raceSchedule?.name || 'Vòng đua',
+          tournament: p.raceSchedule?.tournament?.name || '',
+          jockey: p.jockey ? (p.jockey.fullName || p.jockey.userName) : 'Chưa gán',
+          jockeyStatus: p.jockeyInvitationStatus || 'PENDING',
+          submitted: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleDateString('vi-VN') : 'N/A',
+          status: s,
+          raw: p // keeping raw data if needed
+        }
+      })
+      setRegistrations(mapped)
+    } catch (err) {
+      console.error(err)
+      setRegistrations(initialRegistrations)
+    } finally {
+      setLoading(false)
+    }
+  }
   
   // Checklist state for selected registration
   const [checklist, setChecklist] = useState({
@@ -64,97 +74,24 @@ export default function RegistrationApproval() {
     })
   }
 
-  const handleUpdateStatus = (id, newStatus) => {
+  const handleUpdateStatus = async (id, newStatus) => {
     if (newStatus === 'approved' && (!checklist.breedOk || !checklist.healthOk || !checklist.dopingClear)) {
       alert('Vui lòng kiểm tra và tích chọn toàn bộ Checklist trước khi phê duyệt!')
       return
     }
 
-    const updated = registrations.map(r => {
-      if (r.id === id) {
-        const nextReg = { ...r, status: newStatus }
-        if (selectedReg && selectedReg.id === id) {
-          setSelectedReg(nextReg)
-        }
-        return nextReg
-      }
-      return r
-    })
-    setRegistrations(updated)
-    localStorage.setItem('mock_registrations', JSON.stringify(updated))
-
-    // ── Update the owner's horse status inside localStorage ──
-    const targetReg = registrations.find(r => r.id === id)
-    if (targetReg) {
-      const horseName = targetReg.horse
-      // Search all owner horses in localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('owner_horses_')) {
-          try {
-            const ownerHorses = JSON.parse(localStorage.getItem(key) || '[]')
-            let modified = false
-            const nextOwnerHorses = ownerHorses.map(h => {
-              if (h.name === horseName) {
-                modified = true
-                return { ...h, status: newStatus === 'approved' ? 'ready' : 'resting' }
-              }
-              return h
-            })
-            if (modified) {
-              localStorage.setItem(key, JSON.stringify(nextOwnerHorses))
-            }
-          } catch (e) {
-            console.error('Lỗi khi cập nhật trạng thái ngựa của owner trong localStorage:', e)
-          }
-        }
-      }
-
-      // Also update the matching race status in owner_races inside localStorage
-      const storedRaces = localStorage.getItem('owner_races')
-      if (storedRaces) {
-        try {
-          const currentRaces = JSON.parse(storedRaces)
-          const updatedRaces = currentRaces.map(r => {
-            if (r.registeredHorse === horseName) {
-              return {
-                ...r,
-                status: newStatus === 'approved' ? 'registered' : 'upcoming',
-                registeredHorse: newStatus === 'approved' ? horseName : null
-              }
-            }
-            return r
-          })
-          localStorage.setItem('owner_races', JSON.stringify(updatedRaces))
-        } catch (e) {
-          console.error(e)
-        }
-      }
-
-      // ── Send a notification to the owner ──
-      const notifs = JSON.parse(localStorage.getItem('owner_notifications') || '[]')
-      const timestamp = new Date().toLocaleString('vi-VN')
+    try {
       if (newStatus === 'approved') {
-        notifs.unshift({
-          id: `NOTIF-${Date.now()}`,
-          title: 'Đăng ký được phê duyệt 💚',
-          message: `Chiến mã "${horseName}" đăng ký tham gia giải đấu "${targetReg.race}" đã được duyệt thành công! Ngựa đủ điều kiện tham gia.`,
-          type: 'success',
-          timestamp
-        })
+        await approveRegistration(id)
       } else if (newStatus === 'rejected') {
-        notifs.unshift({
-          id: `NOTIF-${Date.now()}`,
-          title: 'Đăng ký bị từ chối ❌',
-          message: `Yêu cầu đăng ký chiến mã "${horseName}" tham gia giải đấu "${targetReg.race}" đã bị từ chối xét duyệt.`,
-          type: 'danger',
-          timestamp
-        })
+        await rejectRegistration(id)
       }
-      localStorage.setItem('owner_notifications', JSON.stringify(notifs))
+      alert(newStatus === 'approved' ? 'Đã duyệt đăng ký thành công!' : 'Đã từ chối đăng ký!')
+      setSelectedReg(null)
+      fetchRegistrations()
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Lỗi khi cập nhật trạng thái')
     }
-
-    alert(newStatus === 'approved' ? 'Đã duyệt đăng ký thành công!' : newStatus === 'rejected' ? 'Đã từ chối đăng ký!' : 'Đã trả hồ sơ về hàng chờ!')
   }
 
   return (
@@ -195,12 +132,22 @@ export default function RegistrationApproval() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {loading ? (
+                  <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>Đang tải dữ liệu...</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan="7" style={{textAlign: 'center', padding: '20px'}}>Không có đơn đăng ký nào.</td></tr>
+                ) : filtered.map((r) => (
                   <tr key={r.id}>
                     <td>{r.id}</td>
-                    <td><strong>{r.horse}</strong></td>
+                    <td>
+                      <strong>{r.horse}</strong>
+                      <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                        Nài: {r.jockey} <br/>
+                        ({r.jockeyStatus === 'ACCEPTED' ? <span style={{color: '#4ade80'}}>Đã đồng ý</span> : r.jockeyStatus === 'REJECTED' ? <span style={{color: '#f87171'}}>Từ chối</span> : <span style={{color: '#fbbf24'}}>Chờ phản hồi</span>})
+                      </div>
+                    </td>
                     <td>{r.owner}</td>
-                    <td>{r.race}</td>
+                    <td>{r.race} <br/><span style={{fontSize: 11, color: '#666'}}>{r.tournament}</span></td>
                     <td>{r.submitted}</td>
                     <td><StatusBadge status={r.status} /></td>
                     <td>
@@ -212,21 +159,6 @@ export default function RegistrationApproval() {
                         >
                           Chi tiết
                         </button>
-                        {r.status === 'pending' && (
-                          <>
-                            <button 
-                              type="button" 
-                              className="admin-btn admin-btn--success admin-btn--sm"
-                              onClick={() => {
-                                handleSelectReg(r)
-                                // Auto check for convenience in demo, but still show modal
-                                setChecklist({ breedOk: true, healthOk: true, dopingClear: true })
-                              }}
-                            >
-                              Duyệt nhanh
-                            </button>
-                          </>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -277,65 +209,6 @@ export default function RegistrationApproval() {
                 <dd><StatusBadge status={selectedReg.status} /></dd>
               </dl>
 
-              {/* Document Previews */}
-              <div style={{ marginBottom: '20px', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <h5 style={{ margin: '0 0 12px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d4af37' }}>Tài liệu đính kèm</h5>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                  
-                  {/* Horse Image */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Ảnh ngựa</div>
-                    {selectedReg.horseImageUrl ? (
-                      <img 
-                        src={selectedReg.horseImageUrl} 
-                        alt="Ảnh chiến mã" 
-                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                        onClick={() => setZoomedImg(selectedReg.horseImageUrl)}
-                      />
-                    ) : (
-                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                        Chưa có
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Birth Certificate */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Khai sinh</div>
-                    {selectedReg.birthCertificateUrl ? (
-                      <img 
-                        src={selectedReg.birthCertificateUrl} 
-                        alt="Giấy khai sinh" 
-                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                        onClick={() => setZoomedImg(selectedReg.birthCertificateUrl)}
-                      />
-                    ) : (
-                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                        Chưa có
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Medical Certificate */}
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#888', marginBottom: '4px' }}>Giấy y tế</div>
-                    {selectedReg.medicalCertificateUrl ? (
-                      <img 
-                        src={selectedReg.medicalCertificateUrl} 
-                        alt="Chứng nhận y tế" 
-                        style={{ width: '100%', height: '56px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                        onClick={() => setZoomedImg(selectedReg.medicalCertificateUrl)}
-                      />
-                    ) : (
-                      <div style={{ fontSize: '10px', color: '#555', fontStyle: 'italic', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.2)', borderRadius: '6px' }}>
-                        Chưa có
-                      </div>
-                    )}
-                  </div>
-
-                </div>
-              </div>
-
               {selectedReg.status === 'pending' && (
                 <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.05)', marginBottom: '20px' }}>
                   <h5 style={{ margin: '0 0 10px 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d4af37' }}>Checklist xác minh</h5>
@@ -378,8 +251,10 @@ export default function RegistrationApproval() {
                     <button 
                       type="button" 
                       className="admin-btn admin-btn--success" 
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, opacity: selectedReg.jockeyStatus !== 'ACCEPTED' ? 0.5 : 1, cursor: selectedReg.jockeyStatus !== 'ACCEPTED' ? 'not-allowed' : 'pointer' }}
+                      disabled={selectedReg.jockeyStatus !== 'ACCEPTED'}
                       onClick={() => handleUpdateStatus(selectedReg.id, 'approved')}
+                      title={selectedReg.jockeyStatus !== 'ACCEPTED' ? "Nài ngựa chưa chấp nhận, không thể duyệt" : ""}
                     >
                       Duyệt hồ sơ
                     </button>
@@ -392,53 +267,12 @@ export default function RegistrationApproval() {
                       Từ chối
                     </button>
                   </>
-                ) : (
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--outline" 
-                    style={{ flex: 1 }}
-                    onClick={() => handleUpdateStatus(selectedReg.id, 'pending')}
-                  >
-                    Hoàn lại Chờ Duyệt
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Lightbox Zoom Overlay */}
-      {zoomedImg && (
-        <div 
-          onClick={() => setZoomedImg(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            cursor: 'zoom-out'
-          }}
-        >
-          <img 
-            src={zoomedImg} 
-            alt="Phóng to tài liệu" 
-            style={{ 
-              maxWidth: '90%', 
-              maxHeight: '90%', 
-              objectFit: 'contain', 
-              borderRadius: '8px', 
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)' 
-            }} 
-          />
-        </div>
-      )}
     </div>
   )
 }

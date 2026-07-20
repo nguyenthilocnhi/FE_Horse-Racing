@@ -2,35 +2,31 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   dashboardStats,
+  revenueChart,
   recentActivities,
+  registrations as defaultRegistrations,
   resultReports as defaultResultReports,
   complaints as defaultComplaints
 } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
-import * as adminAccountService from '../../../services/adminAccountService'
 import './Dashboard.css'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const maxChart = Math.max(...revenueChart.map((d) => d.value))
 
-  const [pendingAccountCount, setPendingAccountCount] = useState(0)
+  const [pendingRegCount, setPendingRegCount] = useState(0)
   const [pendingResultCount, setPendingResultCount] = useState(0)
   const [pendingComplaintCount, setPendingComplaintCount] = useState(0)
 
   useEffect(() => {
-
-    // Accounts count
-    async function fetchAccounts() {
-      try {
-        const data = await adminAccountService.getAllAccounts()
-        const list = data || []
-        const pending = list.filter(u => u.status?.toLowerCase() === 'pending' || u.accountStatus?.toLowerCase() === 'pending')
-        setPendingAccountCount(pending.length)
-      } catch (err) {
-        console.warn("Failed to fetch pending accounts for dashboard:", err)
-      }
+    // Registrations count
+    const storedReg = localStorage.getItem('mock_registrations')
+    const regs = storedReg ? JSON.parse(storedReg) : defaultRegistrations
+    if (!storedReg) {
+      localStorage.setItem('mock_registrations', JSON.stringify(defaultRegistrations))
     }
-    fetchAccounts()
+    setPendingRegCount(regs.filter(r => r.status === 'pending').length)
 
     // Results count
     const storedResults = localStorage.getItem('mock_result_reports')
@@ -86,18 +82,56 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="dashboard-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+      <div className="dashboard-grid">
+        <div className="admin-card dashboard-chart-card">
+          <div className="admin-card-head">
+            <h3>Doanh thu theo tháng (triệu VND)</h3>
+          </div>
+          <div className="admin-card-body">
+            <div className="dashboard-chart">
+              {revenueChart.map((item) => (
+                <div key={item.month} className="dashboard-chart-col">
+                  <div
+                    className="dashboard-chart-bar"
+                    style={{ height: `${(item.value / maxChart) * 100}%` }}
+                  />
+                  <span>{item.month}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-card dashboard-activity-card">
+          <div className="admin-card-head">
+            <h3>Hoạt động gần đây</h3>
+          </div>
+          <div className="admin-card-body dashboard-activity-list">
+            {recentActivities.map((act) => (
+              <div key={act.id} className={`dashboard-activity-item dashboard-activity-item--${act.type}`}>
+                <div className="dashboard-activity-dot" />
+                <div>
+                  <strong>{act.action}</strong>
+                  <p>{act.user} · {act.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-quick-grid">
         <div className="admin-card">
           <div className="admin-card-head"><h3>Chờ xử lý</h3></div>
           <div className="admin-card-body dashboard-pending-list">
             <div 
               className="dashboard-pending-item"
-              onClick={() => navigate('/admin/users')}
+              onClick={() => navigate('/admin/registrations')}
               style={{ cursor: 'pointer', transition: 'transform 0.2s, background-color 0.2s' }}
             >
-              <span>Tài khoản chờ duyệt</span>
+              <span>Đăng ký chờ duyệt</span>
               <StatusBadge status="pending" />
-              <strong>{pendingAccountCount}</strong>
+              <strong>{pendingRegCount}</strong>
             </div>
             <div 
               className="dashboard-pending-item"
@@ -117,23 +151,6 @@ export default function Dashboard() {
               <StatusBadge status="reviewing" />
               <strong>{pendingComplaintCount}</strong>
             </div>
-          </div>
-        </div>
-
-        <div className="admin-card dashboard-activity-card">
-          <div className="admin-card-head">
-            <h3>Hoạt động gần đây</h3>
-          </div>
-          <div className="admin-card-body dashboard-activity-list">
-            {recentActivities.map((act) => (
-              <div key={act.id} className={`dashboard-activity-item dashboard-activity-item--${act.type}`}>
-                <div className="dashboard-activity-dot" />
-                <div>
-                  <strong>{act.action}</strong>
-                  <p>{act.user} · {act.time}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

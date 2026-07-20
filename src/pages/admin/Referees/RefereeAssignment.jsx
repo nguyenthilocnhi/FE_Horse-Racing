@@ -1,145 +1,96 @@
-import React, { useState } from 'react'
-import { referees as initialReferees, raceAssignments as initialAssignments } from '../../../data/adminMockData'
+import React, { useState, useEffect } from 'react'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import { getAllReferees, assignRefereeToRace } from '../../../services/adminService'
+import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
 import './RefereeAssignment.css'
 
 export default function RefereeAssignment() {
-  const [referees, setReferees] = useState(initialReferees)
-  const [assignments, setAssignments] = useState(initialAssignments)
+  const [referees, setReferees] = useState([])
+  const [tournaments, setTournaments] = useState([])
+  const [selectedTournament, setSelectedTournament] = useState('')
+  const [assignments, setAssignments] = useState([])
   const [assigningRaceId, setAssigningRaceId] = useState(null)
+  
+  useEffect(() => {
+    loadInitialData()
+  }, [])
 
-  /**
-   * Check schedule conflict: a referee must not be assigned to two races
-   * that share the same date AND the same time slot.
-   *
-   * @param {string} refId - referee ID being assigned
-   * @param {string} targetRaceId - race being assigned to
-   * @returns {{ hasConflict: boolean, conflictingRace: object|null }}
-   */
-  const checkScheduleConflict = (refId, targetRaceId) => {
-    const selectedRef = referees.find(r => String(r.id) === String(refId))
-    if (!selectedRef) return { hasConflict: false, conflictingRace: null }
-
-    // Get the target race's date/time from assignments
-    const targetAssignment = assignments.find(a => a.raceId === targetRaceId)
-    if (!targetAssignment || !targetAssignment.date || !targetAssignment.time) {
-      return { hasConflict: false, conflictingRace: null }
+  const loadInitialData = async () => {
+    try {
+      const [refs, tours] = await Promise.all([
+        getAllReferees(),
+        getAllTournaments()
+      ])
+      // data.data is the payload
+      setReferees(refs.data || refs || [])
+      setTournaments(Array.isArray(tours) ? tours : (tours.data || tours.content || []))
+    } catch (err) {
+      console.error(err)
     }
-
-    // Find other races already assigned to this referee (excluding the target race itself)
-    const otherAssignedRaceIds = selectedRef.assignedRaces.filter(id => id !== targetRaceId)
-
-    for (const existingRaceId of otherAssignedRaceIds) {
-      const existingAssignment = assignments.find(a => a.raceId === existingRaceId)
-      if (!existingAssignment) continue
-
-      // Same date AND same time → hard conflict, block assignment
-      if (
-        existingAssignment.date === targetAssignment.date &&
-        existingAssignment.time === targetAssignment.time
-      ) {
-        return { hasConflict: true, conflictingRace: existingAssignment, type: 'same_slot' }
-      }
-
-      // Same date but different time → soft warning (still allowed but user is informed)
-      if (existingAssignment.date === targetAssignment.date) {
-        return { hasConflict: true, conflictingRace: existingAssignment, type: 'same_day' }
-      }
-    }
-
-    return { hasConflict: false, conflictingRace: null }
   }
 
-  const handleAssignReferee = (raceId, refereeId) => {
-    // Handle "Bỏ phân công": value is empty string OR sentinel 'unassign'
-    if (!refereeId || refereeId === 'unassign') {
-      setAssignments(prev => prev.map(a =>
-        a.raceId === raceId
-          ? { ...a, referee: null, status: 'unassigned', conflict: false }
-          : a
-      ))
-      setReferees(prev => prev.map(r => ({
-        ...r,
-        assignedRaces: r.assignedRaces.filter(id => id !== raceId)
-      })))
-      setAssigningRaceId(null)
-      return
-    }
-
-    const selectedRef = referees.find(r => String(r.id) === String(refereeId))
-    if (!selectedRef) return
-
-    // ── 1. Static interest conflict (existing flag) ──────────────────────────
-    const hasInterestConflict = selectedRef.conflict
-
-    // ── 2. Schedule conflict check ───────────────────────────────────────────
-    const { hasConflict: hasScheduleConflict, conflictingRace, type: conflictType } =
-      checkScheduleConflict(refereeId, raceId)
-
-    // BLOCK: same date + same time (hard rule — 1 referee per time slot)
-    if (hasScheduleConflict && conflictType === 'same_slot') {
-      alert(
-        `🚫 Không thể phân công!\n\n` +
-        `Trọng tài ${selectedRef.name} đã được gán cho race "${conflictingRace.raceName}" ` +
-        `vào cùng khung giờ ${conflictingRace.time} ngày ${conflictingRace.date}.\n\n` +
-        `Một trọng tài chỉ có thể giám sát 1 race trong cùng khung giờ.`
-      )
-      return  // Hard block — do NOT proceed
-    }
-
-    // WARN: same date but different time (soft rule — inform admin)
-    if (hasScheduleConflict && conflictType === 'same_day') {
-      const confirmed = window.confirm(
-        `⚠️ Cảnh báo lịch!\n\n` +
-        `Trọng tài ${selectedRef.name} đã có race "${conflictingRace.raceName}" ` +
-        `vào lúc ${conflictingRace.time} ngày ${conflictingRace.date}.\n\n` +
-        `Bạn vẫn muốn gán thêm race trong cùng ngày không?`
-      )
-      if (!confirmed) return  // Admin chose to cancel
-    }
-
-    // ── 3. Update assignment record ──────────────────────────────────────────
-    const targetAssignment = assignments.find(a => a.raceId === raceId)
-    const isScheduleWarn = hasScheduleConflict && conflictType === 'same_day'
-    const isConflict = hasInterestConflict || isScheduleWarn
-
-    setAssignments(prev => prev.map(a => {
-      if (a.raceId === raceId) {
-        return {
-          ...a,
-          referee: selectedRef.name,
-          status: isConflict ? 'conflict' : 'assigned',
-          conflict: isConflict,
-          scheduleWarn: isScheduleWarn,
-        }
-      }
-      return a
-    }))
-
-    // ── 4. Update referee's assignedRaces ────────────────────────────────────
-    setReferees(prev => prev.map(r => {
-      if (String(r.id) === String(selectedRef.id)) {
-        return { ...r, assignedRaces: Array.from(new Set([...r.assignedRaces, raceId])) }
-      }
-      return { ...r, assignedRaces: r.assignedRaces.filter(id => id !== raceId) }
-    }))
-
-    setAssigningRaceId(null)
-
-    // ── 5. Success / warning notification ───────────────────────────────────
-    if (hasInterestConflict && isScheduleWarn) {
-      alert(
-        `⚠️ Đã phân công với 2 cảnh báo:\n` +
-        `• Trọng tài có xung đột lợi ích với race này\n` +
-        `• Trọng tài đã có race khác trong cùng ngày`
-      )
-    } else if (hasInterestConflict) {
-      alert(`⚠️ Cảnh báo: Trọng tài ${selectedRef.name} có xung đột lợi ích với cuộc đua này! Hệ thống đã gắn cờ cảnh báo.`)
-    } else if (isScheduleWarn) {
-      alert(`⚠️ Đã phân công. Lưu ý: trọng tài có race khác trong cùng ngày.`)
+  useEffect(() => {
+    if (selectedTournament) {
+      loadSchedule(selectedTournament)
     } else {
-      alert(`✅ Đã phân công Trọng tài ${selectedRef.name} thành công!`)
+      setAssignments([])
     }
+  }, [selectedTournament])
+
+  const loadSchedule = async (tournamentId) => {
+    try {
+      const res = await getTournamentSchedule(tournamentId)
+      const races = res.data || []
+      
+      const mapped = races.map(r => ({
+        raceId: r.id,
+        raceName: r.name,
+        date: r.raceDate,
+        time: r.startTime ? new Date(r.startTime).toLocaleTimeString() : '',
+        refereeId: r.refereeId,
+        referee: r.refereeName,
+        status: r.refereeId ? 'assigned' : 'unassigned'
+      }))
+      setAssignments(mapped)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const handleAssignReferee = async (raceId, refereeId) => {
+    const isUnassign = !refereeId || refereeId === 'unassign'
+    
+    try {
+      await assignRefereeToRace(raceId, isUnassign ? null : refereeId)
+      
+      const selectedRef = referees.find(r => String(r.id) === String(refereeId))
+      
+      setAssignments(prev => prev.map(a => {
+        if (a.raceId === raceId) {
+          return {
+            ...a,
+            refereeId: isUnassign ? null : refereeId,
+            referee: isUnassign ? null : selectedRef?.fullName,
+            status: isUnassign ? 'unassigned' : 'assigned'
+          }
+        }
+        return a
+      }))
+      setAssigningRaceId(null)
+      
+      if (!isUnassign) {
+        alert(`✅ Đã phân công Trọng tài thành công!`)
+      }
+    } catch (err) {
+      // Backend conflict detection will throw error
+      const msg = err.response?.data?.message || err.message
+      alert(`🚫 Lỗi phân công: \n${msg}`)
+      setAssigningRaceId(null)
+    }
+  }
+
+  const getAssignedCount = (refId) => {
+    return assignments.filter(a => String(a.refereeId) === String(refId)).length;
   }
 
   return (
@@ -173,18 +124,20 @@ export default function RefereeAssignment() {
                 {referees.map((r) => (
                   <tr key={r.id}>
                     <td>{r.id}</td>
-                    <td><strong style={{ color: '#fff' }}>{r.name}</strong></td>
-                    <td>{r.license}</td>
-                    <td>{r.experience}</td>
+                    <td><strong style={{ color: '#fff' }}>{r.fullName}</strong></td>
+                    <td>{r.certificateLevel}</td>
+                    <td>{r.experienceYears} năm</td>
                     <td>
-                      <span style={{ fontSize: '11px', color: r.assignedRaces.length > 0 ? '#d4af37' : '#555' }}>
-                        {r.assignedRaces.length > 0 ? r.assignedRaces.join(', ') : '—'}
-                      </span>
+                      {getAssignedCount(r.id) > 0 ? (
+                        <span style={{ fontSize: '12px', color: '#4ade80', fontWeight: 'bold' }}>{getAssignedCount(r.id)} race</span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#555' }}>—</span>
+                      )}
                     </td>
                     <td>
-                      {r.conflict
-                        ? <span className="admin-badge admin-badge--red">Xung đột</span>
-                        : <span className="admin-badge admin-badge--green">Sẵn sàng</span>}
+                      {r.accountStatus === 'ACTIVE' || r.accountStatus === 'APPROVED'
+                        ? <span className="admin-badge admin-badge--green">{r.accountStatus}</span>
+                        : <span className="admin-badge admin-badge--red">{r.accountStatus}</span>}
                     </td>
                   </tr>
                 ))}
@@ -195,10 +148,27 @@ export default function RefereeAssignment() {
 
         {/* ── Right: Assignment list ── */}
         <div className="admin-card">
-          <div className="admin-card-head">
+          <div className="admin-card-head" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <h3>Phân công theo Race</h3>
+            <select 
+              className="admin-select" 
+              style={{maxWidth: '200px'}}
+              value={selectedTournament}
+              onChange={(e) => setSelectedTournament(e.target.value)}
+            >
+              <option value="">-- Chọn Giải đấu --</option>
+              {tournaments.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
           </div>
           <div className="admin-card-body referee-assign-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {selectedTournament && assignments.length === 0 && (
+              <p style={{color: '#888', textAlign: 'center', marginTop: '20px'}}>Giải đấu này chưa có lịch đua nào.</p>
+            )}
+            {!selectedTournament && (
+              <p style={{color: '#888', textAlign: 'center', marginTop: '20px'}}>Vui lòng chọn giải đấu để xem lịch đua.</p>
+            )}
             {assignments.map((a) => (
               <div
                 key={a.raceId}
@@ -249,23 +219,11 @@ export default function RefereeAssignment() {
                   >
                     <option value="" disabled>-- Chọn Trọng tài --</option>
                     <option value="unassign">🚫 Bỏ phân công</option>
-                    {referees.map(r => {
-                      // Pre-compute warnings to display in dropdown
-                      const { hasConflict, conflictingRace, type } = checkScheduleConflict(r.id, a.raceId)
-                      const sameSlot = hasConflict && type === 'same_slot'
-                      const sameDay  = hasConflict && type === 'same_day'
-                      const label = [
-                        r.name,
-                        r.conflict ? '⚡Xung đột lợi ích' : null,
-                        sameSlot   ? '🚫 Trùng khung giờ' : null,
-                        sameDay    ? '⚠️ Cùng ngày'       : null,
-                      ].filter(Boolean).join(' · ')
-                      return (
-                        <option key={r.id} value={r.id} disabled={sameSlot}>
-                          {label}
+                    {referees.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.fullName} ({r.certificateLevel})
                         </option>
-                      )
-                    })}
+                      ))}
                   </select>
                 ) : (
                   <button

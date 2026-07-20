@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '../../../contexts/AuthContext'
-import * as jockeyService from '../../../services/jockeyService'
-import * as tournamentService from '../../../services/tournamentService'
+import { jockeyProfile } from '../../../data/jockeyMockData'
+import { auth, jockey } from '../../../services'
 import './Profile.css'
 
 /* ── Registration Form (for new Jockey) ── */
@@ -146,7 +145,7 @@ function RegisterForm({ onDone }) {
           onChange={(e) => set('agreeTerms', e.target.checked)}
           className="profile-checkbox"
         />
-        <span>Tôi đồng ý với <a href="#!" style={{ color: '#d4af37' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#d4af37' }}>Chính sách bảo mật</a> của HORSIE.</span>
+        <span>Tôi đồng ý với <a href="#!" style={{ color: '#00d4aa' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#00d4aa' }}>Chính sách bảo mật</a> của HORSIE.</span>
       </label>
       {errors.agreeTerms && <span className="profile-err">{errors.agreeTerms}</span>}
 
@@ -161,299 +160,273 @@ function RegisterForm({ onDone }) {
 
 /* ── Profile View (for existing jockey) ── */
 function ProfileView() {
-  const { user } = useAuth()
-  const [editing, setEditing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [profileData, setProfileData] = useState(null)
+  
+  const [editingPersonal, setEditingPersonal] = useState(false)
+  const [editingLicense, setEditingLicense] = useState(false)
+  const [personalErrors, setPersonalErrors] = useState({})
+
   const [form, setForm] = useState({
-    name: user?.fullName ?? user?.name ?? '',
-    nickname: 'Nài ngựa',
-    phone: user?.phone ?? '',
-    weight: '54',
-    height: '162',
-    experience: 'Chưa cập nhật',
-    email: user?.email ?? '',
-    licenseNo: 'VN-JOC-PENDING',
-    licenseExpiry: 'Chưa rõ',
-    dob: '',
-    nationality: 'Việt Nam'
+    name: '',
+    nickname: '',
+    phone: '',
+    weight: '',
+    height: '',
+    experience: '',
   })
-  const [accountStatus, setAccountStatus] = useState('PENDING')
-  const [joinedDate, setJoinedDate] = useState('Chưa rõ')
-  const [stats, setStats] = useState({
-    totalRaces: 0,
-    wins: 0,
-    winRate: 0,
-    totalPoints: 0
+
+  const [licenseForm, setLicenseForm] = useState({
+    licenseNo: '',
+    licenseExpiry: ''
   })
 
   useEffect(() => {
-    let cancelled = false
-    async function loadData() {
-      try {
-        const data = await jockeyService.getJockeyProfile(user?.id)
-        if (!cancelled && data) {
-          setForm({
-            name: data.fullName ?? user?.fullName ?? user?.name ?? '',
-            nickname: data.nickname ?? 'Nài ngựa',
-            phone: data.phone ?? user?.phone ?? '',
-            weight: data.weight ?? '54',
-            height: data.height ?? '162',
-            experience: data.experienceYears ? `${data.experienceYears} năm` : 'Chưa cập nhật',
-            email: data.email ?? user?.email ?? '',
-            licenseNo: data.licenseNumber ?? 'VN-JOC-PENDING',
-            licenseExpiry: data.licenseExpiryDate ?? 'Chưa rõ',
-            dob: data.birthDate ?? '',
-            nationality: data.nationality ?? 'Việt Nam'
-          })
-          const statusVal = data.accountStatus ?? 'PENDING'
-          setAccountStatus(statusVal)
-          
-          let jDate = 'Chờ phê duyệt'
-          if (statusVal === 'APPROVED') {
-            jDate = new Date().toLocaleDateString('vi-VN')
-            try {
-              const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
-              const matched = historyList.find(h => 
-                (h.id && user?.id && h.id === user.id) ||
-                (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase())
-              )
-              if (matched?.joined) {
-                jDate = new Date(matched.joined).toLocaleDateString('vi-VN')
-              }
-            } catch (_) {}
-          }
-          setJoinedDate(jDate)
-        }
-      } catch (err) {
-        console.warn("Failed to load jockey profile from API:", err.message)
-      }
+    loadProfile()
+  }, [])
 
-      try {
-        const tournaments = await tournamentService.getTournaments()
-        if (cancelled || !Array.isArray(tournaments)) return
-        
-        let totalRaces = 0
-        let wins = 0
-        let totalPoints = 0
-        
-        const promises = tournaments.map(async (t) => {
-          try {
-            const schedule = await tournamentService.getTournamentSchedule(t.id)
-            if (Array.isArray(schedule)) {
-              schedule.forEach(race => {
-                const participations = race.participations || race.raceParticipations || [];
-                const raceResults = race.results || race.raceResults || [];
-                
-                participations.forEach(p => {
-                  const jockeyId = p.jockeyId || p.jockey?.id;
-                  if (jockeyId === user?.id) {
-                    const status = (p.status || '').toUpperCase();
-                    if (status === 'ACCEPTED' || status === 'CONFIRMED' || status === 'APPROVED') {
-                      totalRaces++;
-                      if (p.pointsEarned || p.points) {
-                        totalPoints += (p.pointsEarned || p.points || 0);
-                      }
-                      
-                      const matchedResult = raceResults.find(resItem => resItem.participationId === p.id);
-                      if (matchedResult && (matchedResult.rankPosition === 1 || matchedResult.rank === 1)) {
-                        wins++;
-                      }
-                    }
-                  }
-                });
-              });
-            }
-          } catch (_) {}
-        })
-        
-        await Promise.all(promises)
-        if (!cancelled) {
-          setStats({
-            totalRaces,
-            wins,
-            winRate: totalRaces > 0 ? Math.round((wins / totalRaces) * 100) : 0,
-            totalPoints
-          })
-        }
-      } catch (err) {
-        console.warn("Failed to dynamically compute jockey stats:", err)
-      }
+  const loadProfile = async () => {
+    try {
+      setLoading(true)
+      const data = await auth.getMe()
+      setProfileData(data)
+      setForm({
+        name: data.fullName || '',
+        nickname: data.userName || '',
+        phone: data.phone || '',
+        weight: '60', // Mock data since not in DB
+        height: '170', // Mock data since not in DB
+        experience: data.experienceYears || ''
+      })
+      setLicenseForm({
+        licenseNo: data.licenseNumber || '',
+        licenseExpiry: data.licenseExpiryDate || ''
+      })
+    } catch (err) {
+      console.error('Failed to load profile:', err)
+    } finally {
+      setLoading(false)
     }
-    if (user?.id) {
-      loadData()
-    }
-    return () => { cancelled = true }
-  }, [user?.id])
+  }
 
   function set(field, val) {
     setForm((prev) => ({ ...prev, [field]: val }))
   }
 
-  async function handleSave(e) {
+  async function handleSavePersonal(e) {
     e.preventDefault()
-    const expNum = parseInt(form.experience, 10) || 0
-    const payload = {
-      fullName: form.name,
-      phone: form.phone,
-      birthDate: form.dob,
-      experienceYears: expNum,
-      licenseNumber: form.licenseNo,
-      licenseExpiryDate: form.licenseExpiry
+    setPersonalErrors({})
+    let errs = {}
+    if (!form.name || form.name.trim().length < 4) {
+      errs.name = "Full name phải có ít nhất 4 ký tự"
+    }
+    if (!form.phone || !/^0\d{9}$/.test(form.phone)) {
+      errs.phone = "sai định dạng số điện thoại"
+    }
+    if (form.experience && parseInt(form.experience) < 1) {
+      errs.experience = "phải có ít nhất 1 năm kinh nghiệm"
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setPersonalErrors(errs)
+      return
     }
 
     try {
-      await jockeyService.updateJockeyProfile(user?.id, payload)
-      alert('✅ Cập nhật hồ sơ thành công!')
-      setEditing(false)
+      await jockey.updateJockeyProfile(profileData.id, {
+        fullName: form.name,
+        phone: form.phone,
+        birthDate: profileData.birthDate || '2000-01-01',
+        experienceYears: form.experience || 0,
+        licenseNumber: licenseForm.licenseNo,
+        licenseExpiryDate: licenseForm.licenseExpiry || null
+      })
+      alert('✅ Cập nhật thông tin thành công!')
+      setEditingPersonal(false)
+      loadProfile()
     } catch (err) {
-      alert('❌ Cập nhật hồ sơ thất bại: ' + (err.response?.data?.message || err.message))
+      alert('❌ Lỗi cập nhật: ' + (err.response?.data?.message || err.message))
     }
   }
 
+  async function handleSaveLicense(e) {
+    e.preventDefault()
+    try {
+      await jockey.updateLicense(profileData.id, {
+        licenseNumber: licenseForm.licenseNo,
+        licenseExpiryDate: licenseForm.licenseExpiry || null
+      })
+      alert('✅ Cập nhật giấy phép thành công!')
+      setEditingLicense(false)
+      loadProfile()
+    } catch (err) {
+      alert('❌ Lỗi cập nhật giấy phép: ' + (err.response?.data?.message || err.message))
+    }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#fff' }}>Đang tải hồ sơ...</div>
+  if (!profileData) return <div style={{ padding: 40, textAlign: 'center', color: '#fff' }}>Không thể tải hồ sơ.</div>
+
+  const isLicenseActive = profileData.accountStatus === 'ACTIVE'
+  
   return (
     <div className="profile-view">
       {/* hero card */}
       <div className="profile-hero">
         <div className="profile-avatar-wrap">
           <div className="profile-avatar">
-            {form.name ? form.name.charAt(0) : 'J'}
+            {(profileData.fullName || 'J').charAt(0)}
           </div>
-          <span className={`jockey-badge ${accountStatus === 'APPROVED' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
-            {accountStatus === 'APPROVED' ? '✓ Hoạt động' : 'Chờ xét duyệt'}
+          <span className={`jockey-badge ${isLicenseActive ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
+            {isLicenseActive ? '✓ Hoạt động' : 'Không hoạt động'}
           </span>
         </div>
         <div className="profile-hero-info">
-          <h2 className="profile-hero-name">{form.name}</h2>
-          <div className="profile-hero-nick">"{form.nickname}"</div>
+          <h2 className="profile-hero-name">{profileData.fullName}</h2>
+          <div className="profile-hero-nick">"{profileData.userName}"</div>
           <div className="profile-hero-meta">
-            <span>🪪 {user?.id}</span>
-            <span>📋 {form.licenseNo}</span>
-            <span>📅 Tham gia {joinedDate}</span>
+            <span>🪪 {profileData.id}</span>
+            <span>📋 {profileData.licenseNumber}</span>
+            <span>📅 Sinh ngày {profileData.birthDate || 'N/A'}</span>
           </div>
           <div className="profile-hero-stats">
             <div className="profile-hero-stat">
-              <strong>{stats.totalRaces}</strong>
+              <strong>{jockeyProfile.stats.totalRaces}</strong>
               <span>Cuộc đua</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#d4af37' }}>{stats.wins}</strong>
+              <strong style={{ color: '#d4af37' }}>{jockeyProfile.stats.wins}</strong>
               <span>Chiến thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#d4af37' }}>{stats.winRate}%</strong>
+              <strong style={{ color: '#00d4aa' }}>{jockeyProfile.stats.winRate}%</strong>
               <span>Tỷ lệ thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#c084fc' }}>{stats.totalPoints.toLocaleString()}</strong>
+              <strong style={{ color: '#c084fc' }}>{jockeyProfile.stats.totalPoints.toLocaleString()}</strong>
               <span>Điểm</span>
             </div>
           </div>
         </div>
-        {!editing && (
-          <button
-            type="button"
-            className="jockey-btn jockey-btn--outline jockey-btn--sm"
-            onClick={() => setEditing(true)}
-            style={{ alignSelf: 'flex-start' }}
-          >
-            ✎ Chỉnh sửa
-          </button>
-        )}
       </div>
 
       {/* details */}
       <div className="profile-detail-grid">
         <div className="jockey-card">
-          <div className="jockey-card-head"><h3>Thông tin cá nhân</h3></div>
+          <div className="jockey-card-head">
+            <h3>Thông tin cá nhân</h3>
+            {!editingPersonal && (
+              <button
+                type="button"
+                className="jockey-btn jockey-btn--ghost jockey-btn--sm"
+                onClick={() => setEditingPersonal(true)}
+              >
+                ✎ Sửa
+              </button>
+            )}
+          </div>
           <div className="jockey-card-body">
-            {editing ? (
-              <form onSubmit={handleSave}>
+            {editingPersonal ? (
+              <form onSubmit={handleSavePersonal}>
                 <div className="jockey-form-grid">
                   <div className="jockey-form-group">
                     <label className="jockey-label">Tên hiển thị</label>
                     <input className="jockey-input" value={form.name} onChange={(e) => set('name', e.target.value)} />
+                    {personalErrors.name && <span className="profile-err">{personalErrors.name}</span>}
                   </div>
                   <div className="jockey-form-group">
-                    <label className="jockey-label">Biệt danh</label>
-                    <input className="jockey-input" value={form.nickname} onChange={(e) => set('nickname', e.target.value)} />
+                    <label className="jockey-label">Biệt danh (Username)</label>
+                    <input className="jockey-input" value={form.nickname} disabled style={{opacity: 0.5}} />
                   </div>
                   <div className="jockey-form-group">
                     <label className="jockey-label">Số điện thoại</label>
                     <input className="jockey-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                    {personalErrors.phone && <span className="profile-err">{personalErrors.phone}</span>}
                   </div>
                   <div className="jockey-form-group">
-                    <label className="jockey-label">Kinh nghiệm</label>
-                    <input className="jockey-input" value={form.experience} onChange={(e) => set('experience', e.target.value)} />
-                  </div>
-                  <div className="jockey-form-group">
-                    <label className="jockey-label">Cân nặng (kg)</label>
-                    <input className="jockey-input" type="number" step="0.1" value={form.weight} onChange={(e) => set('weight', e.target.value)} />
-                  </div>
-                  <div className="jockey-form-group">
-                    <label className="jockey-label">Chiều cao (cm)</label>
-                    <input className="jockey-input" type="number" value={form.height} onChange={(e) => set('height', e.target.value)} />
+                    <label className="jockey-label">Năm kinh nghiệm</label>
+                    <input className="jockey-input" type="number" value={form.experience} onChange={(e) => set('experience', e.target.value)} />
+                    {personalErrors.experience && <span className="profile-err">{personalErrors.experience}</span>}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                   <button type="submit" className="jockey-btn jockey-btn--teal jockey-btn--sm">✓ Lưu thay đổi</button>
-                  <button type="button" className="jockey-btn jockey-btn--ghost jockey-btn--sm" onClick={() => setEditing(false)}>Hủy</button>
+                  <button type="button" className="jockey-btn jockey-btn--ghost jockey-btn--sm" onClick={() => setEditingPersonal(false)}>Hủy</button>
                 </div>
               </form>
             ) : (
               <>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Họ tên</span><span className="jockey-detail-value">{form.name}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Biệt danh</span><span className="jockey-detail-value">"{form.nickname}"</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Email</span><span className="jockey-detail-value">{form.email}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Điện thoại</span><span className="jockey-detail-value">{form.phone}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Ngày sinh</span><span className="jockey-detail-value">{form.dob}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Quốc tịch</span><span className="jockey-detail-value">{form.nationality}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Kinh nghiệm</span><span className="jockey-detail-value">{form.experience}</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Cân nặng</span><span className="jockey-detail-value">{form.weight} kg</span></div>
-                <div className="jockey-detail-row"><span className="jockey-detail-label">Chiều cao</span><span className="jockey-detail-value">{form.height} cm</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Họ tên</span><span className="jockey-detail-value">{profileData.fullName}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Biệt danh</span><span className="jockey-detail-value">"{profileData.userName}"</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Email</span><span className="jockey-detail-value">{profileData.email}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Điện thoại</span><span className="jockey-detail-value">{profileData.phone}</span></div>
+                <div className="jockey-detail-row"><span className="jockey-detail-label">Kinh nghiệm</span><span className="jockey-detail-value">{profileData.experienceYears} năm</span></div>
               </>
             )}
           </div>
         </div>
 
         <div className="jockey-card">
-          <div className="jockey-card-head"><h3>Thông tin giấy phép</h3></div>
+          <div className="jockey-card-head">
+            <h3>Thông tin giấy phép</h3>
+            {!editingLicense && (
+              <button
+                type="button"
+                className="jockey-btn jockey-btn--ghost jockey-btn--sm"
+                onClick={() => setEditingLicense(true)}
+              >
+                ✎ Cập nhật
+              </button>
+            )}
+          </div>
           <div className="jockey-card-body">
-            <div className="profile-license-badge">
-              <span className="plb-icon">🪪</span>
-              <div>
-                <div className="plb-number">{form.licenseNo}</div>
-                <div className="plb-sub">Giấy phép thi đấu chính thức</div>
-              </div>
-              <span className="jockey-badge jockey-badge--green">Còn hiệu lực</span>
-            </div>
-            <div className="jockey-detail-row">
-              <span className="jockey-detail-label">Số hiệu</span>
-              <span className="jockey-detail-value">{form.licenseNo}</span>
-            </div>
-            <div className="jockey-detail-row">
-              <span className="jockey-detail-label">Ngày hết hạn</span>
-              <span className="jockey-detail-value">{form.licenseExpiry}</span>
-            </div>
-            <div className="jockey-detail-row">
-              <span className="jockey-detail-label">Mã jockey</span>
-              <span className="jockey-detail-value">{user?.id}</span>
-            </div>
-            <div className="jockey-detail-row">
-              <span className="jockey-detail-label">Ngày tham gia</span>
-              <span className="jockey-detail-value">{joinedDate}</span>
-            </div>
-            <div className="jockey-detail-row">
-              <span className="jockey-detail-label">Trạng thái</span>
-              <span className={`jockey-badge ${accountStatus === 'APPROVED' ? 'jockey-badge--green' : 'jockey-badge--gray'}`}>
-                {accountStatus === 'APPROVED' ? 'Hoạt động' : 'Chờ duyệt'}
-              </span>
-            </div>
+            {editingLicense ? (
+               <form onSubmit={handleSaveLicense}>
+                 <div className="jockey-form-grid" style={{ gridTemplateColumns: '1fr' }}>
+                   <div className="jockey-form-group">
+                     <label className="jockey-label">Số giấy phép</label>
+                     <input className="jockey-input" value={licenseForm.licenseNo} onChange={(e) => setLicenseForm({...licenseForm, licenseNo: e.target.value})} required />
+                   </div>
+                   <div className="jockey-form-group">
+                     <label className="jockey-label">Ngày hết hạn</label>
+                     <input className="jockey-input" type="date" value={licenseForm.licenseExpiry} onChange={(e) => setLicenseForm({...licenseForm, licenseExpiry: e.target.value})} />
+                   </div>
+                 </div>
+                 <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                   <button type="submit" className="jockey-btn jockey-btn--teal jockey-btn--sm">✓ Lưu giấy phép</button>
+                   <button type="button" className="jockey-btn jockey-btn--ghost jockey-btn--sm" onClick={() => setEditingLicense(false)}>Hủy</button>
+                 </div>
+               </form>
+            ) : (
+              <>
+                <div className="profile-license-badge">
+                  <span className="plb-icon">🪪</span>
+                  <div>
+                    <div className="plb-number">{profileData.licenseNumber}</div>
+                    <div className="plb-sub">Giấy phép thi đấu chính thức</div>
+                  </div>
+                  <span className="jockey-badge jockey-badge--green">Còn hiệu lực</span>
+                </div>
+                <div className="jockey-detail-row">
+                  <span className="jockey-detail-label">Số hiệu</span>
+                  <span className="jockey-detail-value">{profileData.licenseNumber}</span>
+                </div>
+                <div className="jockey-detail-row">
+                  <span className="jockey-detail-label">Ngày hết hạn</span>
+                  <span className="jockey-detail-value">{profileData.licenseExpiryDate || 'Chưa cập nhật'}</span>
+                </div>
+                <div className="jockey-detail-row">
+                  <span className="jockey-detail-label">Mã jockey</span>
+                  <span className="jockey-detail-value">{profileData.id}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
 }
-
 
 /* ── Main component ── */
 export default function Profile() {

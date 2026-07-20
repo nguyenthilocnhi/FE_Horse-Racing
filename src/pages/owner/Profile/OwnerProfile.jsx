@@ -32,7 +32,7 @@ export default function OwnerProfile() {
     if (pending) {
       try {
         const parsed = JSON.parse(pending)
-        const isMatch = parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id || (parsed.name && parsed.name === user?.name)
+        const isMatch = parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id
         if (isMatch) {
           setName(parsed.name ?? defaultName)
           setStableName(parsed.stableName ?? 'My Stable')
@@ -96,7 +96,7 @@ export default function OwnerProfile() {
             </div>
             <h2 style={{ margin: '0 0 6px', color: '#fff', fontSize: '1.2rem' }}>{name}</h2>
             <span className="owner-badge owner-badge--gold" style={{ marginBottom: 16 }}>{profile.licenseNo}</span>
-
+            
             <div style={{ textAlign: 'left', marginTop: 24, fontSize: 13, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 8 }}>
                 <span style={{ color: '#666' }}>Trang trại</span>
@@ -109,24 +109,6 @@ export default function OwnerProfile() {
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 8 }}>
                 <span style={{ color: '#666' }}>Địa điểm</span>
                 <strong style={{ color: '#fff', fontSize: 12 }}>{location}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: 8 }}>
-                <span style={{ color: '#666' }}>Ngày gia nhập</span>
-                <strong style={{ color: '#fff' }}>
-                  {(() => {
-                    try {
-                      const historyList = JSON.parse(localStorage.getItem('registered_users_history') || '[]')
-                      const matched = historyList.find(h => 
-                        (h.id && user?.id && h.id === user.id) ||
-                        (h.email && user?.email && h.email.toLowerCase() === user.email.toLowerCase())
-                      )
-                      if (matched?.joined) {
-                        return new Date(matched.joined).toLocaleDateString('vi-VN')
-                      }
-                    } catch (_) {}
-                    return new Date().toLocaleDateString('vi-VN')
-                  })()}
-                </strong>
               </div>
             </div>
           </div>
@@ -143,7 +125,7 @@ export default function OwnerProfile() {
                 ✓ Đã lưu thông tin hồ sơ stable thành công!
               </div>
             )}
-
+            
             <form onSubmit={handleSave}>
               <div className="owner-form-grid">
                 <div className="owner-form-group">
@@ -218,7 +200,7 @@ export default function OwnerProfile() {
                   />
                 </div>
               </div>
-
+              
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                 <button type="submit" className="owner-btn owner-btn--gold">
                   Lưu thay đổi

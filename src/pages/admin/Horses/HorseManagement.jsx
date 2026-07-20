@@ -1,106 +1,99 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { StatusBadge } from '../../../utils/adminHelpers'
+import { admin } from '../../../services'
 import * as horseService from '../../../services/horseService'
-import * as adminAccountService from '../../../services/adminAccountService'
+import { StatusBadge } from '../../../utils/adminHelpers'
 import './HorseManagement.css'
 
 export default function HorseManagement() {
   const [horses, setHorses] = useState([])
-  const [owners, setOwners] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const { searchQuery: search = '', setSearchQuery: setSearch = () => {} } = useOutletContext() || {}
-  const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selectedHorse, setSelectedHorse] = useState(null)
-  
-  // Modal states
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingHorse, setEditingHorse] = useState(null)
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    age: '', 
-    breed: '', 
-    ownerId: '', 
-    healthStatus: 'ELIGIBLE', 
-    image: '' 
-  })
+  useEffect(() => {
+    loadHorses()
+  }, [])
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 8
-
-  const fetchHorses = async () => {
-    setLoading(true)
+  const loadHorses = async () => {
     try {
-      const data = await horseService.getHorses()
-      const list = data || []
-      const mappedList = list.map(h => {
-        let statusVal = 'active'
-        let healthLabel = 'Khỏe mạnh'
-
-        if (h.healthStatus === 'INJURED') {
-          statusVal = 'injured'
-          healthLabel = 'Bị chấn thương'
-        } else if (h.healthStatus === 'SICK') {
-          statusVal = 'injured'
-          healthLabel = 'Bị ốm'
-        } else if (h.healthStatus === 'SUSPENDED') {
-          statusVal = 'retired'
-          healthLabel = 'Bị đình chỉ'
-        }
-
-        return {
-          id: h.id,
-          name: h.name,
-          age: h.age || 0,
-          breed: h.breed || '',
-          owner: h.ownerName || h.horseOwner?.fullName || '—',
-          ownerId: h.ownerId || h.horseOwner?.id || '',
-          status: statusVal,
-          health: healthLabel,
-          healthStatus: h.healthStatus || 'ELIGIBLE',
-          wins: 0,
-          races: 0,
-          points: 0,
-          image: '',
-          rawHorse: h
-        }
-      })
-      setHorses(mappedList)
+      setLoading(true)
+      const data = await admin.getAllAdminHorses()
+      
+      // Map data to match frontend structure
+      const formatted = data.map(h => ({
+        id: h.id,
+        name: h.name,
+        age: h.age,
+        breed: h.breed,
+        owner: h.horseOwner?.fullName || h.horseOwner?.userName || 'N/A',
+        status: (h.healthStatus === 'ELIGIBLE' || !h.healthStatus) ? 'active' : 'injured', // Simple mock status based on health
+        healthStatus: h.healthStatus || 'ELIGIBLE',
+        health: h.healthStatus === 'ELIGIBLE' ? 'Khỏe mạnh' : 
+               h.healthStatus === 'SUSPENDED' ? 'Bị đình chỉ' : 
+               h.healthStatus === 'INJURED' ? 'Bị chấn thương' : 
+               h.healthStatus === 'SICK' ? 'Bị ốm' : (h.healthStatus || 'N/A'),
+        wins: 0,
+        races: 0,
+        points: 0,
+        image: 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80' // default
+      }))
+      
+      setHorses(formatted)
     } catch (err) {
-      console.error("Failed to fetch horses from API:", err)
-      setHorses([])
+      console.error('Failed to load horses:', err)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchOwners = async () => {
-    try {
-      const data = await adminAccountService.getAllAccounts()
-      const ownerList = (data || []).filter(u => u.role === 'HORSE_OWNER')
-      setOwners(ownerList)
-    } catch (err) {
-      console.error("Failed to fetch owners:", err)
-    }
-  }
+  const [localSearch, setLocalSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [selectedHorse, setSelectedHorse] = useState(null)
+  const [horseHistory, setHorseHistory] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
 
   useEffect(() => {
-    fetchHorses()
-    fetchOwners()
-  }, [])
+    if (selectedHorse) {
+      loadHorseHistory(selectedHorse.id)
+    } else {
+      setHorseHistory([])
+    }
+  }, [selectedHorse])
+
+  const loadHorseHistory = async (horseId) => {
+    try {
+      setLoadingHistory(true)
+      const history = await horseService.getHorseHistory(horseId)
+      setHorseHistory(history || [])
+    } catch (error) {
+      console.error('Failed to load history:', error)
+      setHorseHistory([])
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+  
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingHorse, setEditingHorse] = useState(null)
+  const [formData, setFormData] = useState({ name: '', age: '', breed: '', owner: '', healthStatus: 'ELIGIBLE', image: '' })
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 8
+
+  // Currently disabling edit/add/delete logic as it was pure mock
+  // To fully implement these, we need to connect to backend POST/PUT/DELETE
+  const saveHorses = (updatedList) => {
+    setHorses(updatedList)
+  }
 
   // Filter list by search query & status
   const filtered = horses.filter((horse) => {
-    const query = search.toLowerCase()
-    const nameVal = horse.name || ''
-    const breedVal = horse.breed || ''
-    const ownerVal = horse.owner || ''
+    const query = localSearch.toLowerCase()
     const matchSearch =
-      nameVal.toLowerCase().includes(query) ||
-      breedVal.toLowerCase().includes(query) ||
-      ownerVal.toLowerCase().includes(query)
+      horse.name.toLowerCase().includes(query) ||
+      horse.breed.toLowerCase().includes(query) ||
+      horse.owner.toLowerCase().includes(query)
     const matchStatus = statusFilter === 'ALL' || horse.status === statusFilter
     return matchSearch && matchStatus
   })
@@ -115,7 +108,7 @@ export default function HorseManagement() {
   // Actions
   const handleOpenAdd = () => {
     setEditingHorse(null)
-    setFormData({ name: '', age: '', breed: '', ownerId: '', healthStatus: 'ELIGIBLE', image: '' })
+    setFormData({ name: '', age: '', breed: '', owner: '', healthStatus: 'ELIGIBLE', image: '' })
     setModalOpen(true)
   }
 
@@ -123,9 +116,9 @@ export default function HorseManagement() {
     setEditingHorse(horse)
     setFormData({
       name: horse.name,
-      age: horse.age.toString(),
+      age: horse.age,
       breed: horse.breed,
-      ownerId: horse.ownerId?.toString() || '',
+      owner: horse.owner,
       healthStatus: horse.healthStatus || 'ELIGIBLE',
       image: horse.image || ''
     })
@@ -133,18 +126,16 @@ export default function HorseManagement() {
   }
 
   const handleDelete = async (id) => {
-    const h = horses.find(item => item.id === id)
-    if (!h) return
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ngựa đua "${h.name}" không?`)) {
+    if (window.confirm('Bạn có chắc chắn muốn xóa ngựa đua này không?')) {
       try {
-        await horseService.deleteHorse(id)
-        setHorses(horses.filter(item => item.id !== id))
+        await admin.deleteAdminHorse(id)
+        alert('Xóa ngựa đua thành công!')
+        loadHorses()
         if (selectedHorse && selectedHorse.id === id) {
           setSelectedHorse(null)
         }
-        alert('Xóa ngựa đua thành công!')
       } catch (err) {
-        alert('Xóa thất bại: ' + (err.response?.data?.message || err.message))
+        alert("Lỗi: " + (err.response?.data?.message || err.response?.data || err.message))
       }
     }
   }
@@ -153,34 +144,31 @@ export default function HorseManagement() {
     e.preventDefault()
     
     try {
+      const payload = {
+        name: formData.name,
+        age: parseInt(formData.age) || 0,
+        breed: formData.breed,
+        healthStatus: formData.healthStatus,
+        horseOwner: formData.owner ? { fullName: formData.owner.trim() } : null
+      }
+
       if (editingHorse) {
         // Edit mode
-        const updated = await horseService.updateHorse(editingHorse.id, {
-          name: formData.name,
-          age: parseInt(formData.age) || 0,
-          breed: formData.breed,
-          healthStatus: formData.healthStatus
-        })
-        alert('Cập nhật ngựa đua thành công!')
+        await admin.updateAdminHorse(editingHorse.id, payload)
+        alert('Cập nhật ngựa thành công!')
       } else {
         // Add mode
-        if (!formData.ownerId) {
-          alert('Vui lòng chọn một chủ sở hữu cho ngựa đua!')
-          return
-        }
-        await horseService.createHorse({
-          name: formData.name,
-          age: parseInt(formData.age) || 0,
-          breed: formData.breed,
-          healthStatus: formData.healthStatus,
-          horseOwner: { id: parseInt(formData.ownerId) }
-        })
-        alert('Thêm ngựa đua mới thành công!')
+        await admin.createAdminHorse(payload)
+        alert('Thêm ngựa đua thành công!')
       }
-      fetchHorses()
+      
       setModalOpen(false)
+      loadHorses()
+      if (selectedHorse && editingHorse && selectedHorse.id === editingHorse.id) {
+        setSelectedHorse(null)
+      }
     } catch (err) {
-      alert('Thao tác thất bại: ' + (err.response?.data?.message || err.message))
+      alert("Lỗi: " + (err.response?.data?.message || err.response?.data || err.message))
     }
   }
 
@@ -189,7 +177,7 @@ export default function HorseManagement() {
       <div className="admin-page-head">
         <div>
           <h1 className="admin-page-title">Quản lý Ngựa đua</h1>
-          <p className="admin-page-sub">Quản lý danh sách ngựa đua, thông số chiến tích và trạng thái hoạt động trực tuyến</p>
+          <p className="admin-page-sub">Quản lý danh sách ngựa đua, thông số chiến tích và trạng thái hoạt động</p>
         </div>
         <button
           type="button"
@@ -204,9 +192,9 @@ export default function HorseManagement() {
         <input
           className="admin-input"
           placeholder="Tìm theo tên ngựa, giống loài hoặc chủ sở hữu..."
-          value={search}
+          value={localSearch}
           onChange={(e) => {
-            setSearch(e.target.value)
+            setLocalSearch(e.target.value)
             setCurrentPage(1)
           }}
         />
@@ -221,123 +209,123 @@ export default function HorseManagement() {
           <option value="ALL">Tất cả trạng thái</option>
           <option value="active">Đang hoạt động (Active)</option>
           <option value="injured">Chấn thương (Injured)</option>
-          <option value="retired">Giải nghệ/Đình chỉ (Suspended)</option>
+          <option value="retired">Giải nghệ (Retired)</option>
         </select>
       </div>
 
       <div className="user-mgmt-layout" style={{ display: 'grid', gridTemplateColumns: selectedHorse ? '1fr 340px' : '1fr', gap: '20px' }}>
         <div className="admin-card user-mgmt-table-card">
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#aaa' }}>Đang tải dữ liệu ngựa đua...</div>
-          ) : (
-            <>
-              <div className="admin-table-wrap">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Tên ngựa</th>
-                      <th>Tuổi</th>
-                      <th>Giống</th>
-                      <th>Chủ sở hữu</th>
-                      <th>Sức khỏe</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: 'right' }}>Thao tác</th>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Tên ngựa</th>
+                  <th>Tuổi</th>
+                  <th>Giống</th>
+                  <th>Chủ sở hữu</th>
+                  <th>Sức khỏe</th>
+                  <th>Trạng thái</th>
+                  <th style={{ textAlign: 'right' }}>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                      Đang tải dữ liệu ngựa...
+                    </td>
+                  </tr>
+                ) : paginatedHorses.length > 0 ? (
+                  paginatedHorses.map((horse) => (
+                    <tr key={horse.id}>
+                      <td style={{ fontWeight: '600', color: '#fff' }}>{horse.name}</td>
+                      <td>{horse.age} tuổi</td>
+                      <td>{horse.breed}</td>
+                      <td>{horse.owner}</td>
+                      <td>{horse.health || 'Khỏe mạnh'}</td>
+                      <td>
+                        <StatusBadge status={horse.status} />
+                      </td>
+                      <td>
+                        <div className="admin-table-actions" style={{ justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--ghost admin-btn--sm"
+                            onClick={() => setSelectedHorse(horse)}
+                          >
+                            Chi tiết
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--ghost admin-btn--sm"
+                            onClick={() => handleEdit(horse)}
+                          >
+                            Chỉnh sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--danger admin-btn--sm"
+                            onClick={() => handleDelete(horse.id)}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedHorses.length > 0 ? (
-                      paginatedHorses.map((horse) => (
-                        <tr key={horse.id}>
-                          <td style={{ fontWeight: '600', color: '#fff' }}>{horse.name}</td>
-                          <td>{horse.age} tuổi</td>
-                          <td>{horse.breed}</td>
-                          <td>{horse.owner}</td>
-                          <td>{horse.health || 'Khỏe mạnh'}</td>
-                          <td>
-                            <StatusBadge status={horse.status} />
-                          </td>
-                          <td>
-                            <div className="admin-table-actions" style={{ justifyContent: 'flex-end' }}>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--ghost admin-btn--sm"
-                                onClick={() => setSelectedHorse(horse)}
-                              >
-                                Chi tiết
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--outline admin-btn--sm"
-                                onClick={() => handleEdit(horse)}
-                              >
-                                Sửa
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--danger admin-btn--sm"
-                                onClick={() => handleDelete(horse.id)}
-                              >
-                                Xóa
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
-                          Không tìm thấy kết quả phù hợp
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                      Không tìm thấy kết quả phù hợp
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-              {totalPages > 1 && (
-                <div
-                  className="admin-pagination"
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '16px 22px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-                    flexWrap: 'wrap',
-                    gap: '12px'
-                  }}
+          {totalPages > 1 && (
+            <div
+              className="admin-pagination"
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '16px 22px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              <span className="text-muted" style={{ fontSize: '12px' }}>
+                Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(filtered.length, currentPage * itemsPerPage)} trong tổng số {filtered.length} con ngựa
+              </span>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  className="admin-btn admin-btn--ghost admin-btn--sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
                 >
-                  <span className="text-muted" style={{ fontSize: '12px' }}>
-                    Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(filtered.length, currentPage * itemsPerPage)} trong tổng số {filtered.length} con ngựa
-                  </span>
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      className="admin-btn admin-btn--ghost admin-btn--sm"
-                      disabled={currentPage === 1}
-                      onClick={() => setCurrentPage(p => p - 1)}
-                    >
-                      Trang trước
-                    </button>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                      <button
-                        key={page}
-                        className={`admin-btn admin-btn--sm ${currentPage === page ? 'admin-btn--gold' : 'admin-btn--ghost'}`}
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    <button
-                      className="admin-btn admin-btn--ghost admin-btn--sm"
-                      disabled={currentPage === totalPages}
-                      onClick={() => setCurrentPage(p => p + 1)}
-                    >
-                      Trang sau
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+                  Trang trước
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    className={`admin-btn admin-btn--sm ${currentPage === page ? 'admin-btn--gold' : 'admin-btn--ghost'}`}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  className="admin-btn admin-btn--ghost admin-btn--sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -387,25 +375,31 @@ export default function HorseManagement() {
                   {selectedHorse.wins || 0} thắng / {selectedHorse.races || 0} trận
                 </dd>
               </dl>
-              
-              <div style={{ marginTop: '24px', display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--outline admin-btn--sm"
-                  style={{ flex: 1 }}
-                  onClick={() => handleEdit(selectedHorse)}
-                >
-                  Sửa
-                </button>
-                <button
-                  type="button"
-                  className="admin-btn admin-btn--danger admin-btn--sm"
-                  style={{ flex: 1 }}
-                  onClick={() => handleDelete(selectedHorse.id)}
-                >
-                  Xóa
-                </button>
+
+              <div style={{ marginTop: '24px' }}>
+                <h5 style={{ color: '#d4af37', marginBottom: '12px', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lịch sử thi đấu</h5>
+                {loadingHistory ? (
+                  <div className="text-muted" style={{ fontSize: '12px' }}>Đang tải lịch sử...</div>
+                ) : horseHistory.length === 0 ? (
+                  <div className="text-muted" style={{ fontSize: '12px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', textAlign: 'center' }}>
+                    Chưa có lịch sử thi đấu nào.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {horseHistory.map((race, idx) => (
+                      <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #d4af37' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <strong style={{ fontSize: '13px', color: '#fff' }}>{race.raceName || `Trận đấu #${race.raceId}`}</strong>
+                          <span style={{ fontSize: '12px', color: race.placement === 1 ? '#4ade80' : '#aaa' }}>Hạng {race.placement}</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#888' }}>Thời gian hoàn thành: {race.completionTime}s</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              
+              
             </div>
           </div>
         )}
@@ -477,43 +471,46 @@ export default function HorseManagement() {
                   <input
                     required
                     className="admin-input"
-                    placeholder="Thoroughbred, Arabian..."
+                    placeholder="Ví dụ: Thoroughbred..."
                     value={formData.breed}
                     onChange={(e) => setFormData(f => ({ ...f, breed: e.target.value }))}
                   />
                 </div>
               </div>
 
-              {!editingHorse && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chủ sở hữu (Owner)</label>
-                  <select
-                    required
-                    className="admin-select"
-                    value={formData.ownerId}
-                    onChange={(e) => setFormData(f => ({ ...f, ownerId: e.target.value }))}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="">Chọn chủ sở hữu...</option>
-                    {owners.map(o => (
-                      <option key={o.id} value={o.id}>{o.fullName} ({o.email})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Chủ sở hữu</label>
+                <input
+                  required
+                  className="admin-input"
+                  placeholder="Ví dụ: Stable Alpha..."
+                  value={formData.owner}
+                  onChange={(e) => setFormData(f => ({ ...f, owner: e.target.value }))}
+                />
+              </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tình trạng sức khỏe & Trạng thái</label>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Link ảnh ngựa (Tùy chọn)</label>
+                <input
+                  className="admin-input"
+                  placeholder="Nhập URL hình ảnh (Unsplash...)..."
+                  value={formData.image}
+                  onChange={(e) => setFormData(f => ({ ...f, image: e.target.value }))}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tình trạng Sức khỏe</label>
                 <select
                   className="admin-select"
                   value={formData.healthStatus}
                   onChange={(e) => setFormData(f => ({ ...f, healthStatus: e.target.value }))}
                   style={{ width: '100%' }}
                 >
-                  <option value="ELIGIBLE">Khỏe mạnh / Đủ điều kiện thi đấu</option>
+                  <option value="ELIGIBLE">Khỏe mạnh</option>
+                  <option value="SUSPENDED">Bị đình chỉ</option>
                   <option value="INJURED">Bị chấn thương</option>
                   <option value="SICK">Bị ốm</option>
-                  <option value="SUSPENDED">Bị đình chỉ thi đấu</option>
                 </select>
               </div>
 

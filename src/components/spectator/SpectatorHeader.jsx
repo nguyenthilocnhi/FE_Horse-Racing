@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import * as horseService from '../../services/horseService'
 
 const SPECTATOR_NOTIFICATIONS = [
   { id: 1, title: '🎁 Nhận thưởng: +12,500,000 VND dự đoán Derby Một Dặm', time: '5 phút trước' },
@@ -32,9 +33,36 @@ export default function SpectatorHeader() {
   const [userOpen, setUserOpen] = useState(false)
   const notifRef = useRef(null)
   const userRef = useRef(null)
+  const searchRef = useRef(null)
+
+  const [query, setQuery] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
 
   useClickOutside(notifRef, () => setNotifOpen(false))
   useClickOutside(userRef, () => setUserOpen(false))
+  useClickOutside(searchRef, () => setSearchResults(null))
+
+  const handleSearch = async (e) => {
+    if (e.key === 'Enter') {
+      if (!query.trim()) {
+        setSearchResults(null)
+        return
+      }
+      setIsSearching(true)
+      try {
+        const response = await horseService.searchHorses(query.trim())
+        setSearchResults(response.data || [])
+      } catch (err) {
+        console.error('Search failed:', err)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+        setNotifOpen(false)
+        setUserOpen(false)
+      }
+    }
+  }
 
   const pageLabel = breadcrumbLabels[location.pathname] || 'Spectator Portal'
 
@@ -46,7 +74,34 @@ export default function SpectatorHeader() {
         <span>{pageLabel}</span>
       </nav>
 
-      <div style={{ flex: 1 }} />
+      <div className="admin-search" ref={searchRef} style={{ position: 'relative' }}>
+        <span className="admin-search-icon">⌕</span>
+        <input
+          className="admin-search-input"
+          placeholder="Tìm ngựa theo tên..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleSearch}
+        />
+        {searchResults !== null && (
+          <div className="admin-dropdown-menu admin-dropdown-menu--wide" style={{ top: '100%', left: 0, marginTop: '8px', right: 'auto', minWidth: '300px', display: 'block' }}>
+            <div className="admin-dropdown-head">Kết quả tìm kiếm ({searchResults.length})</div>
+            {isSearching ? (
+              <div className="admin-dropdown-item text-muted">Đang tìm kiếm...</div>
+            ) : searchResults.length === 0 ? (
+              <div className="admin-dropdown-item text-muted">Không tìm thấy kết quả.</div>
+            ) : (
+              searchResults.map(horse => (
+                <div key={horse.id} className="admin-notif-item" style={{ cursor: 'pointer' }} onClick={() => setSearchResults(null)}>
+                  <strong>{horse.name}</strong>
+                  <span style={{ fontSize: '11px' }}>Tuổi: {horse.age} | Giống: {horse.breed}</span>
+                  <span style={{ fontSize: '11px', color: '#d4af37' }}>Chủ: {horse.ownerName}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="admin-header-actions">
         <div className="admin-dropdown" ref={notifRef}>

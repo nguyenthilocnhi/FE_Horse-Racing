@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { ownerBreadcrumbLabels, ownerRaces } from '../../data/ownerMockData'
+import * as horseService from '../../services/horseService'
 
 function useClickOutside(ref, handler) {
   useEffect(() => {
@@ -19,53 +20,39 @@ export default function OwnerHeader() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [userOpen, setUserOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [searchResults, setSearchResults] = useState(null)
+  const [isSearching, setIsSearching] = useState(false)
   const notifRef = useRef(null)
   const userRef = useRef(null)
+  const searchRef = useRef(null)
 
   useClickOutside(notifRef, () => setNotifOpen(false))
   useClickOutside(userRef, () => setUserOpen(false))
+  useClickOutside(searchRef, () => setSearchResults(null))
 
-  const pageLabel = ownerBreadcrumbLabels[location.pathname] || 'Chủ ngựa'
-  const [notifications, setNotifications] = useState([])
-
-  useEffect(() => {
-    const loadNotifs = () => {
-      const stored = localStorage.getItem('owner_notifications')
-      const systemNotifs = stored ? JSON.parse(stored) : []
-
-      const storedRaces = localStorage.getItem('owner_races')
-      const currentRaces = storedRaces ? JSON.parse(storedRaces) : ownerRaces
-      const pendingRaces = currentRaces.filter(r => r.status === 'pending_confirmation')
-      
-      const raceNotifs = pendingRaces.map(r => ({
-        id: `RACE-CONF-${r.id}`,
-        title: 'Xác nhận thi đấu 🏁',
-        message: `Ngựa "${r.registeredHorse}" cần xác nhận tham gia "${r.name}".`,
-        type: 'warning',
-        timestamp: r.date
-      }))
-
-      setNotifications([...systemNotifs, ...raceNotifs])
+  const handleSearch = async (e) => {
+    if (e.key === 'Enter') {
+      if (!query.trim()) {
+        setSearchResults(null)
+        return
+      }
+      setIsSearching(true)
+      try {
+        const response = await horseService.searchHorses(query.trim())
+        setSearchResults(response.data || [])
+      } catch (err) {
+        console.error('Search failed:', err)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+        setNotifOpen(false)
+        setUserOpen(false)
+      }
     }
-
-    loadNotifs()
-    window.addEventListener('storage', loadNotifs)
-    window.addEventListener('owner_notifs_update', loadNotifs)
-
-    return () => {
-      window.removeEventListener('storage', loadNotifs)
-      window.removeEventListener('owner_notifs_update', loadNotifs)
-    }
-  }, [])
-
-  const handleClearNotifs = (e) => {
-    e.stopPropagation()
-    localStorage.setItem('owner_notifications', '[]')
-    setNotifications([])
-    window.dispatchEvent(new Event('owner_notifs_update'))
   }
 
-  const hasUnread = notifications.length > 0
+  const pageLabel = ownerBreadcrumbLabels[location.pathname] || 'Chủ ngựa'
+  const pendingNotifications = ownerRaces.filter(r => r.status === 'pending_confirmation')
 
   return (
     <header className="owner-header">
@@ -75,14 +62,33 @@ export default function OwnerHeader() {
         <span>{pageLabel}</span>
       </nav>
 
-      <div className="owner-search">
+      <div className="owner-search" ref={searchRef} style={{ position: 'relative' }}>
         <span className="owner-search-icon">⌕</span>
         <input
           className="owner-search-input"
-          placeholder="Tìm kiếm ngựa, jockey, giải đấu..."
+          placeholder="Tìm kiếm ngựa theo tên..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleSearch}
         />
+        {searchResults !== null && (
+          <div className="owner-dropdown-menu owner-dropdown-menu--wide" style={{ top: '100%', left: 0, marginTop: '8px', right: 'auto', minWidth: '300px', display: 'block' }}>
+            <div className="owner-dropdown-head">Kết quả tìm kiếm ({searchResults.length})</div>
+            {isSearching ? (
+              <div className="owner-dropdown-item" style={{ color: '#aaa' }}>Đang tìm kiếm...</div>
+            ) : searchResults.length === 0 ? (
+              <div className="owner-dropdown-item" style={{ color: '#aaa' }}>Không tìm thấy kết quả.</div>
+            ) : (
+              searchResults.map(horse => (
+                <div key={horse.id} className="owner-notif-item" style={{ cursor: 'pointer' }} onClick={() => setSearchResults(null)}>
+                  <strong>{horse.name}</strong>
+                  <div style={{ fontSize: '11px', color: '#ccc' }}>Tuổi: {horse.age} | Giống: {horse.breed}</div>
+                  <div style={{ fontSize: '11px', color: '#d4af37' }}>Chủ: {horse.ownerName}</div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       <div className="owner-header-actions">
@@ -95,31 +101,18 @@ export default function OwnerHeader() {
             onClick={() => { setNotifOpen((v) => !v); setUserOpen(false) }}
           >
             🔔
-            {hasUnread && <span className="owner-notif-badge" />}
+            {pendingNotifications.length > 0 && <span className="owner-notif-badge" />}
           </button>
           {notifOpen && (
             <div className="owner-dropdown-menu owner-dropdown-menu--wide">
-              <div className="owner-dropdown-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Thông báo mới ({notifications.length})</span>
-                {notifications.length > 0 && (
-                  <button 
-                    onClick={handleClearNotifs} 
-                    style={{ background: 'none', border: 'none', color: '#d4af37', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Xóa tất cả
-                  </button>
-                )}
-              </div>
-              {notifications.length > 0 ? (
-                notifications.map((n) => (
+              <div className="owner-dropdown-head">Thông báo mới</div>
+              {pendingNotifications.length > 0 ? (
+                pendingNotifications.map((n) => (
                   <div key={n.id} className="owner-notif-item">
-                    <span className="owner-notif-dot" style={{ 
-                      backgroundColor: n.type === 'danger' || n.type === 'error' ? '#f87171' : n.type === 'success' ? '#4ade80' : '#fbbf24' 
-                    }} />
+                    <span className="owner-notif-dot" />
                     <div>
-                      <strong>{n.title}</strong>
-                      <span style={{ color: '#ccc' }}>{n.message}</span>
-                      {n.timestamp && <span style={{ display: 'block', color: '#666', fontSize: '10px', marginTop: '2px' }}>{n.timestamp}</span>}
+                      <strong>Xác nhận thi đấu</strong>
+                      <span style={{ color: '#ccc' }}>Ngựa {n.registeredHorse} cần xác nhận tham gia {n.name}.</span>
                     </div>
                   </div>
                 ))
