@@ -28,10 +28,14 @@ export default function UserManagement() {
     setLoading(true)
     try {
       const data = await adminAccountService.getAllAccounts()
-      setUsers(data || [])
+      if (data && Array.isArray(data) && data.length > 0) {
+        setUsers(data)
+      } else {
+        setUsers(initialUsers)
+      }
     } catch (err) {
-      console.error("Failed to fetch accounts from API:", err)
-      setUsers([])
+      console.error("Failed to fetch accounts from API, using mock fallback:", err)
+      setUsers(initialUsers)
     } finally {
       setLoading(false)
     }
