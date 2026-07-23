@@ -33,6 +33,7 @@ import SpectatorLayout from '../layouts/SpectatorLayout'
 import SpectatorDashboard from '../pages/spectator/Dashboard/SpectatorDashboard'
 import SpectatorRankings from '../pages/spectator/Rankings/SpectatorRankings'
 import SpectatorPredictions from '../pages/spectator/Predictions/SpectatorPredictions'
+import PaymentResult from '../pages/payment/PaymentResult'
 import SpectatorProfile from '../pages/spectator/Profile/SpectatorProfile'
 // Referee pages
 import RefereeLayout from '../layouts/RefereeLayout'
@@ -172,6 +173,11 @@ export default function AppRoutes() {
         <Route path="/spectator/predictions" element={<SpectatorPredictions />} />
         <Route path="/spectator/profile" element={<SpectatorProfile />} />
       </Route>
+
+      {/* ── PayOS Payment Result Routes ── */}
+      <Route path="/payment/result" element={<PaymentResult />} />
+      <Route path="/payment/success" element={<PaymentResult />} />
+      <Route path="/payment/cancel" element={<PaymentResult />} />
 
 
       <Route path="*" element={<Navigate to="/" replace />} />

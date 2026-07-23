@@ -58,7 +58,7 @@ function RegisterForm({ onDone }) {
         <div className="prs-icon">✅</div>
         <h2>Đăng ký thành công!</h2>
         <p>Tài khoản Jockey của bạn đang chờ Admin xét duyệt.<br />Chúng tôi sẽ thông báo kết quả qua email <strong>{form.email}</strong>.</p>
-        <button type="button" className="jockey-btn jockey-btn--teal" onClick={onDone}>
+        <button type="button" className="jockey-btn jockey-btn--gold" onClick={onDone}>
           Về trang đăng nhập
         </button>
       </div>
@@ -145,13 +145,13 @@ function RegisterForm({ onDone }) {
           onChange={(e) => set('agreeTerms', e.target.checked)}
           className="profile-checkbox"
         />
-        <span>Tôi đồng ý với <a href="#!" style={{ color: '#00d4aa' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#00d4aa' }}>Chính sách bảo mật</a> của HORSIE.</span>
+        <span>Tôi đồng ý với <a href="#!" style={{ color: '#d4af37' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#d4af37' }}>Chính sách bảo mật</a> của HORSIE.</span>
       </label>
       {errors.agreeTerms && <span className="profile-err">{errors.agreeTerms}</span>}
 
       <div style={{ marginTop: 28 }}>
-        <button type="submit" className="jockey-btn jockey-btn--teal" style={{ width: '100%', padding: '14px 20px', fontSize: 13 }}>
-          🏇 Đăng ký tài khoản Jockey
+        <button type="submit" className="jockey-btn jockey-btn--gold" style={{ width: '100%', padding: '14px 20px', fontSize: 13 }}>
+          🚀 Nộp hồ sơ đăng ký Jockey
         </button>
       </div>
     </form>
@@ -299,7 +299,7 @@ function ProfileView() {
               <span>Chiến thắng</span>
             </div>
             <div className="profile-hero-stat">
-              <strong style={{ color: '#00d4aa' }}>{jockeyProfile.stats.winRate}%</strong>
+              <strong style={{ color: '#d4af37' }}>{jockeyProfile.stats.winRate}%</strong>
               <span>Tỷ lệ thắng</span>
             </div>
             <div className="profile-hero-stat">
@@ -350,7 +350,8 @@ function ProfileView() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                  <button type="submit" className="jockey-btn jockey-btn--teal jockey-btn--sm">✓ Lưu thay đổi</button>
+                  <button type="submit" className="jockey-btn jockey-btn--gold jockey-btn--sm">✓ Lưu thay đổi</button>
+
                   <button type="button" className="jockey-btn jockey-btn--ghost jockey-btn--sm" onClick={() => setEditingPersonal(false)}>Hủy</button>
                 </div>
               </form>
@@ -448,7 +449,7 @@ export default function Profile() {
         <div style={{ display: 'flex', gap: 10 }}>
           <button
             type="button"
-            className={`jockey-btn jockey-btn--sm ${mode === 'profile' ? 'jockey-btn--teal' : 'jockey-btn--ghost'}`}
+            className={`jockey-btn jockey-btn--sm ${mode === 'profile' ? 'jockey-btn--gold' : 'jockey-btn--ghost'}`}
             onClick={() => setMode('profile')}
           >
             ◎ Hồ sơ

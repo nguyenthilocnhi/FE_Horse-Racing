@@ -57,7 +57,7 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
           </div>
           <div className="jockey-detail-row">
             <span className="jockey-detail-label">Thù lao jockey</span>
-            <span className="jockey-detail-value" style={{ color: '#00d4aa' }}>{inv.fee}</span>
+            <span className="jockey-detail-value" style={{ color: '#d4af37' }}>{inv.fee}</span>
           </div>
           <div className="jockey-detail-row">
             <span className="jockey-detail-label">Hạn phản hồi</span>
@@ -85,7 +85,7 @@ function InvitationDetailModal({ inv, onClose, onAccept, onDecline }) {
             </button>
             <button
               type="button"
-              className="jockey-btn jockey-btn--teal"
+              className="jockey-btn jockey-btn--gold"
               onClick={() => { onAccept(inv.id); onClose() }}
             >
               ✓ Chấp nhận tham gia
@@ -248,7 +248,7 @@ export default function Invitations() {
                   </div>
                   <div className="inv-meta-item">
                     <span>💰 Thù lao</span>
-                    <strong style={{ color: '#00d4aa' }}>{inv.fee}</strong>
+                    <strong style={{ color: '#d4af37' }}>{inv.fee}</strong>
                   </div>
                 </div>
 

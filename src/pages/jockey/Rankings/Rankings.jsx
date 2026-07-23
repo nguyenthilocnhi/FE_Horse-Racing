@@ -141,7 +141,7 @@ export default function Rankings() {
                         {r.name.charAt(0)}
                       </span>
                       <div>
-                        <div style={{ fontWeight: r.isMe ? 700 : 500, color: r.isMe ? '#00d4aa' : '#fff' }}>
+                        <div style={{ fontWeight: r.isMe ? 700 : 500, color: r.isMe ? '#d4af37' : '#fff' }}>
                           {r.name}
                           {r.isMe && <span className="rank-you-tag">Bạn</span>}
                         </div>

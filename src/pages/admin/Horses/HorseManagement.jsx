@@ -105,12 +105,6 @@ export default function HorseManagement() {
     currentPage * itemsPerPage
   )
 
-  // Actions
-  const handleOpenAdd = () => {
-    setEditingHorse(null)
-    setFormData({ name: '', age: '', breed: '', owner: '', healthStatus: 'ELIGIBLE', image: '' })
-    setModalOpen(true)
-  }
 
   const handleEdit = (horse) => {
     setEditingHorse(horse)
@@ -142,6 +136,7 @@ export default function HorseManagement() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    if (!editingHorse) return
     
     try {
       const payload = {
@@ -152,19 +147,12 @@ export default function HorseManagement() {
         horseOwner: formData.owner ? { fullName: formData.owner.trim() } : null
       }
 
-      if (editingHorse) {
-        // Edit mode
-        await admin.updateAdminHorse(editingHorse.id, payload)
-        alert('Cập nhật ngựa thành công!')
-      } else {
-        // Add mode
-        await admin.createAdminHorse(payload)
-        alert('Thêm ngựa đua thành công!')
-      }
+      await admin.updateAdminHorse(editingHorse.id, payload)
+      alert('Cập nhật ngựa thành công!')
       
       setModalOpen(false)
       loadHorses()
-      if (selectedHorse && editingHorse && selectedHorse.id === editingHorse.id) {
+      if (selectedHorse && selectedHorse.id === editingHorse.id) {
         setSelectedHorse(null)
       }
     } catch (err) {
@@ -179,13 +167,6 @@ export default function HorseManagement() {
           <h1 className="admin-page-title">Quản lý Ngựa đua</h1>
           <p className="admin-page-sub">Quản lý danh sách ngựa đua, thông số chiến tích và trạng thái hoạt động</p>
         </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn--gold"
-          onClick={handleOpenAdd}
-        >
-          + Thêm ngựa mới
-        </button>
       </div>
 
       <div className="admin-filter-bar">
@@ -430,7 +411,7 @@ export default function HorseManagement() {
             }}
           >
             <div className="admin-card-head">
-              <h3>{editingHorse ? `Sửa thông tin: ${editingHorse.name}` : 'Thêm ngựa đua mới'}</h3>
+              <h3>Sửa thông tin: {editingHorse?.name}</h3>
               <button
                 type="button"
                 className="admin-btn admin-btn--ghost admin-btn--sm"

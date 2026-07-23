@@ -1,4 +1,4 @@
-/* Invitations page styles */
+/* Invitations page styles — Gold Luxury Theme */
 
 .inv-grid {
   display: grid;
@@ -34,7 +34,7 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  color: #555;
+  color: #777;
 }
 
 .inv-race-name {
@@ -45,7 +45,7 @@
 
 .inv-tournament {
   font-size: 12px;
-  color: #666;
+  color: #777;
 }
 
 .inv-horse-row {
@@ -55,12 +55,12 @@
 }
 
 .inv-horse-chip {
-  background: rgba(0, 212, 170, 0.1);
-  border: 1px solid rgba(0, 212, 170, 0.2);
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.25);
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
-  color: #00d4aa;
+  color: #d4af37;
   font-weight: 600;
 }
 
@@ -78,7 +78,7 @@
 
 .inv-meta-item span {
   font-size: 10px;
-  color: #555;
+  color: #777;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -111,8 +111,8 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  background: rgba(0, 212, 170, 0.08);
-  border: 1px solid rgba(0, 212, 170, 0.18);
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 12px;
   margin-bottom: 16px;
 }
@@ -127,7 +127,7 @@
 
 .inv-horse-sub {
   font-size: 12px;
-  color: #666;
+  color: #777;
   margin-top: 2px;
 }
 

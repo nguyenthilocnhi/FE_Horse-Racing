@@ -173,10 +173,12 @@ export async function recalculateRankings(tournamentId) {
  * @param {string|number} tournamentId
  * @param {object} payload
  */
-export async function updateRankings(tournamentId, payload) {
-  const res = await apiClient.put(
-    `/tournaments/${tournamentId}/rankings/update`,
-    payload
-  )
+/**
+ * Lấy bảng xếp hạng Jockey của giải đấu.
+ * @param {string|number} tournamentId
+ */
+export async function getJockeyRankings(tournamentId) {
+  const res = await apiClient.get(`/tournaments/${tournamentId}/rankings/jockeys`)
   return res.data
 }
+

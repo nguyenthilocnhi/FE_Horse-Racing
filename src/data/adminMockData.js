@@ -103,9 +103,9 @@ export const tickets = [
 ]
 
 export const payments = [
-  { id: 'PAY-7001', transactionId: 'TXN-20260603-001', buyer: 'Nguyen Van A', amount: 300000, method: 'VNPay', status: 'completed', date: '2026-06-01 10:30' },
-  { id: 'PAY-7002', transactionId: 'TXN-20260602-045', buyer: 'Tran Thi B', amount: 100000, method: 'MoMo', status: 'completed', date: '2026-06-02 14:15' },
-  { id: 'PAY-7003', transactionId: 'TXN-20260603-012', buyer: 'Le Van C', amount: 100000, method: 'Bank Transfer', status: 'pending', date: '2026-06-03 09:00' },
+  { id: 'PAY-7001', transactionId: 'TXN-20260603-001', buyer: 'Nguyen Van A', amount: 300000, method: 'PayOS', status: 'completed', date: '2026-06-01 10:30' },
+  { id: 'PAY-7002', transactionId: 'TXN-20260602-045', buyer: 'Tran Thi B', amount: 100000, method: 'PayOS', status: 'completed', date: '2026-06-02 14:15' },
+  { id: 'PAY-7003', transactionId: 'TXN-20260603-012', buyer: 'Le Van C', amount: 100000, method: 'PayOS', status: 'pending', date: '2026-06-03 09:00' },
 ]
 
 export const notifications = [
@@ -187,4 +187,12 @@ export const mockUserPredictions = [
   { id: 'UPRED-703', user: 'Tran Thi B', race: 'Sprint Classic', horse: 'Aurelius', amount: 10000000, odds: 1.8, status: 'won', payout: 18000000 },
   { id: 'UPRED-704', user: 'Le Van C', race: 'Sprint Classic', horse: 'Midnight Star', amount: 3000000, odds: 4.2, status: 'lost', payout: 0 }
 ]
+
+export const mockRaceTracks = [
+  { id: 1, name: 'Trường đua Phú Thọ', location: 'Quận 11, TP. Hồ Chí Minh', surface: 'Cỏ (Turf)', length: 1600, capacity: 25000, status: 'active', description: 'Trường đua truyền thống hàng đầu với mặt sân cỏ tiêu chuẩn quốc tế.' },
+  { id: 2, name: 'Trường đua Đại Nam', location: 'TP. Thủ Dầu Một, Bình Dương', surface: 'Cát (Dirt)', length: 1500, capacity: 20000, status: 'active', description: 'Trường đua hiện đại phục vụ các giải đấu chuyên nghiệp.' },
+  { id: 3, name: 'Trường đua Hà Nội Turf Club', location: 'Sóc Sơn, Hà Nội', surface: 'Cỏ (Turf)', length: 1800, capacity: 18000, status: 'maintenance', description: 'Đang nâng cấp khán đài và hệ thống thoát nước mặt sân.' },
+  { id: 4, name: 'Trường đua Đà Nẵng Grand', location: 'Quận Liên Chiểu, Đà Nẵng', surface: 'Tổng hợp (Synthetic)', length: 1400, capacity: 15000, status: 'active', description: 'Trường đua ven biển với tầm nhìn tuyệt đẹp và đường đua hiện đại.' }
+]
+
 

@@ -82,22 +82,6 @@ export default function JockeyManagement() {
     return matchSearch && matchStatus
   })
 
-  // Handlers
-  const handleOpenAdd = () => {
-    setEditingJockey(null)
-    setFormData({
-      userName: '',
-      password: '',
-      fullName: '',
-      email: '',
-      phone: '',
-      birthDate: '',
-      licenseNumber: '',
-      experienceYears: '0',
-      status: 'active'
-    })
-    setModalOpen(true)
-  }
 
   const handleOpenEdit = (j) => {
     setEditingJockey(j)
@@ -133,6 +117,7 @@ export default function JockeyManagement() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    if (!editingJockey) return
     if (!formData.userName || !formData.fullName || !formData.licenseNumber) {
       alert('Vui lòng điền đầy đủ các thông tin bắt buộc!')
       return
@@ -154,13 +139,8 @@ export default function JockeyManagement() {
     }
 
     try {
-      if (editingJockey) {
-        await updateAdminJockey(editingJockey.id, payload)
-        alert('Cập nhật Jockey thành công!')
-      } else {
-        await createAdminJockey(payload)
-        alert('Thêm Jockey thành công!')
-      }
+      await updateAdminJockey(editingJockey.id, payload)
+      alert('Cập nhật Jockey thành công!')
       setModalOpen(false)
       fetchJockeys()
     } catch (err) {
@@ -176,13 +156,6 @@ export default function JockeyManagement() {
           <h1 className="admin-page-title">Quản lý Jockey (Nài ngựa)</h1>
           <p className="admin-page-sub">Danh sách nài ngựa đua chuyên nghiệp, kinh nghiệm và thống kê phong độ</p>
         </div>
-        <button 
-          type="button" 
-          className="admin-btn admin-btn--gold"
-          onClick={handleOpenAdd}
-        >
-          + Add New Jockey
-        </button>
       </div>
 
       <div className="admin-filter-bar">
@@ -360,7 +333,7 @@ export default function JockeyManagement() {
             }}
           >
             <div className="admin-card-head">
-              <h3>{editingJockey ? `Sửa Jockey: ${editingJockey.name}` : 'Thêm Jockey mới'}</h3>
+              <h3>Sửa Jockey: {editingJockey?.name}</h3>
               <button
                 type="button"
                 className="admin-btn admin-btn--ghost admin-btn--sm"
@@ -383,12 +356,11 @@ export default function JockeyManagement() {
                   />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Mật khẩu {!editingJockey && '(Bắt buộc)'}</label>
+                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Mật khẩu</label>
                   <input
-                    required={!editingJockey}
                     type="text"
                     className="admin-input"
-                    placeholder={editingJockey ? "Bỏ trống nếu không đổi..." : "Nhập mật khẩu..."}
+                    placeholder="Bỏ trống nếu không đổi..."
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   />
@@ -491,7 +463,7 @@ export default function JockeyManagement() {
                   type="submit"
                   className="admin-btn admin-btn--gold"
                 >
-                  {editingJockey ? 'Cập nhật' : 'Thêm mới'}
+                  Cập nhật
                 </button>
               </div>
             </form>

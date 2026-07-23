@@ -121,7 +121,7 @@ export default function Register() {
             phone:     phone,
             joined:    new Date().toISOString(),
             balance:   0,
-            momoLinked: false,
+            payosLinked: false,
           }
           localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
           setSuccess(true)
@@ -178,7 +178,7 @@ export default function Register() {
           phone:     phone,
           joined:    new Date().toISOString(),
           balance:   0,
-          momoLinked: false,
+          payosLinked: false,
         }
         localStorage.setItem('pending_profile', JSON.stringify(profileSnapshot))
         setSuccess(true)

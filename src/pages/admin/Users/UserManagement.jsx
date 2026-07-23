@@ -19,9 +19,6 @@ export default function UserManagement() {
   // Sorting State
   const [sortOption, setSortOption] = useState('NEWEST')
 
-  // Create User modal
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'APPROVED' })
 
   // Edit User modal
   const [showEditForm, setShowEditForm] = useState(false)
@@ -184,51 +181,6 @@ export default function UserManagement() {
     }
   }
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault()
-    if (!newUser.name || !newUser.email || !newUser.dob) return
-
-    // Age validation (must be at least 18 years old)
-    const birthDate = new Date(newUser.dob)
-    if (isNaN(birthDate.getTime())) {
-      alert('Ngày sinh không hợp lệ.')
-      return
-    }
-    const today = new Date('2026-06-14') // Use current date in 2026 as per metadata
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const m = today.getMonth() - birthDate.getMonth()
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--
-    }
-
-    if (age < 18) {
-      alert(`Không thể đăng ký tài khoản: Người dùng chưa đủ 18 tuổi (Hiện tại ${age} tuổi).`)
-      return
-    }
-
-    try {
-      const payload = {
-        fullName: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        birthDate: newUser.dob,
-        role: newUser.role,
-        status: newUser.status,
-      }
-      const created = await adminAccountService.createAccount(payload)
-      const nextUser = created || {
-        id: Date.now(),
-        ...payload,
-        joined: new Date().toISOString().split('T')[0]
-      }
-      setUsers([nextUser, ...users])
-      setShowAddForm(false)
-      setNewUser({ name: '', email: '', phone: '', dob: '', role: 'SPECTATOR', status: 'active' })
-      alert("Tạo tài khoản thành công!")
-    } catch (err) {
-      alert("Tạo tài khoản thất bại: " + (err.response?.data?.message || err.message))
-    }
-  }
 
   return (
     <div className="user-mgmt-page">
@@ -237,13 +189,6 @@ export default function UserManagement() {
           <h1 className="admin-page-title">Quản lý Tài khoản</h1>
           <p className="admin-page-sub">Quản lý danh sách tài khoản người dùng, khóa và đổi vai trò trực tuyến</p>
         </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn--gold"
-          onClick={() => setShowAddForm(true)}
-        >
-          + Tạo tài khoản
-        </button>
       </div>
 
       <div className="admin-filter-bar" style={{ marginTop: '16px' }}>
@@ -447,94 +392,7 @@ export default function UserManagement() {
         )}
       </div>
 
-      {/* Create User Modal */}
-      {showAddForm && (
-        <div className="modal-overlay" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.75)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 1000
-        }}>
-          <div className="admin-card" style={{ width: '100%', maxWidth: '480px', border: '1px solid rgba(212,175,55,0.15)' }}>
-            <div className="admin-card-head">
-              <h3>Tạo tài khoản người dùng</h3>
-              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setShowAddForm(false)}>✕</button>
-            </div>
-            <form onSubmit={handleCreateUser} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Họ và tên</label>
-                <input
-                  required
-                  className="admin-input"
-                  placeholder="Nhập tên..."
-                  value={newUser.name}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Email</label>
-                <input
-                  required
-                  type="email"
-                  className="admin-input"
-                  placeholder="Nhập email..."
-                  value={newUser.email}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số điện thoại</label>
-                <input
-                  type="tel"
-                  className="admin-input"
-                  placeholder="Nhập số điện thoại..."
-                  value={newUser.phone}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, phone: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Ngày sinh</label>
-                <input
-                  required
-                  type="date"
-                  className="admin-input"
-                  value={newUser.dob}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, dob: e.target.value }))}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Hệ Role</label>
-                <select
-                  className="admin-select"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value }))}
-                  style={{ width: '100%' }}
-                >
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="HORSE_OWNER">HORSE OWNER</option>
-                  <option value="JOCKEY">JOCKEY</option>
-                  <option value="RACE_REFEREE">REFEREE</option>
-                  <option value="SPECTATOR">SPECTATOR</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
-                <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setShowAddForm(false)}>Hủy</button>
-                <button type="submit" className="admin-btn admin-btn--gold">Tạo</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
       {/* Edit User Modal */}
       {showEditForm && editingUser && (
         <div className="modal-overlay" style={{

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { tournaments as initialTournaments } from '../../../data/adminMockData'
+import { tournaments as initialTournaments, mockRaceTracks } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
-import { getAllTournaments, createTournament, updateTournament, cancelTournament, updateTournamentRegistration } from '../../../services/tournamentService'
+import { getAllTournaments, getTournamentSchedule, createTournament, updateTournament, cancelTournament, updateTournamentRegistration } from '../../../services/tournamentService'
+import { getAllRaceTracks } from '../../../services/adminService'
 import './TournamentManagement.css'
 
 export default function TournamentManagement() {
   const [tournaments, setTournaments] = useState(initialTournaments)
+  const [raceTracks, setRaceTracks] = useState([])
   const [loading, setLoading] = useState(true)
   const { searchQuery = '' } = useOutletContext() || {}
 
@@ -17,7 +19,23 @@ export default function TournamentManagement() {
 
   useEffect(() => {
     fetchTournaments()
+    fetchRaceTracks()
   }, [])
+
+  const fetchRaceTracks = async () => {
+    try {
+      const res = await getAllRaceTracks()
+      const data = res?.data || res
+      if (Array.isArray(data) && data.length > 0) {
+        setRaceTracks(data)
+      } else {
+        setRaceTracks(mockRaceTracks)
+      }
+    } catch (err) {
+      console.warn('Failed to load race tracks from API, using mock data:', err)
+      setRaceTracks(mockRaceTracks)
+    }
+  }
 
   const mapBackendStatusToFrontend = (backendStatus) => {
     if (!backendStatus) return 'upcoming'
@@ -32,18 +50,43 @@ export default function TournamentManagement() {
     try {
       setLoading(true)
       const data = await getAllTournaments()
-      if (data && data.length > 0) {
-        // Map backend data to frontend format
-        const formatted = data.map(t => ({
-          id: t.id,
-          name: t.name,
-          venue: t.location,
-          startDate: t.startDate,
-          endDate: t.endDate,
-          races: t.racesCount || 0,
-          prize: 'Chưa cập nhật',
-          status: mapBackendStatusToFrontend(t.status)
-        }))
+      const tourList = data?.data || data || []
+
+      if (Array.isArray(tourList) && tourList.length > 0) {
+        // Fetch actual schedule count for each tournament
+        const formatted = await Promise.all(
+          tourList.map(async (t) => {
+            let raceCount = 0
+            if (Array.isArray(t.schedules)) {
+              raceCount = t.schedules.length
+            } else if (Array.isArray(t.races)) {
+              raceCount = t.races.length
+            } else if (t.racesCount !== undefined && t.racesCount !== null && t.racesCount > 0) {
+              raceCount = Number(t.racesCount)
+            } else {
+              try {
+                const scheduleRes = await getTournamentSchedule(t.id)
+                const schedules = scheduleRes?.data || scheduleRes || []
+                if (Array.isArray(schedules)) {
+                  raceCount = schedules.length
+                }
+              } catch (_) {
+                raceCount = 0
+              }
+            }
+
+            return {
+              id: t.id,
+              name: t.name,
+              venue: t.location || t.venue,
+              startDate: t.startDate,
+              endDate: t.endDate,
+              races: raceCount,
+              prize: 'Chưa cập nhật',
+              status: mapBackendStatusToFrontend(t.status)
+            }
+          })
+        )
         setTournaments(formatted)
       } else {
         // Fallback to mock data if empty
@@ -332,15 +375,24 @@ export default function TournamentManagement() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Địa điểm tổ chức</label>
-                <input
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Địa điểm tổ chức (Trường đua)</label>
+                <select
                   required
-                  className="admin-input"
-                  placeholder="Địa điểm..."
+                  className="admin-select"
                   value={formData.venue}
                   onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
-                  style={{ width: '100%' }}
-                />
+                  style={{ width: '100%', padding: '10px 14px' }}
+                >
+                  <option value="">-- Chọn trường đua --</option>
+                  {raceTracks.map((track) => (
+                    <option key={track.id} value={track.name}>
+                      {track.name} {track.location ? `(${track.location})` : ''}
+                    </option>
+                  ))}
+                  {formData.venue && !raceTracks.some(t => t.name === formData.venue) && (
+                    <option value={formData.venue}>{formData.venue}</option>
+                  )}
+                </select>
               </div>
 
 
@@ -512,14 +564,24 @@ export default function TournamentManagement() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Địa điểm tổ chức</label>
-                <input
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Địa điểm tổ chức (Trường đua)</label>
+                <select
                   required
-                  className="admin-input"
+                  className="admin-select"
                   value={formData.venue}
                   onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
                   style={{ width: '100%', fontSize: '13px', padding: '6px 10px' }}
-                />
+                >
+                  <option value="">-- Chọn trường đua --</option>
+                  {raceTracks.map((track) => (
+                    <option key={track.id} value={track.name}>
+                      {track.name} {track.location ? `(${track.location})` : ''}
+                    </option>
+                  ))}
+                  {formData.venue && !raceTracks.some(t => t.name === formData.venue) && (
+                    <option value={formData.venue}>{formData.venue}</option>
+                  )}
+                </select>
               </div>
 
 

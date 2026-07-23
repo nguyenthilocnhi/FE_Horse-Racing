@@ -36,17 +36,17 @@ export default function PersonalResults() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             type="button"
-            className={`jockey-btn jockey-btn--sm ${view === 'table' ? 'jockey-btn--teal' : 'jockey-btn--ghost'}`}
+            className={`jockey-btn jockey-btn--sm ${view === 'table' ? 'jockey-btn--gold' : 'jockey-btn--ghost'}`}
             onClick={() => setView('table')}
           >
-            ☰ Danh sách
+            📋 Chi tiết
           </button>
           <button
             type="button"
-            className={`jockey-btn jockey-btn--sm ${view === 'chart' ? 'jockey-btn--teal' : 'jockey-btn--ghost'}`}
+            className={`jockey-btn jockey-btn--sm ${view === 'chart' ? 'jockey-btn--gold' : 'jockey-btn--ghost'}`}
             onClick={() => setView('chart')}
           >
-            ▤ Biểu đồ
+            📊 Biểu đồ
           </button>
         </div>
       </div>
@@ -138,7 +138,7 @@ export default function PersonalResults() {
                         <td>{m.races}</td>
                         <td style={{ color: '#4ade80', fontWeight: 600 }}>{m.wins}</td>
                         <td style={{ color: '#d4af37' }}>{m.top3}</td>
-                        <td style={{ color: '#00d4aa', fontWeight: 600 }}>{m.points}</td>
+                        <td style={{ color: '#d4af37', fontWeight: 600 }}>{m.points}</td>
                         <td>
                           <div className="res-winrate-bar-wrap">
                             <div className="res-winrate-bar">
@@ -151,7 +151,7 @@ export default function PersonalResults() {
                           </div>
                         </td>
                         <td>
-                          <span className={`jockey-badge ${pct >= 40 ? 'jockey-badge--green' : pct >= 25 ? 'jockey-badge--teal' : 'jockey-badge--gray'}`}>
+                          <span className={`jockey-badge ${pct >= 40 ? 'jockey-badge--green' : pct >= 25 ? 'jockey-badge--gold' : 'jockey-badge--gray'}`}>
                             {pct >= 40 ? 'Xuất sắc' : pct >= 25 ? 'Tốt' : 'Trung bình'}
                           </span>
                         </td>
@@ -191,7 +191,7 @@ export default function PersonalResults() {
                     <td><PositionMedal pos={r.position} /></td>
                     <td style={{ color: '#fff', fontWeight: 600 }}>{r.race}</td>
                     <td>
-                      <span style={{ color: '#00d4aa' }}>🐴 {r.horse}</span>
+                      <span style={{ color: '#d4af37' }}>🐴 {r.horse}</span>
                     </td>
                     <td style={{ fontFamily: 'monospace', color: '#ccc' }}>{r.time}</td>
                     <td>

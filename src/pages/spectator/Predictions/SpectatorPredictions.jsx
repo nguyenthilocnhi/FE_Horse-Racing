@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { mockPredictions as initialPools, mockUserPredictions as initialUserPreds } from '../../../data/adminMockData'
 import { StatusBadge, formatCurrency } from '../../../utils/adminHelpers'
+import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
+import { createPrediction } from '../../../services/predictionService'
 import './SpectatorPredictions.css'
 
 const MOCK_HORSES_DETAILS = [
@@ -54,7 +56,7 @@ export default function SpectatorPredictions() {
       phone: '0987 654 321',
       balance: 5500000,
       joined: '2025-02-14',
-      momoLinked: true
+      payosLinked: true
     }
     return INITIAL_PROFILE
   })
@@ -71,6 +73,46 @@ export default function SpectatorPredictions() {
     }
     return initialUserPreds
   })
+
+  // Tải danh sách cuộc đua của các giải đấu MỞ ĐĂNG KÝ từ API
+  useEffect(() => {
+    async function loadOpenRegistrationPools() {
+      try {
+        const res = await getAllTournaments()
+        const allTournaments = Array.isArray(res) ? res : (res?.data || [])
+        // Chỉ lấy các giải đấu được Admin mở cổng đăng ký
+        const openTournaments = allTournaments.filter(t => Boolean(t.registrationOpen) === true)
+
+        if (openTournaments.length > 0) {
+          const apiPools = []
+          for (const tour of openTournaments) {
+            try {
+              const schedRes = await getTournamentSchedule(tour.id)
+              const schedules = Array.isArray(schedRes) ? schedRes : (schedRes?.data || [])
+              schedules.forEach(s => {
+                apiPools.push({
+                  id: s.id,
+                  tournamentId: tour.id,
+                  raceName: `${s.name || 'Vòng đua'} - ${tour.name}`,
+                  totalPool: 5000000,
+                  participants: 8,
+                  status: 'open',
+                  endDate: tour.endDate || '2026-12-31',
+                  runners: MOCK_RUNNERS
+                })
+              })
+            } catch (_) {}
+          }
+          if (apiPools.length > 0) {
+            setPools(apiPools)
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi kết nối API giải đấu mở đăng ký:', err?.message)
+      }
+    }
+    loadOpenRegistrationPools()
+  }, [])
 
   const handleSelectPool = (pool) => {
     setSelectedPool(pool)

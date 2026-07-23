@@ -1,31 +1,37 @@
 /**
  * predictionService.js
- * Dự đoán kết quả cuộc đua (Spectator).
- *
- * Endpoints (dự kiến backend mở rộng thêm):
- *   GET  /predictions?raceId=
- *   POST /predictions
- *   GET  /predictions/my
+ * Service quản lý Dự đoán kết quả cuộc đua (Prediction) kết nối Backend API.
+ * Endpoints Backend Spring Boot (PredictionController):
+ *   POST /api/predictions
+ *   GET  /api/predictions/spectators/{spectatorId}
+ *   POST /api/predictions/{predictionId}/cancel
  */
 import apiClient from './apiClient'
 
-/** Lấy danh sách tất cả dự đoán (admin) hoặc theo race */
-export async function getPredictions(params) {
-  const res = await apiClient.get('/predictions', { params })
-  return res.data
-}
-
 /**
  * Tạo dự đoán mới.
- * @param {{ raceId, horseId, amount, ticketType }} payload
+ * @param {{ spectatorId: number, raceId: number, horseId: number, stakeAmount: number }} payload
  */
 export async function createPrediction(payload) {
   const res = await apiClient.post('/predictions', payload)
-  return res.data
+  return res.data?.data || res.data
 }
 
-/** Lấy danh sách dự đoán của người dùng đang đăng nhập */
-export async function getMyPredictions() {
-  const res = await apiClient.get('/predictions/my')
-  return res.data
+/**
+ * Lấy lịch sử dự đoán của khán giả theo spectatorId.
+ * @param {number|string} spectatorId
+ */
+export async function getPredictionHistory(spectatorId) {
+  const res = await apiClient.get(`/predictions/spectators/${spectatorId}`)
+  return res.data?.data || res.data
+}
+
+/**
+ * Hủy dự đoán và hoàn cọc ví.
+ * @param {number|string} predictionId
+ * @param {number|string} spectatorId
+ */
+export async function cancelPrediction(predictionId, spectatorId) {
+  const res = await apiClient.post(`/predictions/${predictionId}/cancel`, { spectatorId: Number(spectatorId) })
+  return res.data?.data || res.data
 }

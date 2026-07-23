@@ -14,6 +14,7 @@ export default function SpectatorDashboard() {
   // Filters
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [selectedTournamentFilter, setSelectedTournamentFilter] = useState('ALL')
   const [sortOrder, setSortOrder] = useState('NEWEST')
 
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function SpectatorDashboard() {
       const formattedTournaments = fetchedTournaments.map(t => ({
         id: t.id,
         name: t.name,
-        venue: t.location,
+        venue: t.location || t.venue,
         startDate: t.startDate,
         endDate: t.endDate,
         races: t.racesCount || 0,
@@ -42,11 +43,16 @@ export default function SpectatorDashboard() {
 
       if (fetchedTournaments && fetchedTournaments.length > 0) {
         const allRaces = []
+        const tournamentRaceCounts = {}
+
         for (const t of fetchedTournaments) {
           try {
             const scheduleRes = await getTournamentSchedule(t.id)
-            const schedules = scheduleRes.data || []
-            const formattedSchedules = schedules.map(s => ({
+            const schedules = scheduleRes.data || scheduleRes || []
+            const scheduleArr = Array.isArray(schedules) ? schedules : []
+            tournamentRaceCounts[t.id] = scheduleArr.length
+
+            const formattedSchedules = scheduleArr.map(s => ({
               id: `R-${s.id}`,
               originalId: s.id,
               name: s.name,
@@ -64,6 +70,12 @@ export default function SpectatorDashboard() {
           }
         }
         setRaces(allRaces)
+
+        // Cập nhật lại racesCount số lượng cuộc đua thực tế cho giải đấu
+        setTournaments(prev => prev.map(t => ({
+          ...t,
+          races: tournamentRaceCounts[t.id] !== undefined ? tournamentRaceCounts[t.id] : t.races
+        })))
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -93,6 +105,7 @@ export default function SpectatorDashboard() {
       const q = localSearchQuery.toLowerCase()
       if (q && !race.name.toLowerCase().includes(q) && !race.tournament.toLowerCase().includes(q) && !race.id.toLowerCase().includes(q)) return false
       if (statusFilter !== 'ALL' && race.status !== statusFilter.toLowerCase()) return false
+      if (selectedTournamentFilter !== 'ALL' && String(race.tournamentId) !== String(selectedTournamentFilter)) return false
       return true
     })
     .sort((a, b) => {
@@ -110,34 +123,9 @@ export default function SpectatorDashboard() {
     <div className="spectator-dashboard">
       <div className="admin-page-head">
         <div>
-          <h1 className="admin-page-title">Giải Đấu & Lịch Đua</h1>
-          <p className="admin-page-sub">Theo dõi lịch trình các sự kiện, vòng đua trực tiếp và thông tin chi tiết</p>
+          <h1 className="admin-page-title">Danh Sách Giải Đấu</h1>
+          <p className="admin-page-sub">Theo dõi danh sách các sự kiện giải đấu đua ngựa</p>
         </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button 
-          className={`admin-btn ${activeTab === 'TOURNAMENTS' ? 'admin-btn--gold' : 'admin-btn--outline'}`}
-          onClick={() => {
-            setActiveTab('TOURNAMENTS')
-            setLocalSearchQuery('')
-            setStatusFilter('ALL')
-            setSortOrder('NEWEST')
-          }}
-        >
-          Giải Đấu
-        </button>
-        <button 
-          className={`admin-btn ${activeTab === 'RACES' ? 'admin-btn--gold' : 'admin-btn--outline'}`}
-          onClick={() => {
-            setActiveTab('RACES')
-            setLocalSearchQuery('')
-            setStatusFilter('ALL')
-            setSortOrder('NEWEST')
-          }}
-        >
-          Cuộc Đua
-        </button>
       </div>
 
       <div className="admin-filters" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -156,24 +144,9 @@ export default function SpectatorDashboard() {
           style={{ minWidth: '160px' }}
         >
           <option value="ALL">Tất cả Trạng thái</option>
-          {activeTab === 'TOURNAMENTS' ? (
-            <>
-              <option value="upcoming">Sắp diễn ra</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="cancelled">Đã hủy</option>
-            </>
-          ) : (
-            <>
-              <option value="scheduled">Đã lên lịch</option>
-              <option value="pending">Chờ xử lý</option>
-              <option value="delayed">Bị hoãn</option>
-              <option value="running">Đang chạy</option>
-              <option value="ongoing">Đang diễn ra</option>
-              <option value="completed">Đã hoàn thành</option>
-              <option value="cancelled">Đã hủy</option>
-            </>
-          )}
+          <option value="upcoming">Sắp diễn ra</option>
+          <option value="ongoing">Đang diễn ra</option>
+          <option value="completed">Đã hoàn thành</option>
         </select>
         <select 
           className="admin-select"
@@ -189,7 +162,7 @@ export default function SpectatorDashboard() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Đang tải dữ liệu...</div>
-      ) : activeTab === 'TOURNAMENTS' ? (
+      ) : (
         <div className="admin-card">
           <div className="admin-table-wrap">
             <table className="admin-table">
@@ -199,7 +172,6 @@ export default function SpectatorDashboard() {
                   <th>Tên giải đấu</th>
                   <th>Địa điểm</th>
                   <th>Thời gian</th>
-                  <th>Races</th>
                   <th>Giải thưởng</th>
                   <th>Trạng thái</th>
                 </tr>
@@ -217,14 +189,13 @@ export default function SpectatorDashboard() {
                       <td><strong className="tournament-name" style={{ color: '#fff' }}>{t.name}</strong></td>
                       <td>{t.venue}</td>
                       <td>{t.startDate} → {t.endDate}</td>
-                      <td>{t.races} races</td>
                       <td>{t.prize}</td>
                       <td><StatusBadge status={t.status} /></td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
                       Không có giải đấu nào phù hợp.
                     </td>
                   </tr>
@@ -232,34 +203,6 @@ export default function SpectatorDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        <div className="race-cards-grid">
-          {filteredRaces.length > 0 ? (
-            filteredRaces.map((race) => (
-              <div 
-                key={race.id} 
-                className="admin-card race-card-item" 
-                onClick={() => setSelectedRace(race)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="race-card-top">
-                  <span className="race-card-id">{race.id}</span>
-                  <StatusBadge status={race.status} />
-                </div>
-                <h3>{race.name}</h3>
-                <p className="race-card-tournament">{race.tournament}</p>
-                <div className="race-card-meta">
-                  <span>📅 {race.date} · ⏰ {race.time}</span>
-                  <span>📏 Cự ly: {race.distance}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: '#666', gridColumn: '1 / -1' }}>
-              Không có cuộc đua nào phù hợp.
-            </div>
-          )}
         </div>
       )}
 

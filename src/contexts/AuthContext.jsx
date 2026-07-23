@@ -36,7 +36,7 @@ function LogoutModal({ onConfirm, onCancel }) {
           Bạn có chắc chắn muốn đăng xuất khỏi hệ thống Đua Ngựa?
         </p>
         <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-          <button 
+          <button
             type="button"
             onClick={onCancel}
             style={{
@@ -52,7 +52,7 @@ function LogoutModal({ onConfirm, onCancel }) {
           >
             Hủy
           </button>
-          <button 
+          <button
             type="button"
             onClick={onConfirm}
             style={{
@@ -119,21 +119,23 @@ export function AuthProvider({ children }) {
   }, [user])
 
   async function login(credentials) {
-    const data = await authService.login(credentials)
-    // Gộp tất cả thông tin từ data.user và response gốc để không bỏ sót field
-    const raw = data.user ? { ...data, ...data.user } : data
-    const userObj = raw.role ? {
-      id:        raw.id        ?? raw.userId      ?? null,
-      username:  raw.userName  ?? raw.username    ?? '',
-      name:      raw.fullName  ?? raw.name        ?? '',
-      email:     raw.email     ?? '',
-      phone:     raw.phone     ?? raw.phoneNumber ?? '',
-      role:      raw.role,
-      createdAt: raw.createdAt ?? raw.joinedAt    ?? raw.joined ?? null,
+    const res = await authService.login(credentials)
+    const payload = res?.data || res
+    const tokenVal = payload?.token || payload?.accessToken || res?.token
+    const rawUser = payload?.user ? { ...payload, ...payload.user } : payload
+    const userObj = rawUser && (rawUser.role || rawUser.id || rawUser.email) ? {
+      id: rawUser.id ?? rawUser.userId ?? rawUser.spectatorId ?? null,
+      username: rawUser.userName ?? rawUser.username ?? '',
+      name: rawUser.fullName ?? rawUser.name ?? rawUser.spectatorName ?? '',
+      email: rawUser.email ?? '',
+      phone: rawUser.phone ?? rawUser.phoneNumber ?? '',
+      role: rawUser.role ?? 'SPECTATOR',
+      createdAt: rawUser.createdAt ?? rawUser.joinedAt ?? rawUser.joined ?? null,
     } : null
-    setToken(data.token)
-    setUser(userObj)
-    return { ...data, user: userObj }
+
+    if (tokenVal) setToken(tokenVal)
+    if (userObj) setUser(userObj)
+    return { ...res, token: tokenVal, user: userObj }
   }
 
   function logout() {
@@ -160,9 +162,9 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{ token, user, login, logout }}>
       {children}
       {showLogoutModal && (
-        <LogoutModal 
-          onConfirm={handleConfirmLogout} 
-          onCancel={handleCancelLogout} 
+        <LogoutModal
+          onConfirm={handleConfirmLogout}
+          onCancel={handleCancelLogout}
         />
       )}
     </AuthContext.Provider>

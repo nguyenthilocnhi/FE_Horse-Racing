@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
-   Jockey Common UI Primitives
-   Accent color: #00d4aa  (teal-emerald)
-═══════════════════════════════════════════════════════════════ */
+   Jockey Common UI Primitives — Gold Luxury Theme
+   Accent color: #d4af37 (Gold)
+ ═══════════════════════════════════════════════════════════════ */
 
 /* page header */
 .jockey-page-title {
@@ -14,7 +14,7 @@
 
 .jockey-page-sub {
   margin: 0 0 24px;
-  color: #6b7280;
+  color: #777;
   font-size: 14px;
 }
 
@@ -46,21 +46,23 @@
   font-family: inherit;
 }
 
+.jockey-btn--gold,
 .jockey-btn--teal {
-  background: linear-gradient(180deg, #00e6b8, #00d4aa);
-  color: #0b0f0e;
-  border-color: #00d4aa;
+  background: linear-gradient(180deg, #e6c564, #d4af37);
+  color: #0d0d0d;
+  border-color: #d4af37;
 }
 
-.jockey-btn--teal:hover { box-shadow: 0 0 20px rgba(0, 212, 170, 0.35); }
+.jockey-btn--gold:hover,
+.jockey-btn--teal:hover { box-shadow: 0 0 20px rgba(212, 175, 55, 0.35); }
 
 .jockey-btn--outline {
   background: transparent;
-  color: #00d4aa;
-  border-color: rgba(0, 212, 170, 0.4);
+  color: #d4af37;
+  border-color: rgba(212, 175, 55, 0.4);
 }
 
-.jockey-btn--outline:hover { background: rgba(0, 212, 170, 0.08); }
+.jockey-btn--outline:hover { background: rgba(212, 175, 55, 0.1); }
 
 .jockey-btn--ghost {
   background: rgba(255, 255, 255, 0.04);
@@ -97,7 +99,7 @@
 }
 
 .jockey-stat-card {
-  background: rgba(14, 20, 18, 0.85);
+  background: rgba(18, 18, 20, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
   padding: 20px;
@@ -112,12 +114,12 @@
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, #00d4aa, transparent);
+  background: linear-gradient(90deg, #d4af37, transparent);
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.jockey-stat-card:hover { border-color: rgba(0, 212, 170, 0.22); transform: translateY(-2px); }
+.jockey-stat-card:hover { border-color: rgba(212, 175, 55, 0.25); transform: translateY(-2px); }
 .jockey-stat-card:hover::before { opacity: 1; }
 
 .jockey-stat-card span {
@@ -125,14 +127,14 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #555;
+  color: #777;
   margin-bottom: 8px;
 }
 
 .jockey-stat-card strong {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #00d4aa;
+  color: #d4af37;
   line-height: 1;
 }
 
@@ -140,13 +142,13 @@
   display: block;
   margin-top: 6px;
   font-size: 11px;
-  color: #444;
+  color: #555;
   font-style: normal;
 }
 
 /* card */
 .jockey-card {
-  background: rgba(14, 20, 18, 0.82);
+  background: rgba(18, 18, 20, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 18px;
   overflow: hidden;
@@ -195,15 +197,15 @@
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.jockey-input::placeholder { color: #444; }
+.jockey-input::placeholder { color: #555; }
 
 .jockey-input:focus,
 .jockey-select:focus {
-  border-color: rgba(0, 212, 170, 0.4);
-  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.08);
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
 }
 
-.jockey-select option { background: #141a18; }
+.jockey-select option { background: #141416; }
 
 /* table */
 .jockey-table-wrap { overflow-x: auto; }
@@ -221,7 +223,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #555;
+  color: #777;
   background: rgba(255, 255, 255, 0.018);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -232,7 +234,7 @@
   color: #ccc;
 }
 
-.jockey-table tr:hover td { background: rgba(0, 212, 170, 0.03); }
+.jockey-table tr:hover td { background: rgba(212, 175, 55, 0.03); }
 
 .jockey-table-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -247,12 +249,12 @@
   text-transform: uppercase;
 }
 
-.jockey-badge--teal { background: rgba(0, 212, 170, 0.12); color: #00d4aa; border: 1px solid rgba(0, 212, 170, 0.3); }
+.jockey-badge--gold,
+.jockey-badge--teal { background: rgba(212, 175, 55, 0.12); color: #d4af37; border: 1px solid rgba(212, 175, 55, 0.3); }
 .jockey-badge--green { background: rgba(74, 222, 128, 0.1); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.25); }
 .jockey-badge--red { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
 .jockey-badge--blue { background: rgba(96, 165, 250, 0.1); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.25); }
 .jockey-badge--gray { background: rgba(255, 255, 255, 0.06); color: #888; border: 1px solid rgba(255, 255, 255, 0.1); }
-.jockey-badge--gold { background: rgba(212, 175, 55, 0.12); color: #d4af37; border: 1px solid rgba(212, 175, 55, 0.3); }
 .jockey-badge--purple { background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.25); }
 .jockey-badge--orange { background: rgba(251, 146, 60, 0.1); color: #fb923c; border: 1px solid rgba(251, 146, 60, 0.25); }
 
@@ -269,7 +271,7 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #555;
+  color: #777;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -278,14 +280,14 @@
   font-family: inherit;
 }
 
-.jockey-tab:hover { color: #aaa; }
-.jockey-tab.is-active { color: #00d4aa; border-bottom-color: #00d4aa; }
+.jockey-tab:hover { color: #ccc; }
+.jockey-tab.is-active { color: #d4af37; border-bottom-color: #d4af37; }
 
 /* modal overlay */
 .jockey-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(6px);
   z-index: 200;
   display: flex;
@@ -298,8 +300,8 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .jockey-modal {
-  background: #141a18;
-  border: 1px solid rgba(0, 212, 170, 0.2);
+  background: #141416;
+  border: 1px solid rgba(212, 175, 55, 0.2);
   border-radius: 20px;
   width: 100%;
   max-width: 560px;
@@ -357,7 +359,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #555;
+  color: #777;
 }
 
 /* detail row in modal */
@@ -371,7 +373,7 @@
 }
 
 .jockey-detail-row:last-child { border-bottom: none; }
-.jockey-detail-label { color: #666; }
+.jockey-detail-label { color: #777; }
 .jockey-detail-value { color: #e5e5e5; font-weight: 500; text-align: right; }
 
 /* position medal */
@@ -403,7 +405,7 @@
   justify-content: center;
   gap: 12px;
   padding: 60px 20px;
-  color: #444;
+  color: #666;
   text-align: center;
 }
 
@@ -412,8 +414,8 @@
 
 /* highlight me row in ranking */
 .jockey-table tr.is-me td {
-  background: rgba(0, 212, 170, 0.07) !important;
-  color: #00d4aa;
+  background: rgba(212, 175, 55, 0.08) !important;
+  color: #d4af37;
   font-weight: 600;
 }
 

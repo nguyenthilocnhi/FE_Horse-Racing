@@ -7,6 +7,14 @@ function getLoginErrorMessage(error) {
     return 'Không thể kết nối máy chủ backend. Vui lòng kiểm tra lại kết nối mạng hoặc máy chủ.'
   }
 
+  if (error.response.status === 400) {
+    const data = error.response.data
+    if (data?.message) return data.message
+    if (data?.error) return data.error
+    if (typeof data === 'string') return data
+    return 'Thông tin đăng nhập không hợp lệ (400 Bad Request). Vui lòng kiểm tra lại Email và Mật khẩu.'
+  }
+
   if (error.response.status >= 500) {
     return 'Máy chủ backend đang gặp sự cố (500). Vui lòng thử lại sau.'
   }

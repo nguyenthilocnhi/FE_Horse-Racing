@@ -1,17 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════
-   Jockey Layout — Luxury dark theme (mirrors admin-layout.css)
-   Primary accent: #00d4aa (teal-emerald for jockey identity)
-═══════════════════════════════════════════════════════════════ */
+   Jockey Layout — Luxury dark gold theme (matches Admin/Owner/Referee)
+   Primary accent: #d4af37 (Gold identity)
+ ═══════════════════════════════════════════════════════════════ */
 
 /* ---------- shell ---------- */
 .jockey-shell {
   display: flex;
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(0, 212, 170, 0.07), transparent 55%),
-    radial-gradient(900px 600px at 95% 0%, rgba(96, 165, 250, 0.05), transparent 55%),
-    radial-gradient(1000px 700px at 40% 110%, rgba(168, 85, 247, 0.05), transparent 60%),
-    linear-gradient(180deg, #0b0f0e 0%, #080c0b 100%);
+    radial-gradient(1200px 600px at 20% -10%, rgba(212, 175, 55, 0.08), transparent 55%),
+    radial-gradient(900px 600px at 95% 0%, rgba(96, 165, 250, 0.06), transparent 55%),
+    radial-gradient(1000px 700px at 40% 110%, rgba(168, 85, 247, 0.06), transparent 60%),
+    linear-gradient(180deg, #0d0d0d 0%, #0b0b0b 100%);
   color: #e5e5e5;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
@@ -20,8 +20,8 @@
 .jockey-sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: linear-gradient(180deg, #0e1412 0%, #0c1210 100%);
-  border-right: 1px solid rgba(0, 212, 170, 0.1);
+  background: linear-gradient(180deg, #121212 0%, #101010 100%);
+  border-right: 1px solid rgba(212, 175, 55, 0.1);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -37,7 +37,7 @@
   align-items: center;
   gap: 12px;
   text-decoration: none;
-  color: #00d4aa;
+  color: #d4af37;
 }
 
 .jockey-sidebar-brand span:first-child { font-size: 26px; }
@@ -52,7 +52,7 @@
   display: block;
   font-size: 9px;
   letter-spacing: 0.2em;
-  color: #555;
+  color: #666;
   margin-top: 2px;
 }
 
@@ -78,20 +78,20 @@
 }
 
 .jockey-nav-link:hover {
-  color: #00d4aa;
-  background: rgba(0, 212, 170, 0.06);
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.06);
 }
 
 .jockey-nav-link.is-active {
-  color: #00d4aa;
-  background: rgba(0, 212, 170, 0.1);
-  border-color: rgba(0, 212, 170, 0.2);
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.2);
 }
 
 .jockey-nav-badge {
   margin-left: auto;
-  background: #00d4aa;
-  color: #0b0f0e;
+  background: #d4af37;
+  color: #0d0d0d;
   font-size: 9px;
   font-weight: 700;
   padding: 2px 7px;
@@ -103,7 +103,7 @@
   width: 20px;
   text-align: center;
   font-size: 12px;
-  color: #00d4aa;
+  color: #d4af37;
   opacity: 0.8;
 }
 
@@ -134,9 +134,9 @@
   justify-content: space-between;
   gap: 20px;
   padding: 16px 32px;
-  background: rgba(11, 15, 14, 0.88);
+  background: rgba(13, 13, 13, 0.88);
   backdrop-filter: blur(18px);
-  border-bottom: 1px solid rgba(0, 212, 170, 0.08);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.08);
 }
 
 .jockey-search {
@@ -153,11 +153,11 @@
 }
 
 .jockey-search:focus-within {
-  border-color: rgba(0, 212, 170, 0.35);
-  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.08);
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.08);
 }
 
-.jockey-search-icon { color: rgba(0, 212, 170, 0.7); font-size: 14px; }
+.jockey-search-icon { color: rgba(212, 175, 55, 0.7); font-size: 14px; }
 
 .jockey-search-input {
   width: 100%;
@@ -180,8 +180,8 @@
 }
 
 .jockey-breadcrumb a { color: #777; text-decoration: none; transition: color 0.2s; }
-.jockey-breadcrumb a:hover { color: #00d4aa; }
-.jockey-breadcrumb span:last-child { color: #00d4aa; }
+.jockey-breadcrumb a:hover { color: #d4af37; }
+.jockey-breadcrumb span:last-child { color: #d4af37; }
 .jockey-breadcrumb-sep { color: #333; font-size: 10px; }
 
 .jockey-header-actions {
@@ -206,15 +206,15 @@
   font-size: 16px;
 }
 
-.jockey-icon-btn:hover { border-color: rgba(0, 212, 170, 0.3); color: #00d4aa; }
+.jockey-icon-btn:hover { border-color: rgba(212, 175, 55, 0.3); color: #d4af37; }
 
 .jockey-notif-badge {
   position: absolute;
   top: 7px; right: 7px;
   width: 8px; height: 8px;
-  background: #00d4aa;
+  background: #d4af37;
   border-radius: 50%;
-  border: 2px solid #0b0f0e;
+  border: 2px solid #0d0d0d;
 }
 
 .jockey-dropdown { position: relative; }
@@ -224,8 +224,8 @@
   top: calc(100% + 8px);
   right: 0;
   min-width: 280px;
-  background: #141a18;
-  border: 1px solid rgba(0, 212, 170, 0.15);
+  background: #141416;
+  border: 1px solid rgba(212, 175, 55, 0.15);
   border-radius: 14px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   overflow: hidden;
@@ -241,7 +241,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #00d4aa;
+  color: #d4af37;
 }
 
 .jockey-dropdown-item {
@@ -258,7 +258,7 @@
   transition: background 0.15s;
 }
 
-.jockey-dropdown-item:hover { background: rgba(0, 212, 170, 0.07); color: #fff; }
+.jockey-dropdown-item:hover { background: rgba(212, 175, 55, 0.07); color: #fff; }
 
 .jockey-notif-item {
   padding: 12px 16px;
@@ -272,13 +272,13 @@
 .jockey-notif-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: #00d4aa;
+  background: #d4af37;
   margin-top: 5px;
   flex-shrink: 0;
 }
 
 .jockey-notif-item strong { display: block; color: #fff; margin-bottom: 3px; font-weight: 500; }
-.jockey-notif-item span { color: #555; font-size: 11px; }
+.jockey-notif-item span { color: #666; font-size: 11px; }
 
 .jockey-user-btn {
   display: flex;
@@ -293,23 +293,23 @@
   transition: all 0.2s;
 }
 
-.jockey-user-btn:hover { border-color: rgba(0, 212, 170, 0.3); }
+.jockey-user-btn:hover { border-color: rgba(212, 175, 55, 0.3); }
 
 .jockey-user-avatar {
   width: 32px; height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #00d4aa, #007a62);
+  background: linear-gradient(135deg, #e6c564, #d4af37);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: 700;
-  color: #0b0f0e;
+  color: #0d0d0d;
 }
 
 .jockey-user-info { text-align: left; }
 .jockey-user-info strong { display: block; font-size: 12px; font-weight: 600; }
-.jockey-user-info span { font-size: 10px; color: #555; letter-spacing: 0.06em; }
+.jockey-user-info span { font-size: 10px; color: #666; letter-spacing: 0.06em; }
 
 /* ---------- content ---------- */
 .jockey-content {

@@ -29,6 +29,7 @@ export default function RaceManagement() {
   
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [tournamentFilter, setTournamentFilter] = useState('all')
   const [sortOrder, setSortOrder] = useState('newest')
 
   const { searchQuery = '' } = useOutletContext() || {}
@@ -90,7 +91,11 @@ export default function RaceManagement() {
         
       const matchesStatus = statusFilter === 'all' || (race.status && race.status.toLowerCase() === statusFilter.toLowerCase())
       
-      return matchesGlobal && matchesLocal && matchesStatus
+      const matchesTournament = tournamentFilter === 'all' || 
+        String(race.tournamentId) === String(tournamentFilter) || 
+        race.tournament === tournamentFilter
+      
+      return matchesGlobal && matchesLocal && matchesStatus && matchesTournament
     })
     .sort((a, b) => {
       if (sortOrder === 'newest') {
@@ -454,15 +459,25 @@ export default function RaceManagement() {
         </button>
       </div>
 
-      <div className="admin-filters" style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+      <div className="admin-filters" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <input 
           type="text" 
           className="admin-input" 
           placeholder="Tìm theo tên hoặc địa điểm..." 
           value={localSearchQuery}
           onChange={(e) => setLocalSearchQuery(e.target.value)}
-          style={{ flex: 1, maxWidth: '300px' }}
+          style={{ flex: 1, minWidth: '220px' }}
         />
+        <select 
+          className="admin-select"
+          value={tournamentFilter}
+          onChange={(e) => setTournamentFilter(e.target.value)}
+        >
+          <option value="all">🏆 Tất cả Giải đấu</option>
+          {tournaments.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
         <select 
           className="admin-select"
           value={statusFilter}
@@ -596,93 +611,139 @@ export default function RaceManagement() {
         </div>
       )}
 
-      <div className="race-cards-grid">
-        {filteredRaces.map((race) => (
-          <div key={race.id} className="admin-card race-card-item">
-            <div className="race-card-top">
-              <span className="race-card-id">{race.id}</span>
-              <StatusBadge status={race.status} />
-            </div>
-            <h3>{race.name}</h3>
-            <p className="race-card-tournament">{race.tournament}</p>
-            <div className="race-card-meta">
-              <span>📅 {race.date} · ⏰ {race.time}</span>
-              <span>📏 Cự ly: {race.distance}</span>
-            </div>
-            {/* 
-            <div className="race-card-horses">
-              <strong>{race.horses}</strong>
-              <span>ngựa tham gia</span>
-            </div>
-            */}
-            <div className="admin-table-actions">
-              <button 
-                type="button" 
-                className="admin-btn admin-btn--ghost admin-btn--sm"
-                onClick={() => handleOpenEdit(race)}
-              >
-                Sửa
-              </button>
-              <button 
-                type="button" 
-                className="admin-btn admin-btn--outline admin-btn--sm"
-                onClick={() => openArrangement(race)}
-              >
-                Sắp xếp cuốc/vòng
-              </button>
-              {race.status === 'scheduled' && (
-                <>
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--outline admin-btn--sm"
-                    style={{ borderColor: '#22c55e', color: '#22c55e' }}
-                    onClick={() => handleStartRace(race)}
-                    disabled={isProcessing}
-                  >
-                    Bắt đầu
-                  </button>
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--danger admin-btn--sm"
-                    onClick={() => {
-                      setDelayingRace(race)
-                      setDelayForm({ reason: '', newStartTime: '', newEndTime: '' })
-                    }}
-                    disabled={isProcessing}
-                  >
-                    Hoãn
-                  </button>
-                </>
-              )}
+      {(() => {
+        // Group filtered races by tournament
+        const groupedRaces = filteredRaces.reduce((acc, race) => {
+          const tourName = race.tournament || 'Giải đấu khác'
+          if (!acc[tourName]) acc[tourName] = []
+          acc[tourName].push(race)
+          return acc
+        }, {})
 
-              {race.status === 'delayed' && (
-                <>
-                  <button 
-                    type="button" 
-                    className="admin-btn admin-btn--outline admin-btn--sm"
-                    style={{ borderColor: '#a855f7', color: '#a855f7' }}
-                    onClick={() => handleReopenPrediction(race)}
-                    disabled={isProcessing}
-                  >
-                    Mở lại dự đoán
-                  </button>
-                </>
-              )}
+        const groupKeys = Object.keys(groupedRaces)
 
-              {race.status === 'completed' && (
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--gold admin-btn--sm"
-                  onClick={() => handlePublish(race)}
-                  disabled={isProcessing}
-                >
-                  Công bố KQ
-                </button>
-              )}
+        if (groupKeys.length === 0) {
+          return (
+            <div className="admin-card" style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+              Không tìm thấy cuộc đua nào phù hợp với bộ lọc.
             </div>
+          )
+        }
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {groupKeys.map((tourName) => {
+              const raceList = groupedRaces[tourName]
+              return (
+                <div key={tourName} className="tournament-race-group">
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 18px',
+                    background: 'linear-gradient(90deg, rgba(212,175,55,0.15) 0%, rgba(30,41,59,0.8) 100%)',
+                    borderLeft: '4px solid #d4af37',
+                    borderRadius: '8px',
+                    marginBottom: '16px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>🏆</span>
+                      <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                        {tourName}
+                      </h2>
+                    </div>
+                    <span style={{ fontSize: '13px', color: '#d4af37', fontWeight: '600', background: 'rgba(212,175,55,0.15)', padding: '4px 12px', borderRadius: '12px' }}>
+                      {raceList.length} cuộc đua
+                    </span>
+                  </div>
+
+                  <div className="race-cards-grid">
+                    {raceList.map((race) => (
+                      <div key={race.id} className="admin-card race-card-item">
+                        <div className="race-card-top">
+                          <span className="race-card-id">{race.id}</span>
+                          <StatusBadge status={race.status} />
+                        </div>
+                        <h3>{race.name}</h3>
+                        <p className="race-card-tournament">{race.tournament}</p>
+                        <div className="race-card-meta">
+                          <span>📅 {race.date} · ⏰ {race.time}</span>
+                          <span>📏 Cự ly: {race.distance}</span>
+                        </div>
+                        <div className="admin-table-actions">
+                          <button 
+                            type="button" 
+                            className="admin-btn admin-btn--ghost admin-btn--sm"
+                            onClick={() => handleOpenEdit(race)}
+                          >
+                            Sửa
+                          </button>
+                          <button 
+                            type="button" 
+                            className="admin-btn admin-btn--outline admin-btn--sm"
+                            onClick={() => openArrangement(race)}
+                          >
+                            Sắp xếp cuốc/vòng
+                          </button>
+                          {race.status === 'scheduled' && (
+                            <>
+                              <button 
+                                type="button" 
+                                className="admin-btn admin-btn--outline admin-btn--sm"
+                                style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                                onClick={() => handleStartRace(race)}
+                                disabled={isProcessing}
+                              >
+                                Bắt đầu
+                              </button>
+                              <button 
+                                type="button" 
+                                className="admin-btn admin-btn--danger admin-btn--sm"
+                                onClick={() => {
+                                  setDelayingRace(race)
+                                  setDelayForm({ reason: '', newStartTime: '', newEndTime: '' })
+                                }}
+                                disabled={isProcessing}
+                              >
+                                Hoãn
+                              </button>
+                            </>
+                          )}
+
+                          {race.status === 'delayed' && (
+                            <>
+                              <button 
+                                type="button" 
+                                className="admin-btn admin-btn--outline admin-btn--sm"
+                                style={{ borderColor: '#a855f7', color: '#a855f7' }}
+                                onClick={() => handleReopenPrediction(race)}
+                                disabled={isProcessing}
+                              >
+                                Mở lại dự đoán
+                              </button>
+                            </>
+                          )}
+
+                          {race.status === 'completed' && (
+                            <button 
+                              type="button" 
+                              className="admin-btn admin-btn--gold admin-btn--sm"
+                              onClick={() => handlePublish(race)}
+                              disabled={isProcessing}
+                            >
+                              Công bố KQ
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
+        )
+      })()}
 
       {/* Delay Modal */}
       {delayingRace && (
