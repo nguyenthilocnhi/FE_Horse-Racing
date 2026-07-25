@@ -28,7 +28,7 @@ export async function login(credentials) {
     userName: emailVal,
     password: credentials.password
   }
-  
+
   try {
     const res = await apiClient.post('/auth/login', payload)
     return res.data

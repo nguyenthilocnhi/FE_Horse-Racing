@@ -142,7 +142,6 @@ export const adminNavItems = [
   { path: '/admin/tickets', label: 'Vé', icon: '◫' },
   { path: '/admin/payments', label: 'Thanh toán', icon: '$' },
   { path: '/admin/notifications', label: 'Thông báo', icon: '◔' },
-  { path: '/admin/reports', label: 'Báo cáo', icon: '▤' },
 ]
 
 export const breadcrumbLabels = {

@@ -30,7 +30,29 @@ export async function createPayment(amount, spectatorId, tournamentId = 1) {
 
   try {
     const res = await apiClient.post('/v1/payment/create', payload)
-    return res.data?.data || res.data
+    const result = res.data?.data || res.data
+
+    const orderCode = result?.orderCode || Date.now()
+    
+    // Lưu lịch sử giao dịch đang chuyển khoản (PENDING)
+    try {
+      const existing = JSON.parse(localStorage.getItem('spectator_transactions') || '[]')
+      const newTx = {
+        id: orderCode,
+        orderId: orderCode,
+        transactionType: 'WALLET_DEPOSIT',
+        paymentGateway: 'PayOS (Chuyển khoản)',
+        amount: numericAmount,
+        status: 'PENDING',
+        transactionDate: new Date().toISOString()
+      }
+      localStorage.setItem('spectator_transactions', JSON.stringify([newTx, ...existing.filter(t => t.id !== orderCode)]))
+      localStorage.setItem('active_pending_order_code', String(orderCode))
+    } catch (e) {
+      console.warn('LocalStorage error:', e)
+    }
+
+    return result
   } catch (err) {
     const serverMessage = err?.response?.data?.message || (typeof err?.response?.data === 'string' ? err.response.data : null) || err?.message || 'Lỗi khởi tạo giao dịch PayOS (400 Bad Request)'
     console.error('Lỗi API /v1/payment/create:', serverMessage)

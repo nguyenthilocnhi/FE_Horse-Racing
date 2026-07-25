@@ -80,11 +80,21 @@ export async function updateTournamentRegistration(id, payload) {
  * @param {{ raceDate, raceTrackId, raceName, ... }} payload
  */
 export async function createRaceSchedule(tournamentId, payload) {
-  const res = await apiClient.post(
-    `/tournaments/${tournamentId}/race-schedules`,
-    payload
-  )
-  return res.data
+  try {
+    const res = await apiClient.post(
+      `/tournaments/${tournamentId}/race-schedules`,
+      payload
+    )
+    return res.data
+  } catch (err) {
+    console.warn(`POST /tournaments/${tournamentId}/race-schedules failed, trying fallback /races`, err)
+    try {
+      const resAlt = await apiClient.post('/races', payload)
+      return resAlt.data
+    } catch (e2) {
+      throw err
+    }
+  }
 }
 
 /**

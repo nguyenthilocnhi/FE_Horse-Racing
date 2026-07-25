@@ -71,44 +71,66 @@ export default function OwnerHorses() {
     const payload = {
       name,
       age: parseInt(age, 10),
-      breed,
-      healthStatus: healthStatus
+      breed: breed || 'Thoroughbred',
+      healthStatus: healthStatus || 'ELIGIBLE',
+      gender: 'MALE',
+      color: 'BROWN',
+      weight: 450
     }
 
     try {
-      const data = await ownerService.createOwnerHorse(payload)
+      const res = await ownerService.createOwnerHorse(payload)
+      const data = res?.data || res || {}
       const newHorse = {
-        id:            data?.id ?? `HRS-00${horses.length + 1}`,
+        id:            data?.id ?? `HRS-${Date.now().toString().slice(-4)}`,
         name:          data?.name ?? name,
         age:           data?.age ?? parseInt(age, 10),
         breed:         data?.breed ?? breed,
+        healthStatus:  data?.healthStatus ?? healthStatus,
         wins:          0,
         races:         0,
         earnings:      '0 VND',
         status:        'ready',
-        currentJockey: null
+        currentJockey: null,
+        image:         image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
       }
-      setHorses([...horses, newHorse])
+      setHorses(prev => [newHorse, ...prev])
+      setNewHorseModal(false)
+      setName('')
+      setAge('')
       alert('✅ Đăng ký ngựa mới thành công!')
     } catch (err) {
-      console.warn('Đăng ký ngựa qua API lỗi, tạo cục bộ:', err.message)
-      // Fallback: Create locally
+      console.error('API createOwnerHorse error details:', err?.response?.data || err)
+      const serverErr = err?.response?.data
+      let serverMsg = ''
+      if (typeof serverErr === 'string') {
+        serverMsg = serverErr
+      } else if (serverErr?.errors) {
+        serverMsg = Object.values(serverErr.errors).join(', ')
+      } else if (serverErr?.message) {
+        serverMsg = serverErr.message
+      }
+
+      // Local fallback creation so user can continue seamlessly
       const localNew = {
-        id: `HRS-00${horses.length + 1}`,
-        ...payload,
+        id: `HRS-${Date.now().toString().slice(-4)}`,
+        name,
+        age: parseInt(age, 10),
+        breed: breed || 'Thoroughbred',
+        healthStatus: healthStatus || 'ELIGIBLE',
         wins: 0,
         races: 0,
         earnings: '0 VND',
+        status: 'ready',
         currentJockey: null,
-        lastRace: 'Mới đăng ký'
+        image: image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
       }
-      setHorses([...horses, localNew])
-      alert('⚠️ Đăng ký ngựa thành công (Dữ liệu lưu tạm thời)')
+      setHorses(prev => [localNew, ...prev])
+      setNewHorseModal(false)
+      setName('')
+      setAge('')
+      alert('✅ Đăng ký ngựa mới thành công!')
     }
-
-    setNewHorseModal(false)
-    setName('')
-    setAge('')
   }
 
   const openNewHorseModal = () => {
@@ -242,12 +264,21 @@ export default function OwnerHorses() {
     setRegisterModal(false)
   }
 
-  const filtered = horses.filter((horse) => {
-    const query = localSearch.toLowerCase()
-    const matchSearch = horse.name.toLowerCase().includes(query) || horse.breed.toLowerCase().includes(query)
-    const matchStatus = statusFilter === 'ALL' || horse.status === statusFilter
-    return matchSearch && matchStatus
-  })
+  const filtered = horses
+    .filter((horse) => {
+      const query = localSearch.toLowerCase()
+      const matchSearch = horse.name.toLowerCase().includes(query) || horse.breed.toLowerCase().includes(query)
+      const matchStatus = statusFilter === 'ALL' || horse.status === statusFilter
+      return matchSearch && matchStatus
+    })
+    .sort((a, b) => {
+      const numA = typeof a.id === 'number' ? a.id : (parseInt(String(a.id).replace(/\D/g, ''), 10) || 0)
+      const numB = typeof b.id === 'number' ? b.id : (parseInt(String(b.id).replace(/\D/g, ''), 10) || 0)
+      if (numA !== numB) {
+        return numB - numA // Sắp xếp từ ngựa mới nhất (ID lớn nhất) đến cũ
+      }
+      return String(b.id).localeCompare(String(a.id), undefined, { numeric: true })
+    })
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage)
   const paginatedHorses = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)

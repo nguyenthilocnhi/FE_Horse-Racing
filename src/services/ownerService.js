@@ -29,8 +29,16 @@ export async function getOwnerHorses() {
  * @param {{ name, breed, age, weight, color, ... }} payload
  */
 export async function createOwnerHorse(payload) {
-  const res = await apiClient.post('/owner/horses', payload)
-  return res.data
+  try {
+    const res = await apiClient.post('/owner/horses', payload)
+    return res.data
+  } catch (err) {
+    if (err?.response?.status === 404) {
+      const fallbackRes = await apiClient.post('/horses', payload)
+      return fallbackRes.data
+    }
+    throw err
+  }
 }
 
 /**

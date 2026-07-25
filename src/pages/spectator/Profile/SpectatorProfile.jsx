@@ -105,11 +105,60 @@ export default function SpectatorProfile() {
           try {
             const txRes = await spectatorService.getSpectatorTransactions(specId)
             const txList = Array.isArray(txRes) ? txRes : (txRes?.data || [])
-            if (!cancelled && txList.length > 0) {
-              setApiTransactions(txList)
+
+            // Đọc thêm lịch sử giao dịch chuyển khoản từ localStorage
+            let localTx = []
+            try {
+              localTx = JSON.parse(localStorage.getItem('spectator_transactions') || '[]')
+            } catch (e) {}
+
+            // Nếu còn mã nạp tiền PENDING mà khán giả quay lại trang mà chưa hoàn tất ➔ gán Bị lỗi (FAILED)
+            const activePendingCode = localStorage.getItem('active_pending_order_code')
+            if (activePendingCode) {
+              localTx = localTx.map(tx => {
+                if (String(tx.id) === String(activePendingCode) && tx.status === 'PENDING') {
+                  return { ...tx, status: 'FAILED' }
+                }
+                return tx
+              })
+              localStorage.setItem('spectator_transactions', JSON.stringify(localTx))
+              localStorage.removeItem('active_pending_order_code')
+            }
+
+            // Gộp danh sách API và LocalStorage
+            const combinedTx = [...localTx]
+            txList.forEach(t => {
+              if (!combinedTx.some(c => String(c.id) === String(t.id))) {
+                combinedTx.push(t)
+              }
+            })
+
+            if (!cancelled) {
+              setApiTransactions(combinedTx)
             }
           } catch (txErr) {
             console.warn('API getSpectatorTransactions error:', txErr?.response?.status ?? txErr?.message)
+            // Lấy từ localTx khi API không phản hồi
+            let localTx = []
+            try {
+              localTx = JSON.parse(localStorage.getItem('spectator_transactions') || '[]')
+            } catch (e) {}
+
+            const activePendingCode = localStorage.getItem('active_pending_order_code')
+            if (activePendingCode) {
+              localTx = localTx.map(tx => {
+                if (String(tx.id) === String(activePendingCode) && tx.status === 'PENDING') {
+                  return { ...tx, status: 'FAILED' }
+                }
+                return tx
+              })
+              localStorage.setItem('spectator_transactions', JSON.stringify(localTx))
+              localStorage.removeItem('active_pending_order_code')
+            }
+
+            if (!cancelled) {
+              setApiTransactions(localTx)
+            }
           }
         }
         if (!cancelled) {
@@ -462,46 +511,13 @@ export default function SpectatorProfile() {
               </div>
             </div>
 
-            {/* History of tickets & predictions */}
+            {/* Ticket & Prediction History Card */}
             <div className="admin-card">
               <div className="admin-card-head">
-                <h3>Lịch Sử Đặt Vé & Dự Đoán</h3>
+                <h3>🎟️ Lịch Sử Đặt Vé & Dự Đoán</h3>
               </div>
               <div className="admin-card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {apiTransactions.length > 0 ? (
-                  apiTransactions.map(tx => (
-                    <div
-                      key={tx.id}
-                      style={{
-                        padding: '14px',
-                        borderRadius: '10px',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.04)',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <strong style={{ color: '#fff', fontSize: '14px' }}>
-                          {tx.transactionType === 'WALLET_DEPOSIT' ? `Nạp tiền ví (${tx.paymentGateway || 'Cổng thanh toán'})` : (tx.ticket?.tournament?.name || 'Giao dịch vé')}
-                        </strong>
-                        <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(tx.amount)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#888' }}>
-                        <span>
-                          {tx.orderId ? `Mã ĐĐ: ${tx.orderId}` : `Mã GD: #${tx.id}`}
-                          {tx.transactionDate ? ` · ${new Date(tx.transactionDate).toLocaleString('vi-VN')}` : ''}
-                        </span>
-                        <span>
-                          {tx.status === 'SUCCESS' || tx.status === 'COMPLETED' || tx.status === 'won' ? (
-                            <span style={{ color: '#4ade80', fontWeight: 'bold' }}>Thành công</span>
-                          ) : (
-                            <span style={{ color: '#e6c564' }}>Đang thực hiện</span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
+                {userPreds && userPreds.length > 0 ? (
                   userPreds.map(up => (
                     <div
                       key={up.id}
@@ -527,6 +543,59 @@ export default function SpectatorProfile() {
                       </div>
                     </div>
                   ))
+                ) : (
+                  <p style={{ color: '#888', textAlign: 'center', margin: '16px 0', fontSize: '13px' }}>
+                    Chưa có lịch sử đặt vé nào.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Deposit History Card */}
+            <div className="admin-card">
+              <div className="admin-card-head">
+                <h3>💳 Lịch Sử Nạp Tiền</h3>
+              </div>
+              <div className="admin-card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {apiTransactions.length > 0 ? (
+                  apiTransactions.map(tx => (
+                    <div
+                      key={tx.id}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '10px',
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        fontSize: '13px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <strong style={{ color: '#fff', fontSize: '14px' }}>
+                          {tx.transactionType === 'WALLET_DEPOSIT' || !tx.transactionType ? `Nạp tiền ví (${tx.paymentGateway || 'Cổng thanh toán PayOS'})` : (tx.ticket?.tournament?.name || 'Giao dịch chuyển khoản')}
+                        </strong>
+                        <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(tx.amount)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#888' }}>
+                        <span>
+                          {tx.orderId ? `Mã ĐĐ: ${tx.orderId}` : `Mã GD: #${tx.id}`}
+                          {tx.transactionDate ? ` · ${new Date(tx.transactionDate).toLocaleString('vi-VN')}` : ''}
+                        </span>
+                        <span>
+                          {tx.status === 'SUCCESS' || tx.status === 'COMPLETED' || tx.status === 'won' ? (
+                            <span style={{ color: '#4ade80', fontWeight: 'bold' }}>Thành công</span>
+                          ) : tx.status === 'FAILED' || tx.status === 'CANCELLED' || tx.status === 'ERROR' ? (
+                            <span style={{ color: '#f87171', fontWeight: 'bold' }}>Bị lỗi</span>
+                          ) : (
+                            <span style={{ color: '#e6c564' }}>Đang thực hiện</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p style={{ color: '#888', textAlign: 'center', margin: '16px 0', fontSize: '13px' }}>
+                    Chưa có lịch sử nạp tiền nào.
+                  </p>
                 )}
               </div>
             </div>

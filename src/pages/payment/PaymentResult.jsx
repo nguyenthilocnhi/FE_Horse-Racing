@@ -20,6 +20,43 @@ export default function PaymentResult() {
   const timerRef = useRef(null)
   const pollCountRef = useRef(0)
 
+  const updateLocalTxStatus = (targetCode, newStatus) => {
+    if (!targetCode) return
+    try {
+      const stored = localStorage.getItem('spectator_transactions')
+      if (stored) {
+        const list = JSON.parse(stored)
+        const updated = list.map(tx => {
+          if (String(tx.id) === String(targetCode) || String(tx.orderId) === String(targetCode)) {
+            return { ...tx, status: newStatus }
+          }
+          return tx
+        })
+        localStorage.setItem('spectator_transactions', JSON.stringify(updated))
+      }
+      if (newStatus !== 'PENDING') {
+        localStorage.removeItem('active_pending_order_code')
+      }
+    } catch (e) {
+      console.warn('LocalStorage update error:', e)
+    }
+  }
+
+  useEffect(() => {
+    // Khi thoát trang, chuyển trang hoặc tải lại khi đang PENDING -> gán Bị lỗi (FAILED)
+    const handleBeforeUnload = () => {
+      const activePending = localStorage.getItem('active_pending_order_code') || orderCode
+      if (activePending) {
+        updateLocalTxStatus(activePending, 'FAILED')
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [orderCode])
+
   useEffect(() => {
     if (!orderCode) {
       setLoading(false)
@@ -32,6 +69,7 @@ export default function PaymentResult() {
       setLoading(false)
       setStatus('FAILED')
       setErrorMessage('Giao dịch đã bị người dùng hủy bỏ trên payOS.')
+      updateLocalTxStatus(orderCode, 'FAILED')
       return
     }
 
@@ -52,14 +90,15 @@ export default function PaymentResult() {
 
       if (serverStatus === 'SUCCESS') {
         setStatus('SUCCESS')
+        updateLocalTxStatus(orderCode, 'SUCCESS')
         setLoading(false)
         if (timerRef.current) clearInterval(timerRef.current)
       } else if (serverStatus === 'FAILED') {
         setStatus('FAILED')
+        updateLocalTxStatus(orderCode, 'FAILED')
         setLoading(false)
         if (timerRef.current) clearInterval(timerRef.current)
       } else {
-        // Nếu Backend trả PENDING ➔ Kích hoạt Polling tự động mỗi 2 giây (tối đa 30 giây = 15 lần)
         setStatus('PENDING')
         startPolling()
       }
@@ -67,6 +106,7 @@ export default function PaymentResult() {
       console.error('Lỗi kiểm tra trạng thái giao dịch:', err)
       if (code && code !== '00') {
         setStatus('FAILED')
+        updateLocalTxStatus(orderCode, 'FAILED')
         setErrorMessage('Giao dịch bị từ chối hoặc hủy bỏ trên cổng payOS.')
       } else {
         setStatus('PENDING')
@@ -82,11 +122,12 @@ export default function PaymentResult() {
     timerRef.current = setInterval(async () => {
       pollCountRef.current += 1
 
-      // Sau 30s (15 lần thử) nếu vẫn PENDING thì ngưng polling và hiển thị thông báo
       if (pollCountRef.current >= 15) {
         if (timerRef.current) clearInterval(timerRef.current)
         setLoading(false)
-        setStatus('PENDING')
+        setStatus('FAILED')
+        updateLocalTxStatus(orderCode, 'FAILED')
+        setErrorMessage('Quá thời gian xác nhận giao dịch. Vui lòng thử lại.')
         return
       }
 
@@ -97,10 +138,12 @@ export default function PaymentResult() {
 
         if (currentStatus === 'SUCCESS') {
           setStatus('SUCCESS')
+          updateLocalTxStatus(orderCode, 'SUCCESS')
           setLoading(false)
           if (timerRef.current) clearInterval(timerRef.current)
         } else if (currentStatus === 'FAILED') {
           setStatus('FAILED')
+          updateLocalTxStatus(orderCode, 'FAILED')
           setLoading(false)
           if (timerRef.current) clearInterval(timerRef.current)
         }

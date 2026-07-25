@@ -8,23 +8,19 @@ const STATUS_MAP = {
   approved: 'green',
   rejected: 'red',
   upcoming: 'blue',
-  ongoing: 'green',
+  ongoing: 'gold',
   completed: 'gray',
   cancelled: 'red',
   scheduled: 'blue',
-  delayed: 'gold',
+  pending_start: 'blue',
+  delayed: 'red',
   running: 'green',
   investigating: 'gold',
   resolved: 'green',
   reviewing: 'gold',
-  paid: 'green',
-  sent: 'green',
-  draft: 'gray',
-  completed_pay: 'green',
-  published: 'purple',
-  conflict: 'red',
+  pending_results: 'gold',
   assigned: 'green',
-  unassigned: 'gray',
+  unassigned: 'purple',
   high: 'red',
   medium: 'gold',
   low: 'gray',
@@ -36,29 +32,24 @@ const STATUS_MAP = {
 }
 
 const STATUS_LABELS = {
-  active: 'Hoạt động',
-  locked: 'Đã khóa',
+  active: 'Đang hoạt động',
+  locked: 'Bị khóa',
   pending: 'Chờ duyệt',
   pending_payment: 'Chờ thanh toán',
-  approved: 'Đã duyệt',
+  approved: 'Đang hoạt động',
   rejected: 'Từ chối',
-  upcoming: 'Sắp diễn ra',
+  upcoming: 'Chờ diễn ra',
   ongoing: 'Đang diễn ra',
   completed: 'Hoàn thành',
   cancelled: 'Đã hủy',
-  scheduled: 'Đã lên lịch',
+  scheduled: 'Chờ diễn ra',
+  pending_start: 'Chờ diễn ra',
   delayed: 'Bị hoãn',
   running: 'Đang chạy',
-  investigating: 'Đang điều tra',
-  resolved: 'Đã xử lý',
-  reviewing: 'Đang xem xét',
-  paid: 'Đã thanh toán',
-  sent: 'Đã gửi',
-  draft: 'Nháp',
-  published: 'Đã công bố',
-  conflict: 'Xung đột',
-  assigned: 'Đã phân công',
-  unassigned: 'Chưa phân công',
+  reviewing: 'Chờ duyệt kết quả',
+  pending_results: 'Chờ duyệt kết quả',
+  assigned: 'Đã phân công trọng tài',
+  unassigned: 'Chờ phân công trọng tài',
   high: 'Cao',
   medium: 'Trung bình',
   low: 'Thấp',
@@ -79,4 +70,76 @@ export function formatCurrency(amount) {
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(amount)
+}
+
+/**
+ * Tính toán tự động trạng thái cuộc đua theo đúng vòng đời chuẩn:
+ * 1. Mới tạo: "Chờ phân công trọng tài" (unassigned)
+ * 2. Phân công trọng tài xong: "Chờ diễn ra" (scheduled)
+ * 3. Đến ngày diễn ra: "Đang diễn ra" (ongoing)
+ * 4. Đến giờ bắt đầu đua: "Đang chạy" (running)
+ * 5. Hết giờ đua: "Chờ duyệt kết quả" (reviewing)
+ * 6. Duyệt/Công bố kết quả: "Hoàn thành" (completed - Không được sửa)
+ */
+export function computeRaceStatus(race) {
+  if (!race) return 'unassigned'
+  const rawStatus = (race.status || '').toLowerCase()
+
+  // Các trạng thái đã chốt cố định
+  if (rawStatus === 'completed' || rawStatus === 'cancelled' || rawStatus === 'delayed') {
+    return rawStatus
+  }
+
+  if (rawStatus === 'reviewing' || rawStatus === 'pending_results') {
+    return 'reviewing'
+  }
+
+  // Kiểm tra đã gán trọng tài chưa
+  const hasReferee = !!race.refereeId || (race.referee && race.referee !== 'Chưa phân công')
+  if (!hasReferee) {
+    return 'unassigned'
+  }
+
+  // Đã gán trọng tài, kiểm tra theo Ngày & Giờ
+  if (race.date) {
+    const now = new Date()
+    const todayStr = now.toISOString().split('T')[0]
+    const raceDateStr = race.date
+
+    // Ngày đua ở tương lai -> Chờ diễn ra
+    if (raceDateStr > todayStr) {
+      return 'scheduled'
+    }
+
+    // Đúng ngày đua
+    if (raceDateStr === todayStr) {
+      if (race.time) {
+        const raceStartDateTime = new Date(`${raceDateStr}T${race.time}:00`)
+        let raceEndDateTime = race.endTime ? new Date(`${raceDateStr}T${race.endTime}:00`) : null
+
+        if (!raceEndDateTime || isNaN(raceEndDateTime.getTime())) {
+          raceEndDateTime = new Date(raceStartDateTime.getTime() + 30 * 60 * 1000)
+        }
+
+        if (now < raceStartDateTime) {
+          // Cùng ngày nhưng chưa đến giờ xuất phát -> Đang diễn ra
+          return 'ongoing'
+        } else if (now >= raceStartDateTime && now <= raceEndDateTime) {
+          // Đúng giờ xuất phát -> Đang chạy
+          return 'running'
+        } else if (now > raceEndDateTime) {
+          // Đã hết giờ đua -> Chờ duyệt kết quả
+          return 'reviewing'
+        }
+      }
+      return 'ongoing'
+    }
+
+    // Ngày đua trong quá khứ -> Chờ duyệt kết quả
+    if (raceDateStr < todayStr) {
+      return 'reviewing'
+    }
+  }
+
+  return 'scheduled'
 }

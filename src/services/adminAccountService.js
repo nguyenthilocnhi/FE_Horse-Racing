@@ -12,13 +12,41 @@
 import apiClient from './apiClient'
 
 /**
- * Lấy tất cả tài khoản từ hệ thống
+ * Lấy danh sách tài khoản theo vai trò cụ thể
+ * @param {'HORSE_OWNER' | 'JOCKEY' | 'RACE_REFEREE' | 'SPECTATOR'} role
+ */
+export async function getAccountsByRole(role) {
+  try {
+    const res = await apiClient.get(`/admin/accounts/${role}`)
+    const list = Array.isArray(res.data) ? res.data : (res.data?.result ?? res.data?.content ?? res.data?.data ?? [])
+    return list.map(u => ({ ...u, role: u.role || role }))
+  } catch (err) {
+    console.warn(`Could not fetch accounts for role ${role}:`, err?.message || err)
+    return []
+  }
+}
+
+/**
+ * Lấy tất cả tài khoản từ hệ thống bao gồm tất cả 4 roles (HORSE_OWNER, JOCKEY, RACE_REFEREE, SPECTATOR)
  */
 export async function getAllAccounts() {
-  const res = await apiClient.get('/admin/accounts')
-  return Array.isArray(res.data) 
-    ? res.data 
-    : res.data?.content ?? res.data?.data ?? []
+  try {
+    const res = await apiClient.get('/admin/accounts')
+    const list = Array.isArray(res.data) ? res.data : (res.data?.result ?? res.data?.content ?? res.data?.data ?? [])
+    return list
+  } catch (err) {
+    console.warn("GET /admin/accounts failed, fetching accounts for all 4 roles individually:", err?.message || err)
+    // Tải danh sách 4 vai trò làm fallback nếu cần
+    const roles = ['HORSE_OWNER', 'JOCKEY', 'RACE_REFEREE', 'SPECTATOR']
+    const results = await Promise.allSettled(roles.map(role => getAccountsByRole(role)))
+    const allAccounts = []
+    results.forEach(item => {
+      if (item.status === 'fulfilled' && Array.isArray(item.value)) {
+        allAccounts.push(...item.value)
+      }
+    })
+    return allAccounts
+  }
 }
 
 /**

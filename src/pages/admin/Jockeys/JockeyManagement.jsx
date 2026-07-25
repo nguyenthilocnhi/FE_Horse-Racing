@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { mockJockeys as initialJockeys } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
-import { getAllAdminJockeys, createAdminJockey, updateAdminJockey, deleteAdminJockey } from '../../../services/adminService'
+import { getAllAdminJockeys, updateAdminJockey, deleteAdminJockey } from '../../../services/adminService'
 import './JockeyManagement.css'
 
 export default function JockeyManagement() {
@@ -20,14 +20,14 @@ export default function JockeyManagement() {
     if (!backendStatus) return 'active'
     if (backendStatus === 'ACTIVE') return 'active'
     if (backendStatus === 'INACTIVE') return 'suspended'
-    if (backendStatus === 'BANNED') return 'suspended' // adjust based on actual enum if needed
+    if (backendStatus === 'BANNED') return 'suspended'
     return 'active'
   }
 
   const mapFrontendStatusToBackend = (frontendStatus) => {
     if (frontendStatus === 'active') return 'ACTIVE'
     if (frontendStatus === 'suspended') return 'INACTIVE'
-    if (frontendStatus === 'injured') return 'INACTIVE' // adjust if needed
+    if (frontendStatus === 'injured') return 'INACTIVE'
     return 'ACTIVE'
   }
 
@@ -63,7 +63,6 @@ export default function JockeyManagement() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingJockey, setEditingJockey] = useState(null)
   const [formData, setFormData] = useState({
-    userName: '',
     password: '',
     fullName: '',
     email: '',
@@ -82,12 +81,10 @@ export default function JockeyManagement() {
     return matchSearch && matchStatus
   })
 
-
   const handleOpenEdit = (j) => {
     setEditingJockey(j)
     setFormData({
-      userName: j.userName,
-      password: '', // Don't show existing password, leave blank unless changing
+      password: '',
       fullName: j.name,
       email: j.email,
       phone: j.phone,
@@ -118,13 +115,13 @@ export default function JockeyManagement() {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!editingJockey) return
-    if (!formData.userName || !formData.fullName || !formData.licenseNumber) {
+    if (!formData.fullName || !formData.licenseNumber) {
       alert('Vui lòng điền đầy đủ các thông tin bắt buộc!')
       return
     }
 
     const payload = {
-      userName: formData.userName,
+      userName: editingJockey.userName,
       fullName: formData.fullName,
       email: formData.email,
       phone: formData.phone,
@@ -179,7 +176,6 @@ export default function JockeyManagement() {
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Tên đăng nhập</th>
                   <th>Họ tên Jockey</th>
                   <th>Giấy phép (Certificate)</th>
                   <th>Kinh nghiệm</th>
@@ -190,14 +186,13 @@ export default function JockeyManagement() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
                       Đang tải dữ liệu...
                     </td>
                   </tr>
                 ) : filtered.length > 0 ? (
                   filtered.map((j) => (
                     <tr key={j.id}>
-                      <td style={{ fontWeight: '500', color: '#d4af37' }}>@{j.userName}</td>
                       <td style={{ fontWeight: '600', color: '#fff' }}>{j.name}</td>
                       <td><code>{j.license}</code></td>
                       <td>{j.experience} năm</td>
@@ -233,7 +228,7 @@ export default function JockeyManagement() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
                       Không tìm thấy kết quả phù hợp
                     </td>
                   </tr>
@@ -259,8 +254,7 @@ export default function JockeyManagement() {
               <div className="user-detail-avatar" style={{ fontSize: '24px', background: 'linear-gradient(135deg, #d4af37, #8b7355)', color: '#0d0d0d' }}>
                 🏇
               </div>
-              <h4 style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{selectedJockey.name}</h4>
-              <p style={{ margin: '0 0 20px', color: '#d4af37', fontSize: '13px', letterSpacing: '0.05em' }}>@{selectedJockey.userName}</p>
+              <h4 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>{selectedJockey.name}</h4>
               
               <dl className="user-detail-dl" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '10px' }}>
                 <dt>Email</dt>
@@ -346,29 +340,6 @@ export default function JockeyManagement() {
             <form onSubmit={handleSave} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Tên đăng nhập</label>
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="VD: banglcb..."
-                    value={formData.userName}
-                    onChange={(e) => setFormData({ ...formData, userName: e.target.value })}
-                  />
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Mật khẩu</label>
-                  <input
-                    type="text"
-                    className="admin-input"
-                    placeholder="Bỏ trống nếu không đổi..."
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Họ tên Jockey</label>
                   <input
                     required
@@ -391,7 +362,7 @@ export default function JockeyManagement() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số điện thoại</label>
                   <input
@@ -412,6 +383,8 @@ export default function JockeyManagement() {
                     onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                   />
                 </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Kinh nghiệm (năm)</label>
                   <input
@@ -423,17 +396,16 @@ export default function JockeyManagement() {
                     onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
                   />
                 </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giấy phép / Chứng chỉ (Certificate Level)</label>
-                <input
-                  required
-                  className="admin-input"
-                  placeholder="Mã giấy phép hoặc cấp bậc chứng chỉ..."
-                  value={formData.licenseNumber}
-                  onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
-                />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giấy phép / Chứng chỉ</label>
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="Mã giấy phép..."
+                    value={formData.licenseNumber}
+                    onChange={(e) => setFormData({ ...formData, licenseNumber: e.target.value })}
+                  />
+                </div>
               </div>
 
               {editingJockey && (

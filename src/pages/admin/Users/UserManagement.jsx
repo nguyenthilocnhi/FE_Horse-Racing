@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import { users as initialUsers } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import * as adminAccountService from '../../../services/adminAccountService'
@@ -10,6 +9,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(false)
   const [localSearch, setLocalSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedUser, setSelectedUser] = useState(null)
   
   // Pagination State
@@ -18,7 +18,6 @@ export default function UserManagement() {
 
   // Sorting State
   const [sortOption, setSortOption] = useState('NEWEST')
-
 
   // Edit User modal
   const [showEditForm, setShowEditForm] = useState(false)
@@ -48,7 +47,7 @@ export default function UserManagement() {
   // Reset page to 1 when filters or sorting change
   useEffect(() => {
     setCurrentPage(1)
-  }, [localSearch, roleFilter, sortOption])
+  }, [localSearch, roleFilter, statusFilter, sortOption])
 
   // Sort users based on selected option
   const sortedUsers = [...users].sort((a, b) => {
@@ -58,16 +57,11 @@ export default function UserManagement() {
     if (sortOption === 'OLDEST') {
       return a.id - b.id
     }
-    if (sortOption === 'AZ') {
-      const nameA = a.fullName || a.name || ''
-      const nameB = b.fullName || b.name || ''
-      return nameA.localeCompare(nameB, 'vi', { sensitivity: 'base' })
-    }
     return 0
   })
 
   const filtered = sortedUsers.filter((u) => {
-    // 1. Exclude ADMIN accounts
+    // Exclude ADMIN accounts
     if (u.role === 'ADMIN') return false
 
     const nameVal = u.fullName || u.name
@@ -76,7 +70,12 @@ export default function UserManagement() {
       (u.email && u.email.toLowerCase().includes(localSearch.toLowerCase())) ||
       (u.phone && u.phone.includes(localSearch))
     const matchRole = roleFilter === 'ALL' || u.role === roleFilter
-    return matchSearch && matchRole
+    const matchStatus = statusFilter === 'ALL' ||
+      (statusFilter === 'APPROVED' && (u.status === 'APPROVED' || u.status === 'ACTIVE')) ||
+      (statusFilter === 'LOCKED' && u.status === 'LOCKED') ||
+      (statusFilter === 'PENDING' && u.status === 'PENDING')
+
+    return matchSearch && matchRole && matchStatus
   })
 
   // Pagination Slice
@@ -121,6 +120,27 @@ export default function UserManagement() {
       alert("Phê duyệt tài khoản thành công!")
     } catch (err) {
       alert("Phê duyệt thất bại: " + (err.response?.data?.message || err.message))
+    }
+  }
+
+  const handleRejectUser = async (userId, userRole) => {
+    const userToUpdate = users.find(u => u.id === userId && u.role === userRole)
+    if (!userToUpdate) return
+    if (!window.confirm(`Bạn có chắc chắn muốn từ chối tài khoản "${userToUpdate.fullName || userToUpdate.name}" không?`)) return
+    
+    try {
+      const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
+        ...userToUpdate,
+        status: 'REJECTED'
+      })
+      const nextUser = updated || { ...userToUpdate, status: 'REJECTED' }
+      setUsers(users.map(u => u.id === userId ? nextUser : u))
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(nextUser)
+      }
+      alert("Đã từ chối tài khoản!")
+    } catch (err) {
+      alert("Từ chối thất bại: " + (err.response?.data?.message || err.message))
     }
   }
 
@@ -185,13 +205,25 @@ export default function UserManagement() {
     }
   }
 
-
   return (
     <div className="user-mgmt-page">
-      <div className="admin-page-head">
+      <div className="admin-page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 className="admin-page-title">Quản lý Tài khoản</h1>
-          <p className="admin-page-sub">Quản lý danh sách tài khoản người dùng, khóa và đổi vai trò trực tuyến</p>
+          <p className="admin-page-sub">Quản lý danh sách tài khoản người dùng cả 4 vai trò (HORSE OWNER, JOCKEY, REFEREE, SPECTATOR)</p>
+        </div>
+        <div style={{
+          background: 'rgba(212, 175, 55, 0.1)',
+          border: '1px solid rgba(212, 175, 55, 0.3)',
+          borderRadius: '10px',
+          padding: '10px 20px',
+          textAlign: 'center',
+          minWidth: '150px'
+        }}>
+          <span style={{ fontSize: '12px', color: '#aaa', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tổng số tài khoản</span>
+          <strong style={{ fontSize: '22px', color: '#d4af37', fontWeight: '700' }}>
+            {users.filter(u => u.role !== 'ADMIN').length}
+          </strong>
         </div>
       </div>
 
@@ -212,10 +244,15 @@ export default function UserManagement() {
           <option value="RACE_REFEREE">REFEREE</option>
           <option value="SPECTATOR">SPECTATOR</option>
         </select>
+        <select className="admin-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="ALL">Tất cả Trạng thái</option>
+          <option value="APPROVED">Đang hoạt động</option>
+          <option value="LOCKED">Bị khóa</option>
+          <option value="PENDING">Chờ duyệt</option>
+        </select>
         <select className="admin-select" value={sortOption} onChange={(e) => setSortOption(e.target.value)}>
           <option value="NEWEST">Sắp xếp: Mới nhất</option>
           <option value="OLDEST">Sắp xếp: Cũ nhất</option>
-          <option value="AZ">Sắp xếp: Tên A → Z</option>
         </select>
       </div>
 
@@ -235,62 +272,85 @@ export default function UserManagement() {
                       <th>Số điện thoại</th>
                       <th>Role</th>
                       <th>Trạng thái</th>
+                      <th>Phê duyệt</th>
+                      <th>Từ chối</th>
                       <th>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedUsers.map((u, index) => (
-                      <tr key={`${u.role}-${u.id || index}-${index}`}>
-                        <td>#{u.id}</td>
-                        <td>{u.fullName || u.name}</td>
-                        <td>{u.email}</td>
-                        <td>{u.phone || '—'}</td>
-                        <td><span className="admin-badge admin-badge--gold">{u.role}</span></td>
-                        <td><StatusBadge status={u.status} /></td>
-                        <td>
-                          <div className="admin-table-actions">
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--ghost admin-btn--sm"
-                              onClick={() => setSelectedUser(u)}
-                            >
-                              Chi tiết
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--ghost admin-btn--sm"
-                              onClick={() => { setEditingUser({ ...u, dob: u.birthDate || u.dob, name: u.fullName || u.name }); setShowEditForm(true); }}
-                            >
-                              Chỉnh sửa
-                            </button>
+                    {paginatedUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: '#aaa', fontSize: '14px' }}>
+                          Không có tài khoản
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedUsers.map((u, index) => (
+                        <tr key={`${u.role}-${u.id || index}-${index}`}>
+                          <td>#{u.id}</td>
+                          <td>{u.fullName || u.name}</td>
+                          <td>{u.email}</td>
+                          <td>{u.phone || '—'}</td>
+                          <td><span className="admin-badge admin-badge--gold">{u.role}</span></td>
+                          <td><StatusBadge status={u.status} /></td>
+                          <td>
                             {u.status === 'PENDING' ? (
                               <button
                                 type="button"
                                 className="admin-btn admin-btn--success admin-btn--sm"
                                 onClick={() => handleApproveUser(u.id, u.role)}
                               >
-                                Duyệt
+                                ✓ Duyệt
                               </button>
                             ) : (
+                              <span style={{ color: '#666', fontSize: '12px' }}>—</span>
+                            )}
+                          </td>
+                          <td>
+                            {u.status === 'PENDING' ? (
                               <button
                                 type="button"
-                                className={`admin-btn admin-btn--sm ${u.status === 'LOCKED' ? 'admin-btn--success' : 'admin-btn--danger'}`}
-                                onClick={() => handleToggleLock(u.id, u.role)}
+                                className="admin-btn admin-btn--danger admin-btn--sm"
+                                onClick={() => handleRejectUser(u.id, u.role)}
                               >
-                                {u.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'}
+                                ✕ Từ chối
                               </button>
+                            ) : (
+                              <span style={{ color: '#666', fontSize: '12px' }}>—</span>
                             )}
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--danger admin-btn--sm"
-                              onClick={() => handleDeleteUser(u.id, u.role)}
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td>
+                            <div className="admin-table-actions">
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--ghost admin-btn--sm"
+                                onClick={() => setSelectedUser(u)}
+                              >
+                                Chi tiết
+                              </button>
+                              {u.status !== 'PENDING' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={`admin-btn admin-btn--sm ${u.status === 'LOCKED' ? 'admin-btn--success' : 'admin-btn--danger'}`}
+                                    onClick={() => handleToggleLock(u.id, u.role)}
+                                  >
+                                    {u.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--danger admin-btn--sm"
+                                    onClick={() => handleDeleteUser(u.id, u.role)}
+                                  >
+                                    Xóa
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -372,30 +432,16 @@ export default function UserManagement() {
                 )}
 
                 <dt>Role</dt>
-                <dd>
-                  <select
-                    className="admin-select"
-                    value={selectedUser.role}
-                    style={{ width: '100%', padding: '6px 10px', fontSize: '12px', minWidth: 'auto', marginTop: '4px' }}
-                    onChange={(e) => handleAssignRole(selectedUser.id, selectedUser.role, e.target.value)}
-                  >
-                    <option value="ADMIN">ADMIN</option>
-                    <option value="HORSE_OWNER">HORSE OWNER</option>
-                    <option value="JOCKEY">JOCKEY</option>
-                    <option value="RACE_REFEREE">REFEREE</option>
-                    <option value="SPECTATOR">SPECTATOR</option>
-                  </select>
-                </dd>
+                <dd><span className="admin-badge admin-badge--gold">{selectedUser.role}</span></dd>
                 <dt>Trạng thái</dt>
                 <dd><StatusBadge status={selectedUser.status} /></dd>
                 <dt>Ngày tham gia</dt>
-                <dd>{selectedUser.joined}</dd>
+                <dd>{selectedUser.joined || '—'}</dd>
               </dl>
             </div>
           </div>
         )}
       </div>
-
 
       {/* Edit User Modal */}
       {showEditForm && editingUser && (
