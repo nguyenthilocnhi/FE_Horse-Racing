@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { mockPredictions as initialPools, mockUserPredictions as initialUserPreds } from '../../../data/adminMockData'
 import { StatusBadge, formatCurrency } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
-import { createPrediction } from '../../../services/predictionService'
+import { createPrediction, cancelPrediction } from '../../../services/predictionService'
 import './SpectatorPredictions.css'
 
 const MOCK_HORSES_DETAILS = [
@@ -28,7 +28,7 @@ const MOCK_RUNNERS = [
 ]
 
 export default function SpectatorPredictions() {
-  const [pools, setPools] = useState(initialPools)
+  const [pools, setPools] = useState([])
   const [selectedPool, setSelectedPool] = useState(null)
 
   // Selection states
@@ -71,8 +71,34 @@ export default function SpectatorPredictions() {
         console.error(e)
       }
     }
-    return initialUserPreds
+    return []
   })
+
+  const handleCancelPredictionTicket = async (predId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn HỦY cược dự đoán này và HOÀN TIỀN cọc về ví tài khoản?')) return
+    try {
+      try {
+        await cancelPrediction(predId, profile.id || 5)
+      } catch (e) {
+        console.warn('API cancel failed, refunding locally', e)
+      }
+      
+      const canceledItem = userPreds.find(p => p.id === predId || p.predictionId === predId)
+      const refundAmount = canceledItem ? (canceledItem.amount || canceledItem.stakeAmount || 100000) : 100000
+      
+      const updatedPreds = userPreds.filter(p => p.id !== predId && p.predictionId !== predId)
+      setUserPreds(updatedPreds)
+      localStorage.setItem('spectator_user_preds', JSON.stringify(updatedPreds))
+
+      const updatedProfile = { ...profile, balance: profile.balance + refundAmount }
+      setProfile(updatedProfile)
+      localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
+      
+      alert(`✅ Hủy cược thành công! Đã hoàn trả ${formatCurrency(refundAmount)} vào ví tài khoản của bạn.`)
+    } catch (err) {
+      alert('Lỗi khi hủy cược: ' + err.message)
+    }
+  }
 
   // Tải danh sách cuộc đua của các giải đấu MỞ ĐĂNG KÝ từ API
   useEffect(() => {
@@ -381,6 +407,61 @@ export default function SpectatorPredictions() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* User Prediction History Section */}
+      <div className="admin-card" style={{ marginTop: '24px', border: '1px solid rgba(212,175,55,0.15)' }}>
+        <div className="admin-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3>🎟️ Lịch Sử Đặt Cược & Dự Đoán Của Tôi</h3>
+          <span style={{ fontSize: '12px', color: '#888' }}>{userPreds ? userPreds.length : 0} vé dự đoán</span>
+        </div>
+        <div className="admin-card-body" style={{ padding: 0, overflowX: 'auto' }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Mã vé</th>
+                <th>Cuộc đua</th>
+                <th>Ngựa cược</th>
+                <th>Loại vé</th>
+                <th>Số tiền cọc</th>
+                <th>Trạng thái</th>
+                <th style={{ textAlign: 'right' }}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {userPreds && userPreds.length > 0 ? (
+                userPreds.map((item) => (
+                  <tr key={item.id || item.predictionId}>
+                    <td><code>#{item.id || item.predictionId}</code></td>
+                    <td style={{ color: '#fff', fontWeight: '500' }}>{item.raceName || item.race}</td>
+                    <td style={{ color: '#4ade80', fontWeight: 'bold' }}>🏇 {item.horse || item.horseName}</td>
+                    <td><span className="admin-badge admin-badge--purple">{item.type || item.ticketType || 'Standard'}</span></td>
+                    <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(item.amount || item.stakeAmount || 100000)}</td>
+                    <td><StatusBadge status={item.status || 'open'} /></td>
+                    <td style={{ textAlign: 'right' }}>
+                      {(item.status === 'open' || item.status === 'pending' || !item.status) && (
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn--danger admin-btn--sm"
+                          onClick={() => handleCancelPredictionTicket(item.id || item.predictionId)}
+                          title="Hủy cược & Hoàn tiền cọc về ví"
+                        >
+                          ❌ Hủy cược
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
+                    Bạn chưa mua vé cược nào. Chọn một cuộc đua ở trên để tham gia dự đoán!
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

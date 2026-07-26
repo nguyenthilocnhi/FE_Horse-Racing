@@ -29,19 +29,49 @@ export default function OwnerHorses() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
 
+  function getCurrentOwnerKey() {
+    try {
+      const u = JSON.parse(localStorage.getItem('user') || '{}')
+      return u.email || u.id || u.username || 'giathanh.owner@gmail.com'
+    } catch (e) {
+      return 'giathanh.owner@gmail.com'
+    }
+  }
+
   // ── Fetch horses from API on mount ──
   useEffect(() => {
     async function loadHorses() {
+      const ownerKey = getCurrentOwnerKey()
       try {
         setLoading(true)
-        const data = await ownerService.getOwnerHorses()
-        // API response format validation
-        const list = Array.isArray(data) ? data : data?.data ?? data?.content ?? []
+        const apiRes = await ownerService.getOwnerHorses()
+        const apiList = Array.isArray(apiRes) ? apiRes : apiRes?.data ?? apiRes?.content ?? []
         
-        // Map API fields (stable-owner attributes) if needed
-        const formatted = list.map(h => ({
-          id:            h.id ?? h.horseId ?? `HRS-00${Math.floor(Math.random() * 1000)}`,
-          name:          h.name ?? h.fullName ?? 'Chưa đặt tên',
+        let localList = []
+        try {
+          localList = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
+        } catch (e) {}
+
+        let combined = [...apiList]
+        localList.forEach(lh => {
+          if (!combined.some(c => String(c.id) === String(lh.id) || c.name === lh.name)) {
+            combined.push(lh)
+          }
+        })
+
+        // If no horses exist for this owner key yet, initialize account-specific horses
+        if (combined.length === 0) {
+          const ownerPrefix = ownerKey.split('@')[0].toUpperCase()
+          combined = [
+            { id: Date.now(), name: `Xích Thố (${ownerPrefix})`, breed: 'Thoroughbred', age: 5, wins: 10, races: 25, earnings: '300,000,000 VND', healthStatus: 'ELIGIBLE', status: 'ready' },
+            { id: Date.now() + 1, name: `Bạch Long (${ownerPrefix})`, breed: 'Arabian', age: 4, wins: 6, races: 18, earnings: '180,000,000 VND', healthStatus: 'ELIGIBLE', status: 'ready' }
+          ]
+          localStorage.setItem('owner_horses_' + ownerKey, JSON.stringify(combined))
+        }
+
+        const formatted = combined.map(h => ({
+          id:            h.id ?? `HRS-${Math.floor(Math.random() * 1000)}`,
+          name:          h.name ?? 'Chưa đặt tên',
           breed:         h.breed ?? 'Thoroughbred',
           age:           h.age ?? 3,
           wins:          h.wins ?? 0,
@@ -54,9 +84,8 @@ export default function OwnerHorses() {
         }))
         setHorses(formatted)
       } catch (err) {
-        console.warn('API getOwnerHorses lỗi, dùng dữ liệu giả lập:', err.message)
-        // Fallback to initial mock data during dev
-        setHorses(initialHorses)
+        console.warn('Lỗi khi lấy danh sách ngựa từ API:', err.message)
+        setHorses([])
       } finally {
         setLoading(false)
       }
@@ -68,6 +97,7 @@ export default function OwnerHorses() {
     e.preventDefault()
     if (!name || !age) return
     
+    const ownerKey = getCurrentOwnerKey()
     const payload = {
       name,
       age: parseInt(age, 10),
@@ -82,7 +112,7 @@ export default function OwnerHorses() {
       const res = await ownerService.createOwnerHorse(payload)
       const data = res?.data || res || {}
       const newHorse = {
-        id:            data?.id ?? `HRS-${Date.now().toString().slice(-4)}`,
+        id:            data?.id ?? Date.now(),
         name:          data?.name ?? name,
         age:           data?.age ?? parseInt(age, 10),
         breed:         data?.breed ?? breed,
@@ -94,42 +124,40 @@ export default function OwnerHorses() {
         currentJockey: null,
         image:         image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
       }
+
+      const stored = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
+      const updated = [newHorse, ...stored.filter(s => s.name !== newHorse.name)]
+      localStorage.setItem('owner_horses_' + ownerKey, JSON.stringify(updated))
+
       setHorses(prev => [newHorse, ...prev])
       setNewHorseModal(false)
       setName('')
       setAge('')
       alert('✅ Đăng ký ngựa mới thành công!')
     } catch (err) {
-      console.error('API createOwnerHorse error details:', err?.response?.data || err)
-      const serverErr = err?.response?.data
-      let serverMsg = ''
-      if (typeof serverErr === 'string') {
-        serverMsg = serverErr
-      } else if (serverErr?.errors) {
-        serverMsg = Object.values(serverErr.errors).join(', ')
-      } else if (serverErr?.message) {
-        serverMsg = serverErr.message
-      }
-
-      // Local fallback creation so user can continue seamlessly
-      const localNew = {
-        id: `HRS-${Date.now().toString().slice(-4)}`,
+      // Local fallback for offline / mock user
+      const newHorse = {
+        id:            Date.now(),
         name,
-        age: parseInt(age, 10),
-        breed: breed || 'Thoroughbred',
-        healthStatus: healthStatus || 'ELIGIBLE',
-        wins: 0,
-        races: 0,
-        earnings: '0 VND',
-        status: 'ready',
+        age:           parseInt(age, 10),
+        breed:         breed || 'Thoroughbred',
+        healthStatus:  healthStatus || 'ELIGIBLE',
+        wins:          0,
+        races:         0,
+        earnings:      '0 VND',
+        status:        'ready',
         currentJockey: null,
-        image: image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
+        image:         image || ''
       }
-      setHorses(prev => [localNew, ...prev])
+      const stored = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
+      const updated = [newHorse, ...stored]
+      localStorage.setItem('owner_horses_' + ownerKey, JSON.stringify(updated))
+
+      setHorses(prev => [newHorse, ...prev])
       setNewHorseModal(false)
       setName('')
       setAge('')
-      alert('✅ Đăng ký ngựa mới thành công!')
+      alert('✅ Đã thêm thành công ngựa mới vào trang trại của bạn!')
     }
   }
 

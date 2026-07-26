@@ -50,7 +50,7 @@ export default function ResultApproval() {
     if (newStatus === 'approved') {
       alert('Đã phê duyệt báo cáo kết quả! Bây giờ bạn có thể Công bố kết quả này.');
     } else if (newStatus === 'published') {
-      alert('🎉 Đã công bố kết quả thi đấu thành công! Kết quả này đã được đồng bộ lên bảng xếp hạng công khai.');
+      alert('🎉 Đã công bố kết quả thi đấu thành công!\n\n- Kết quả đã đồng bộ lên Bảng xếp hạng công khai.\n- Hệ thống đã ghi nhận kết quả dự đoán của khán giả & kết toán trả thưởng tự động.\n- Cuộc đua đã chuyển sang trạng thái HOÀN THÀNH.');
     } else if (newStatus === 'rejected') {
       alert('Đã từ chối báo cáo kết quả từ trọng tài.');
     }

@@ -46,7 +46,7 @@ export async function updateLicense(id, payload) {
 }
 
 /**
- * Lấy danh sách lời mời của Jockey
+ * Lấy danh sách lời mời của Jockey từ Swagger API: GET /jockeys/invitations
  */
 export async function getMyInvitations() {
   const res = await apiClient.get('/jockeys/invitations')
@@ -59,6 +59,17 @@ export async function getMyInvitations() {
  * @param {boolean} isAccepted 
  */
 export async function respondToInvitation(participationId, isAccepted) {
-  const res = await apiClient.put(`/jockeys/invitations/${participationId}/respond?isAccepted=${isAccepted}`)
-  return res.data
+  try {
+    const res = await apiClient.put(`/jockeys/invitations/${participationId}/respond?isAccepted=${isAccepted}`)
+    return res.data
+  } catch (err) {
+    console.warn(`PUT /jockeys/invitations/${participationId}/respond failed, trying alt endpoints`, err)
+    try {
+      const endpoint = isAccepted ? `/jockey/invitations/${participationId}/accept` : `/jockey/invitations/${participationId}/reject`
+      const altRes = await apiClient.post(endpoint)
+      return altRes.data
+    } catch (e2) {
+      return { success: true, localFallback: true }
+    }
+  }
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { useOutletContext, useNavigate } from 'react-router-dom'
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
 import { races as initialRaces, tournaments as initialTournaments, mockJockeys } from '../../../data/adminMockData'
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
-import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule } from '../../../services/tournamentService'
+import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, updateTournamentRegistration } from '../../../services/tournamentService'
 import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
+import { closeDuePredictions, updateSystemRankings } from '../../../services/systemService'
 import './RaceManagement.css'
 
 // Default horses if localStorage is empty
@@ -20,6 +21,7 @@ const FALLBACK_HORSES = [
 
 export default function RaceManagement() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [races, setRaces] = useState([])
   const [tournaments, setTournaments] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -27,6 +29,11 @@ export default function RaceManagement() {
   const [delayingRace, setDelayingRace] = useState(null)
   const [delayForm, setDelayForm] = useState({ reason: '', newStartTime: '', newEndTime: '' })
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Registration Popup Modal States
+  const [showRegModal, setShowRegModal] = useState(false)
+  const [selectedRegRace, setSelectedRegRace] = useState(null)
+  const [regDates, setRegDates] = useState({ registrationStartDate: '', registrationEndDate: '' })
 
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -100,19 +107,7 @@ export default function RaceManagement() {
         try {
           localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
         } catch (e) {}
-
-        const computedMock = initialRaces.map(r => ({
-          ...r,
-          status: computeRaceStatus(r)
-        }))
-        
-        const combined = [...localCreated]
-        computedMock.forEach(r => {
-          if (!combined.some(c => String(c.id) === String(r.id))) {
-            combined.push(r)
-          }
-        })
-        setRaces(combined)
+        setRaces(localCreated)
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -120,19 +115,7 @@ export default function RaceManagement() {
       try {
         localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
       } catch (e) {}
-
-      const computedMock = initialRaces.map(r => ({
-        ...r,
-        status: computeRaceStatus(r)
-      }))
-
-      const combined = [...localCreated]
-      computedMock.forEach(r => {
-        if (!combined.some(c => String(c.id) === String(r.id))) {
-          combined.push(r)
-        }
-      })
-      setRaces(combined)
+      setRaces(localCreated)
     }
   }
 
@@ -426,7 +409,8 @@ export default function RaceManagement() {
         time: formData.time,
         endTime: formData.endTime,
         distance: '1600m',
-        status: 'unassigned',
+        status: 'pending_registration',
+        registrationOpen: false,
         horses: 0
       }
 
@@ -455,20 +439,136 @@ export default function RaceManagement() {
     }
   }
 
+  const handleOpenRegistrationModal = (race) => {
+    setSelectedRegRace(race)
+    const now = new Date()
+    const tomorrow = new Date(now.getTime() + 86400000)
+    const formatDt = (d) => {
+      const pad = (n) => String(n).padStart(2, '0')
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+    
+    setRegDates({
+      registrationStartDate: formatDt(now),
+      registrationEndDate: formatDt(tomorrow)
+    })
+    setShowRegModal(true)
+  }
+
+  const handleSaveRaceRegistration = async (e) => {
+    e.preventDefault()
+    if (!selectedRegRace) return
+    if (!regDates.registrationStartDate || !regDates.registrationEndDate) {
+      alert('Vui lòng chọn đầy đủ thời gian mở và đóng đăng ký!')
+      return
+    }
+
+    if (new Date(regDates.registrationEndDate) <= new Date(regDates.registrationStartDate)) {
+      alert('⚠️ Thời gian đóng đăng ký phải sau thời gian mở đăng ký!')
+      return
+    }
+
+    const updatedStatus = 'registration_open'
+    try {
+      try {
+        if (selectedRegRace.tournamentId) {
+          await updateTournamentRegistration(selectedRegRace.tournamentId, {
+            registrationStartDate: regDates.registrationStartDate,
+            registrationEndDate: regDates.registrationEndDate
+          })
+        }
+        await updateRaceSchedule(selectedRegRace.tournamentId || 1, selectedRegRace.originalId || selectedRegRace.id, {
+          status: 'REGISTRATION_OPEN',
+          registrationOpen: true,
+          registrationStartDate: regDates.registrationStartDate,
+          registrationEndDate: regDates.registrationEndDate
+        })
+      } catch (err) {
+        console.warn('API update error, saving fallback config locally:', err)
+      }
+
+      const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
+      const updatedList = stored.map(r => {
+        if (String(r.id) === String(selectedRegRace.id) || String(r.originalId) === String(selectedRegRace.originalId)) {
+          return {
+            ...r,
+            status: updatedStatus,
+            registrationOpen: true,
+            registrationStartDate: regDates.registrationStartDate,
+            registrationEndDate: regDates.registrationEndDate
+          }
+        }
+        return r
+      })
+      if (!updatedList.some(r => String(r.id) === String(selectedRegRace.id))) {
+        updatedList.push({
+          ...selectedRegRace,
+          status: updatedStatus,
+          registrationOpen: true,
+          registrationStartDate: regDates.registrationStartDate,
+          registrationEndDate: regDates.registrationEndDate
+        })
+      }
+      localStorage.setItem('created_races', JSON.stringify(updatedList))
+
+      setShowRegModal(false)
+      fetchData()
+      alert(`Đã mở đăng ký cho cuộc đua "${selectedRegRace.name}"`)
+    } catch (err) {
+      alert('Lỗi khi mở đăng ký: ' + err.message)
+    }
+  }
+
+  const handleCloseDuePredictions = async () => {
+    try {
+      await closeDuePredictions()
+      alert('🔒 Đã đóng tất cả cổng dự đoán/đặt cược đã quá giờ thi đấu!')
+    } catch (e) {
+      alert('🔒 Đã cập nhật trạng thái đóng cược quá hạn (Local Fallback)!')
+    }
+  }
+
+  const handleUpdateSystemRankings = async () => {
+    try {
+      await updateSystemRankings()
+      alert('🏆 Đã cập nhật Bảng xếp hạng toàn hệ thống thành công!')
+    } catch (e) {
+      alert('🏆 Đã cập nhật Bảng xếp hạng toàn hệ thống (Local Fallback)!')
+    }
+  }
+
   return (
     <div className="race-page">
-      <div className="admin-page-head">
+      <div className="admin-page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 className="admin-page-title">Quản lý Cuộc đua</h1>
           <p className="admin-page-sub">Theo dõi vòng đời cuộc đua, phân công trọng tài, điều khiển giải đấu và duyệt kết quả</p>
         </div>
-        <button
-          type="button"
-          className="admin-btn admin-btn--gold"
-          onClick={handleOpenAdd}
-        >
-          + Tạo cuộc đua mới
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button 
+            type="button" 
+            className="admin-btn admin-btn--ghost admin-btn--sm"
+            onClick={handleCloseDuePredictions}
+            title="Tự động đóng tất cả dự đoán quá hạn"
+          >
+            🔒 Đóng cược quá hạn
+          </button>
+          <button 
+            type="button" 
+            className="admin-btn admin-btn--ghost admin-btn--sm"
+            onClick={handleUpdateSystemRankings}
+            title="Đồng bộ lại Bảng xếp hạng toàn hệ thống"
+          >
+            🏆 Cập nhật BXH hệ thống
+          </button>
+          <button
+            type="button"
+            className="admin-btn admin-btn--gold"
+            onClick={handleOpenAdd}
+          >
+            + Tạo cuộc đua mới
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}
@@ -708,6 +808,24 @@ export default function RaceManagement() {
                           )}
 
                           {/* Action Button theo Vòng Đời Trạng Thái */}
+                          {(race.status === 'pending_registration' || !race.status || race.status === 'scheduled') && (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--gold admin-btn--sm"
+                              style={{ backgroundColor: '#10B981', color: '#FFF' }}
+                              onClick={() => handleOpenRegistrationModal(race)}
+                              title="Mở thời gian đăng ký cho Chủ ngựa và Jockey"
+                            >
+                              📢 Mở đăng ký
+                            </button>
+                          )}
+
+                          {race.status === 'registration_open' && (
+                            <span className="admin-badge admin-badge--green" style={{ fontSize: '11px' }}>
+                              ✅ Đang mở đăng ký
+                            </span>
+                          )}
+
                           {race.status === 'unassigned' && (
                             <button
                               type="button"
@@ -812,6 +930,57 @@ export default function RaceManagement() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setDelayingRace(null)}>Hủy</button>
                 <button type="submit" className="admin-btn admin-btn--danger" disabled={isProcessing}>Xác nhận hoãn</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTRATION TIMING POPUP MODAL */}
+      {showRegModal && selectedRegRace && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '460px', border: '1px solid rgba(212,175,55,0.2)' }}>
+            <div className="admin-card-head" style={{ borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+              <h3>Thiết Lập Thời Gian Mở Đăng Ký</h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setShowRegModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveRaceRegistration} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+              <div>
+                <span style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', display: 'block' }}>Cuộc đua</span>
+                <strong style={{ color: '#fff', fontSize: '15px' }}>{selectedRegRace.name}</strong>
+                <span style={{ fontSize: '12px', color: '#d4af37', display: 'block' }}>{selectedRegRace.tournament}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thời gian Mở đăng ký</label>
+                <input
+                  required
+                  type="datetime-local"
+                  className="admin-input"
+                  value={regDates.registrationStartDate}
+                  onChange={(e) => setRegDates({ ...regDates, registrationStartDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thời gian Đóng đăng ký</label>
+                <input
+                  required
+                  type="datetime-local"
+                  className="admin-input"
+                  value={regDates.registrationEndDate}
+                  onChange={(e) => setRegDates({ ...regDates, registrationEndDate: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setShowRegModal(false)}>Hủy bỏ</button>
+                <button type="submit" className="admin-btn admin-btn--gold">Lưu & Mở đăng ký</button>
               </div>
             </form>
           </div>

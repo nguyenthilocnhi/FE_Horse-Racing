@@ -276,11 +276,8 @@ export const financialLog = [
 
 export const ownerNavItems = [
   { path: '/owner', label: 'Tổng quan', icon: '💎' },
-  { path: '/owner/tournaments', label: 'Giải đấu', icon: '🏆' },
-  { path: '/owner/all-races', label: 'Cuộc đua', icon: '🏁' },
+  { path: '/owner/races', label: 'Lịch thi đấu & Đăng ký', icon: '🏁' },
   { path: '/owner/horses', label: 'Quản lý ngựa', icon: '🐴' },
-  { path: '/owner/jockeys', label: 'Danh sách Jockey', icon: '🏇' },
-  { path: '/owner/races', label: 'Lịch thi đấu & Đăng ký', icon: '📅' },
   { path: '/owner/finances', label: 'Tài chính', icon: '🪙' },
   { path: '/owner/profile', label: 'Hồ sơ Trang trại', icon: '🏠' },
 ]

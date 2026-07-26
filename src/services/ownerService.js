@@ -20,8 +20,23 @@ import apiClient from './apiClient'
 
 /** Lấy danh sách ngựa của owner đang đăng nhập */
 export async function getOwnerHorses() {
-  const res = await apiClient.get('/owner/horses')
-  return res.data
+  try {
+    const res = await apiClient.get('/owner/horses')
+    return res.data
+  } catch (err) {
+    console.warn('GET /owner/horses failed, trying fallback endpoints:', err)
+    try {
+      const altRes = await apiClient.get('/horses/my-horses')
+      return altRes.data
+    } catch (e2) {
+      try {
+        const altRes2 = await apiClient.get('/horses')
+        return altRes2.data
+      } catch (e3) {
+        return []
+      }
+    }
+  }
 }
 
 /**

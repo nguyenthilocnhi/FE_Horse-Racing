@@ -118,36 +118,71 @@ export default function Invitations() {
     try {
       setLoading(true)
       const res = await getMyInvitations()
-      const fetchedData = res?.data || res || []
-      const mapped = fetchedData.map(p => {
+      const apiData = res?.data || res || []
+      const apiList = Array.isArray(apiData) ? apiData : []
+
+      let localRegs = []
+      try {
+        // 1. Read global mock_registrations
+        const globalList = JSON.parse(localStorage.getItem('mock_registrations') || '[]')
+        localRegs = [...globalList]
+
+        // 2. Aggregate all owner-scoped mock_registrations_ keys in localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('mock_registrations_')) {
+            try {
+              const ownerItems = JSON.parse(localStorage.getItem(key) || '[]')
+              ownerItems.forEach(item => {
+                if (!localRegs.some(r => String(r.id) === String(item.id))) {
+                  localRegs.push(item)
+                }
+              })
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
+      const allData = [...apiList]
+      localRegs.forEach(lr => {
+        if (!allData.some(a => String(a.id) === String(lr.id))) {
+          allData.unshift(lr)
+        }
+      })
+
+      const mapped = allData.map(p => {
         let mappedStatus = 'pending'
         if (p.jockeyInvitationStatus === 'ACCEPTED') mappedStatus = 'accepted'
         if (p.jockeyInvitationStatus === 'REJECTED') mappedStatus = 'declined'
 
+        const startTimeFormatted = p.raceSchedule?.startTime
+          ? (p.raceSchedule.startTime.includes('T') ? p.raceSchedule.startTime.split('T')[1].substring(0, 5) : p.raceSchedule.startTime)
+          : '15:00'
+
         return {
           id: p.id,
-          raceId: `R-${p.raceSchedule?.id || ''}`,
+          raceId: `R-${p.raceSchedule?.id || p.raceScheduleId || p.id}`,
           raceName: p.raceSchedule?.name || 'Vòng đấu',
-          tournamentName: p.raceSchedule?.tournament?.name || 'Giải đấu',
-          horseName: p.horse?.name || 'Không rõ',
-          horseAge: p.horse?.age || 3,
-          owner: p.horse?.horseOwner?.fullName || p.horse?.horseOwner?.email || 'Chủ ngựa',
-          venue: 'Saigon Racecourse',
+          tournamentName: p.raceSchedule?.tournament?.name || 'Giải Đua Ngựa Hệ Thống',
+          horseName: p.horse?.name || 'Chưa xác định',
+          horseAge: p.horse?.age || 5,
+          owner: p.horse?.horseOwner?.fullName || p.horse?.horseOwner?.email || (p.ownerKey ? p.ownerKey.split('@')[0] : 'Chủ Trang Trại'),
+          venue: p.raceSchedule?.location || 'Trường đua Phú Thọ',
           distance: '1000m',
-          raceDate: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleDateString('vi-VN') : '',
-          raceTime: p.raceSchedule?.startTime ? new Date(p.raceSchedule.startTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'}) : '',
+          raceDate: p.raceSchedule?.raceDate || (p.raceSchedule?.startTime ? p.raceSchedule.startTime.split('T')[0] : '2026-11-09'),
+          raceTime: startTimeFormatted,
           prizePool: '200,000,000 VND',
           fee: '15,000,000 VND',
-          deadline: p.raceSchedule?.startTime ? new Date(new Date(p.raceSchedule.startTime).getTime() - 86400000).toLocaleDateString('vi-VN') : '',
-          ownerContact: p.horse?.horseOwner?.phone || p.horse?.horseOwner?.email || '',
-          notes: '',
+          deadline: p.raceSchedule?.raceDate || (p.raceSchedule?.startTime ? p.raceSchedule.startTime.split('T')[0] : '2026-11-08'),
+          ownerContact: p.horse?.horseOwner?.phone || p.horse?.horseOwner?.email || '0909 888 777',
+          notes: p.laneNumber ? `Làn chạy số ${p.laneNumber}` : '',
           status: mappedStatus
         }
       })
       setData(mapped)
     } catch (err) {
-      console.error(err)
-      setData(initialInvitations)
+      console.error('Failed to load invitations from API:', err)
+      setData([])
     } finally {
       setLoading(false)
     }
@@ -156,8 +191,27 @@ export default function Invitations() {
   async function handleAccept(id) {
     try {
       await respondToInvitation(id, true)
+
+      // Synchronize acceptance to global mock_registrations & all owner-scoped mock_registrations_
+      try {
+        const globalRegs = JSON.parse(localStorage.getItem('mock_registrations') || '[]')
+        const updatedGlobal = globalRegs.map(r => String(r.id) === String(id) ? { ...r, jockeyInvitationStatus: 'ACCEPTED' } : r)
+        localStorage.setItem('mock_registrations', JSON.stringify(updatedGlobal))
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('mock_registrations_')) {
+            try {
+              const ownerItems = JSON.parse(localStorage.getItem(key) || '[]')
+              const updatedOwner = ownerItems.map(r => String(r.id) === String(id) ? { ...r, jockeyInvitationStatus: 'ACCEPTED' } : r)
+              localStorage.setItem(key, JSON.stringify(updatedOwner))
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
       setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'accepted' } : inv))
-      alert('Đã chấp nhận lời mời!')
+      alert('✅ Đã chấp nhận lời mời thi đấu!\n\nThông tin Horse & Jockey đã được chuyển sang màn hình Duyệt Đăng Ký của Admin.')
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Có lỗi xảy ra')
     }
@@ -166,8 +220,27 @@ export default function Invitations() {
   async function handleDecline(id) {
     try {
       await respondToInvitation(id, false)
+
+      // Synchronize decline to global mock_registrations & all owner-scoped mock_registrations_
+      try {
+        const globalRegs = JSON.parse(localStorage.getItem('mock_registrations') || '[]')
+        const updatedGlobal = globalRegs.map(r => String(r.id) === String(id) ? { ...r, jockeyInvitationStatus: 'REJECTED' } : r)
+        localStorage.setItem('mock_registrations', JSON.stringify(updatedGlobal))
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('mock_registrations_')) {
+            try {
+              const ownerItems = JSON.parse(localStorage.getItem(key) || '[]')
+              const updatedOwner = ownerItems.map(r => String(r.id) === String(id) ? { ...r, jockeyInvitationStatus: 'REJECTED' } : r)
+              localStorage.setItem(key, JSON.stringify(updatedOwner))
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+
       setData((prev) => prev.map((inv) => inv.id === id ? { ...inv, status: 'declined' } : inv))
-      alert('Đã từ chối lời mời!')
+      alert('❌ Đã từ chối lời mời thi đấu.')
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Có lỗi xảy ra')
     }

@@ -1,8 +1,11 @@
-import React, { useState } from 'react'
-import { ownerJockeys as initialJockeys, ownerHorses } from '../../../data/ownerMockData'
+import React, { useState, useEffect } from 'react'
+import { getAllJockeys } from '../../../services/jockeyService'
+import { getOwnerHorses } from '../../../services/ownerService'
 
 export default function OwnerJockeys() {
-  const [jockeys, setJockeys] = useState(initialJockeys)
+  const [jockeys, setJockeys] = useState([])
+  const [ownerHorses, setOwnerHorses] = useState([])
+  const [loading, setLoading] = useState(true)
   const [hireModal, setHireModal] = useState(false)
   const [selectedJockey, setSelectedJockey] = useState(null)
   
@@ -11,11 +14,57 @@ export default function OwnerJockeys() {
   const [offeredFee, setOfferedFee] = useState('')
   const [message, setMessage] = useState('')
 
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const [jocRes, horseRes] = await Promise.allSettled([
+        getAllJockeys(),
+        getOwnerHorses()
+      ])
+
+      if (jocRes.status === 'fulfilled') {
+        const rawJockeys = jocRes.value?.data || jocRes.value || []
+        const formatted = (Array.isArray(rawJockeys) ? rawJockeys : []).map(j => ({
+          id: j.id,
+          name: j.fullName || j.userName || j.name || 'Jockey',
+          experience: j.experience || '5 năm',
+          license: j.license || `JOC-${j.id}`,
+          wins: j.wins || 0,
+          races: j.races || 0,
+          winRate: j.races > 0 ? `${((j.wins / j.races) * 100).toFixed(0)}%` : '0%',
+          fee: '15,000,000 VND',
+          status: 'available',
+          assignedHorse: null,
+          image: j.image || ''
+        }))
+        setJockeys(formatted)
+      } else {
+        setJockeys([])
+      }
+
+      if (horseRes.status === 'fulfilled') {
+        const rawHorses = horseRes.value?.data || horseRes.value || []
+        setOwnerHorses(Array.isArray(rawHorses) ? rawHorses : [])
+      } else {
+        setOwnerHorses([])
+      }
+    } catch (e) {
+      console.warn('Failed to load jockeys/horses from API:', e)
+      setJockeys([])
+      setOwnerHorses([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const openHireModal = (jockey) => {
     setSelectedJockey(jockey)
     setOfferedFee(jockey.fee.replace(' VND', ''))
-    // Find horses without a jockey or ready horses
-    const freeHorses = ownerHorses.filter(h => h.status === 'ready' && !h.currentJockey)
+    const freeHorses = ownerHorses.filter(h => !h.currentJockey)
     if (freeHorses.length > 0) {
       setSelectedHorseId(freeHorses[0].id)
     } else {

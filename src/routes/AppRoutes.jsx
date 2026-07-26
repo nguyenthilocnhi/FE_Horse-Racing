@@ -149,10 +149,10 @@ export default function AppRoutes() {
       {/* ── Owner Portal ── */}
       <Route element={<ProtectedRoute allowedRoles={['OWNER', 'HORSE_OWNER', 'HORSE OWNER']}><OwnerLayout /></ProtectedRoute>}>
         <Route path="/owner" element={<OwnerDashboard />} />
-        <Route path="/owner/tournaments" element={<OwnerTournaments />} />
+        <Route path="/owner/tournaments" element={<Navigate to="/owner/races" replace />} />
         <Route path="/owner/all-races" element={<OwnerAllRaces />} />
         <Route path="/owner/horses" element={<OwnerHorses />} />
-        <Route path="/owner/jockeys" element={<OwnerJockeys />} />
+        <Route path="/owner/jockeys" element={<Navigate to="/owner/races" replace />} />
         <Route path="/owner/races" element={<OwnerRaces />} />
         <Route path="/owner/finances" element={<OwnerFinances />} />
         <Route path="/owner/profile" element={<OwnerProfile />} />

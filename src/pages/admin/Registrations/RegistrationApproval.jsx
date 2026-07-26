@@ -46,8 +46,8 @@ export default function RegistrationApproval() {
       })
       setRegistrations(mapped)
     } catch (err) {
-      console.error(err)
-      setRegistrations(initialRegistrations)
+      console.error('Failed to load registrations from API:', err)
+      setRegistrations([])
     } finally {
       setLoading(false)
     }
