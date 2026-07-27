@@ -65,7 +65,19 @@ export default function RaceTrackManagement() {
       const res = await getAllRaceTracks()
       const data = res?.data || res
       if (Array.isArray(data) && data.length > 0) {
-        setTracks(data)
+        const formatted = data.map((item) => ({
+          id: item.id,
+          name: item.name,
+          location: item.location,
+          surface: item.surface || item.surfaceType || 'Cỏ (Turf)',
+          surfaceType: item.surfaceType || item.surface || 'Cỏ (Turf)',
+          length: item.length || item.lengthMeters || 1500,
+          lengthMeters: item.lengthMeters || item.length || 1500,
+          capacity: Number(item.capacity) || 10000,
+          status: item.status || 'active',
+          description: item.description || ''
+        }))
+        setTracks(formatted)
       } else {
         setTracks(mockRaceTracks)
       }
@@ -146,28 +158,72 @@ export default function RaceTrackManagement() {
     }
 
     const payload = {
-      ...formData,
-      length: Number(formData.length),
-      capacity: Number(formData.capacity)
+      name: formData.name,
+      location: formData.location,
+      surfaceType: formData.surface,
+      lengthMeters: Number(formData.length),
+      description: formData.description || ''
     }
 
     try {
       if (editingTrack) {
         try {
-          await updateRaceTrack(editingTrack.id, payload)
+          const res = await updateRaceTrack(editingTrack.id, payload)
+          const updatedData = res?.data || res
+          if (updatedData && (updatedData.id || updatedData.name)) {
+            setTracks((prev) =>
+              prev.map((t) =>
+                t.id === editingTrack.id
+                  ? {
+                      ...t,
+                      name: updatedData.name || formData.name,
+                      location: updatedData.location || formData.location,
+                      surface: updatedData.surfaceType || formData.surface,
+                      surfaceType: updatedData.surfaceType || formData.surface,
+                      length: updatedData.lengthMeters || Number(formData.length),
+                      lengthMeters: updatedData.lengthMeters || Number(formData.length),
+                      description: updatedData.description ?? formData.description,
+                      capacity: Number(formData.capacity),
+                      status: formData.status
+                    }
+                  : t
+              )
+            )
+          } else {
+            setTracks((prev) =>
+              prev.map((t) => (t.id === editingTrack.id ? { ...t, ...formData, length: Number(formData.length), capacity: Number(formData.capacity) } : t))
+            )
+          }
         } catch (err) {
           console.warn('API update failed, updating locally', err)
+          setTracks((prev) =>
+            prev.map((t) => (t.id === editingTrack.id ? { ...t, ...formData, length: Number(formData.length), capacity: Number(formData.capacity) } : t))
+          )
         }
 
-        setTracks((prev) =>
-          prev.map((t) => (t.id === editingTrack.id ? { ...t, ...payload } : t))
-        )
         showToast(`Đã cập nhật trường đua "${formData.name}" thành công!`)
       } else {
-        let newTrack = { id: Date.now(), ...payload }
+        let newTrack = {
+          id: Date.now(),
+          ...formData,
+          length: Number(formData.length),
+          capacity: Number(formData.capacity)
+        }
         try {
           const res = await createRaceTrack(payload)
-          if (res && res.id) newTrack = res
+          const trackData = res?.data || res
+          if (trackData && (trackData.id || trackData.name)) {
+            newTrack = {
+              id: trackData.id || Date.now(),
+              name: trackData.name || formData.name,
+              location: trackData.location || formData.location,
+              surface: trackData.surfaceType || formData.surface,
+              length: trackData.lengthMeters || Number(formData.length),
+              capacity: Number(formData.capacity) || 10000,
+              status: formData.status || 'active',
+              description: trackData.description ?? formData.description
+            }
+          }
         } catch (err) {
           console.warn('API create failed, creating locally', err)
         }

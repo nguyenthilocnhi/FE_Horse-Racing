@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { tournaments as initialTournaments, races as initialRaces, mockRaceTracks } from '../../../data/adminMockData'
 import { StatusBadge } from '../../../utils/adminHelpers'
-import { 
-  getAllTournaments, 
-  getTournamentSchedule, 
-  createTournament, 
-  updateTournament, 
-  cancelTournament, 
+import {
+  getAllTournaments,
+  getTournamentSchedule,
+  createTournament,
+  updateTournament,
+  cancelTournament,
   updateTournamentRegistration,
   getTournamentReport,
   exportTournament,
@@ -46,12 +46,14 @@ export default function TournamentManagement() {
     try {
       const res = await getAllRaceTracks()
       const data = res?.data || res
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setRaceTracks(data)
+      } else {
+        setRaceTracks(mockRaceTracks)
       }
     } catch (err) {
       console.warn('Failed to load race tracks from API:', err)
-      setRaceTracks([])
+      setRaceTracks(mockRaceTracks)
     }
   }
 
@@ -73,7 +75,7 @@ export default function TournamentManagement() {
       let localCreated = []
       try {
         localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
-      } catch (e) {}
+      } catch (e) { }
 
       if (Array.isArray(tourList)) {
         const formatted = await Promise.all(
@@ -97,7 +99,7 @@ export default function TournamentManagement() {
               }
             }
 
-            const localMatches = localCreated.filter(r => 
+            const localMatches = localCreated.filter(r =>
               String(r.tournamentId) === String(t.id) || r.tournament === t.name
             ).length
 
@@ -290,7 +292,7 @@ export default function TournamentManagement() {
     }
     setSelectedRegTournament(t)
     setRegFormData({
-      registrationStartDate: '', 
+      registrationStartDate: '',
       registrationEndDate: ''
     })
     setShowRegModal(true)
@@ -311,7 +313,7 @@ export default function TournamentManagement() {
     const tournStartDateObj = new Date(selectedRegTournament.startDate);
     regEndDateObj.setHours(0, 0, 0, 0);
     tournStartDateObj.setHours(0, 0, 0, 0);
-    
+
     if (regEndDateObj > tournStartDateObj) {
       alert('Ngày đóng đăng ký không được vượt quá ngày bắt đầu giải đấu')
       return
@@ -328,7 +330,7 @@ export default function TournamentManagement() {
       alert('Thiết lập thời gian đăng ký thành công!')
       setShowRegModal(false)
       setSelectedRegTournament(null)
-      fetchTournaments() 
+      fetchTournaments()
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.response?.data || err.message || 'Lỗi không xác định'
       const displayMsg = typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)
@@ -361,7 +363,7 @@ export default function TournamentManagement() {
         if (selectedTournament && selectedTournament.id === t.id) {
           setSelectedTournament(null)
         }
-      } catch(err) {
+      } catch (err) {
         const errorMsg = err.response?.data || err.message || 'Lỗi không xác định'
         if (typeof errorMsg === 'string') {
           alert('Hủy thất bại: ' + errorMsg)
@@ -374,7 +376,7 @@ export default function TournamentManagement() {
 
   const handleSave = async (e) => {
     e.preventDefault()
-    
+
     if (selectedTournament && selectedTournament.status === 'completed') {
       alert('Giải đấu đã hoàn thành, không thể chỉnh sửa!')
       return
@@ -414,7 +416,7 @@ export default function TournamentManagement() {
         await createTournament(payload)
         alert('Tạo mới giải đấu thành công!')
       }
-      
+
       setShowForm(false)
       setSelectedTournament(null)
       fetchTournaments()
@@ -552,7 +554,7 @@ export default function TournamentManagement() {
               onChange={(e) => setLocalSearch(e.target.value)}
               style={{ minWidth: '220px' }}
             />
-            
+
             <select
               className="admin-select"
               value={statusFilter}
@@ -601,77 +603,77 @@ export default function TournamentManagement() {
                 ) : filteredTournaments.length > 0 ? (
                   filteredTournaments.map((t) => (
                     <tr key={t.id}>
-                    <td>{t.id}</td>
-                    <td><strong className="tournament-name" style={{ color: '#fff' }}>{t.name}</strong></td>
-                    <td>{t.venue}</td>
-                    <td>{t.startDate} → {t.endDate}</td>
-                    <td>{t.races} races</td>
-                    <td>{t.prize}</td>
-                    <td><StatusBadge status={t.status} /></td>
-                    <td>
-                      <div className="admin-table-actions">
-                        {t.status !== 'completed' && t.status !== 'cancelled' ? (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--ghost admin-btn--sm"
-                            onClick={() => handleOpenEdit(t)}
-                          >
-                            Sửa
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--ghost admin-btn--sm"
-                            onClick={() => { setSelectedTournament(t); setFormData({ name: t.name, venue: t.venue, startDate: t.startDate, endDate: t.endDate, prize: t.prize, status: t.status }); }}
-                          >
-                            Chi tiết
-                          </button>
-                        )}
+                      <td>{t.id}</td>
+                      <td><strong className="tournament-name" style={{ color: '#fff' }}>{t.name}</strong></td>
+                      <td>{t.venue}</td>
+                      <td>{t.startDate} → {t.endDate}</td>
+                      <td>{t.races} races</td>
+                      <td>{t.prize}</td>
+                      <td><StatusBadge status={t.status} /></td>
+                      <td>
+                        <div className="admin-table-actions">
+                          {t.status !== 'completed' && t.status !== 'cancelled' ? (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--ghost admin-btn--sm"
+                              onClick={() => handleOpenEdit(t)}
+                            >
+                              Sửa
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--ghost admin-btn--sm"
+                              onClick={() => { setSelectedTournament(t); setFormData({ name: t.name, venue: t.venue, startDate: t.startDate, endDate: t.endDate, prize: t.prize, status: t.status }); }}
+                            >
+                              Chi tiết
+                            </button>
+                          )}
 
-                        {t.status !== 'completed' && t.status !== 'cancelled' && (
+                          {t.status !== 'completed' && t.status !== 'cancelled' && (
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--danger admin-btn--sm"
+                              onClick={() => handleCancelTournament(t)}
+                            >
+                              Hủy
+                            </button>
+                          )}
+                          {t.status === 'upcoming' && (
+                            <>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--sm"
+                                style={{ backgroundColor: '#8B5CF6', color: '#FFF' }}
+                                onClick={() => navigate('/admin/races', { state: { tournamentId: t.id, openAdd: true } })}
+                                title="Thêm lịch thi đấu cho giải đấu này"
+                              >
+                                📅 + Lịch thi đấu
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--sm"
+                                style={{ backgroundColor: '#1A73E8', color: '#FFF' }}
+                                onClick={() => handleOpenRegistration(t)}
+                                title="Thiết lập đăng ký"
+                              >
+                                Chỉnh sửa ngày đăng ký
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
-                            className="admin-btn admin-btn--danger admin-btn--sm"
-                            onClick={() => handleCancelTournament(t)}
+                            className="admin-btn admin-btn--ghost admin-btn--sm"
+                            style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}
+                            onClick={() => handleOpenReportModal(t)}
+                            title="Xem Báo cáo & Bảng xếp hạng"
                           >
-                            Hủy
+                            📊 Báo cáo & BXH
                           </button>
-                        )}
-                        {t.status === 'upcoming' && (
-                          <>
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--sm"
-                              style={{ backgroundColor: '#8B5CF6', color: '#FFF' }}
-                              onClick={() => navigate('/admin/races', { state: { tournamentId: t.id, openAdd: true } })}
-                              title="Thêm lịch thi đấu cho giải đấu này"
-                            >
-                              📅 + Lịch thi đấu
-                            </button>
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--sm"
-                              style={{ backgroundColor: '#1A73E8', color: '#FFF' }}
-                              onClick={() => handleOpenRegistration(t)}
-                              title="Thiết lập đăng ký"
-                            >
-                              Chỉnh sửa ngày đăng ký
-                            </button>
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--ghost admin-btn--sm"
-                          style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}
-                          onClick={() => handleOpenReportModal(t)}
-                          title="Xem Báo cáo & Bảng xếp hạng"
-                        >
-                          📊 Báo cáo & BXH
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   <tr>
                     <td colSpan="8" style={{ textAlign: 'center', padding: '40px 16px', color: '#666' }}>
@@ -798,7 +800,7 @@ export default function TournamentManagement() {
               </div>
               <form onSubmit={handleSaveRegistration} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <p style={{ color: '#ccc', fontSize: '13px', margin: 0 }}>Giải đấu: <strong style={{ color: '#D4AF37' }}>{selectedRegTournament.name}</strong></p>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thời gian Mở đăng ký</label>
                   <input
@@ -848,13 +850,13 @@ export default function TournamentManagement() {
               </div>
 
               <div className="admin-tabs" style={{ padding: '10px 20px 0 20px' }}>
-                <button 
+                <button
                   className={`admin-tab${activeReportTab === 'rankings' ? ' is-active' : ''}`}
                   onClick={() => setActiveReportTab('rankings')}
                 >
                   🏆 Bảng Xếp Hạng
                 </button>
-                <button 
+                <button
                   className={`admin-tab${activeReportTab === 'report' ? ' is-active' : ''}`}
                   onClick={() => setActiveReportTab('report')}
                 >
@@ -867,8 +869,8 @@ export default function TournamentManagement() {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                       <h4 style={{ margin: 0, color: '#fff', fontSize: '14px' }}>Bảng Điểm Chiến Mã Tích Lũy</h4>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--ghost admin-btn--sm"
                         onClick={handleRecalculateRankings}
                         disabled={isRecalculating}
@@ -924,16 +926,16 @@ export default function TournamentManagement() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--ghost"
                         onClick={() => handleExport('pdf')}
                         disabled={isExporting}
                       >
                         📥 Xuất File PDF
                       </button>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--gold"
                         onClick={() => handleExport('excel')}
                         disabled={isExporting}

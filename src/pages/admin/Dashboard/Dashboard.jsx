@@ -280,7 +280,7 @@ export default function Dashboard() {
               onClick={() => navigate('/admin/registrations')}
               style={{ cursor: 'pointer', transition: 'transform 0.2s, background-color 0.2s' }}
             >
-              <span>Đăng ký chờ duyệt</span>
+              <span>Phân làn chạy</span>
               <StatusBadge status="pending" />
               <strong>{pendingRegCount}</strong>
             </div>

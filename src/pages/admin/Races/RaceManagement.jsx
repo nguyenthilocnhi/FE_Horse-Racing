@@ -35,6 +35,14 @@ export default function RaceManagement() {
   const [selectedRegRace, setSelectedRegRace] = useState(null)
   const [regDates, setRegDates] = useState({ registrationStartDate: '', registrationEndDate: '' })
 
+  // Ticket Opening Modal States (Sau khi phân công trọng tài)
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [selectedTicketRace, setSelectedTicketRace] = useState(null)
+  const [ticketFormData, setTicketFormData] = useState({
+    ticketPrice: 50000,
+    totalTickets: 5000
+  })
+
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [tournamentFilter, setTournamentFilter] = useState('all')
@@ -97,8 +105,16 @@ export default function RaceManagement() {
 
         const combined = [...localCreated]
         allRaces.forEach(r => {
+          const localMatch = localCreated.find(c => String(c.id) === String(r.id) || String(c.originalId) === String(r.originalId))
           if (!combined.some(c => String(c.id) === String(r.id) || String(c.originalId) === String(r.originalId))) {
-            combined.push(r)
+            combined.push({
+              ...r,
+              refereeId: localMatch?.refereeId || r.refereeId,
+              referee: localMatch?.referee || r.referee,
+              ticketOpen: localMatch?.ticketOpen || r.ticketOpen || false,
+              ticketPrice: localMatch?.ticketPrice || r.ticketPrice || 50000,
+              totalTickets: localMatch?.totalTickets || r.totalTickets || 5000
+            })
           }
         })
         setRaces(combined)
@@ -519,6 +535,56 @@ export default function RaceManagement() {
     }
   }
 
+  const handleOpenTicketModal = (race) => {
+    setSelectedTicketRace(race)
+    setTicketFormData({
+      ticketPrice: race.ticketPrice || 50000,
+      totalTickets: race.totalTickets || 5000
+    })
+    setShowTicketModal(true)
+  }
+
+  const handleSaveTicketConfig = async (e) => {
+    e.preventDefault()
+    if (!selectedTicketRace) return
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
+      const priceNum = Number(ticketFormData.ticketPrice) || 50000
+      const countNum = Number(ticketFormData.totalTickets) || 5000
+
+      const updatedList = stored.map(r => {
+        if (String(r.id) === String(selectedTicketRace.id) || String(r.originalId) === String(selectedTicketRace.originalId)) {
+          return {
+            ...r,
+            ticketOpen: true,
+            ticketPrice: priceNum,
+            totalTickets: countNum,
+            ticketOpenDate: new Date().toISOString()
+          }
+        }
+        return r
+      })
+
+      if (!updatedList.some(r => String(r.id) === String(selectedTicketRace.id))) {
+        updatedList.push({
+          ...selectedTicketRace,
+          ticketOpen: true,
+          ticketPrice: priceNum,
+          totalTickets: countNum,
+          ticketOpenDate: new Date().toISOString()
+        })
+      }
+
+      localStorage.setItem('created_races', JSON.stringify(updatedList))
+      setShowTicketModal(false)
+      fetchData()
+      alert(`🎟️ Đã mở bán vé cho khán giả thành công cho cuộc đua "${selectedTicketRace.name}"!`)
+    } catch (err) {
+      alert('Lỗi khi mở đặt vé: ' + err.message)
+    }
+  }
+
   const handleCloseDuePredictions = async () => {
     try {
       await closeDuePredictions()
@@ -826,7 +892,7 @@ export default function RaceManagement() {
                             </span>
                           )}
 
-                          {race.status === 'unassigned' && (
+                          {race.status === 'unassigned' && !race.refereeId && (!race.referee || race.referee === 'Chưa phân công') ? (
                             <button
                               type="button"
                               className="admin-btn admin-btn--outline admin-btn--sm"
@@ -836,6 +902,32 @@ export default function RaceManagement() {
                             >
                               Phân công TT
                             </button>
+                          ) : (
+                            !race.ticketOpen ? (
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--gold admin-btn--sm"
+                                style={{ backgroundColor: '#D4AF37', color: '#111', fontWeight: 'bold' }}
+                                onClick={() => handleOpenTicketModal(race)}
+                                title="Đã phân công trọng tài: Bấm để mở cổng bán vé cho khán giả"
+                              >
+                                🎟️ Mở đặt vé
+                              </button>
+                            ) : (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
+                                  🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
+                                </span>
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--ghost admin-btn--sm"
+                                  onClick={() => handleOpenTicketModal(race)}
+                                  title="Chỉnh sửa cấu hình đặt vé"
+                                >
+                                  ⚙️ Vé
+                                </button>
+                              </div>
+                            )
                           )}
 
                           {(race.status === 'unassigned' || race.status === 'scheduled' || race.status === 'ongoing') && (
@@ -981,6 +1073,59 @@ export default function RaceManagement() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setShowRegModal(false)}>Hủy bỏ</button>
                 <button type="submit" className="admin-btn admin-btn--gold">Lưu & Mở đăng ký</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TICKET BOOKING OPENING MODAL */}
+      {showTicketModal && selectedTicketRace && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '440px', border: '1px solid rgba(212,175,55,0.3)' }}>
+            <div className="admin-card-head" style={{ borderBottomColor: 'rgba(255,255,255,0.1)' }}>
+              <h3 style={{ color: '#d4af37' }}>🎟️ Mở Đặt Vé Khán Giả</h3>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setShowTicketModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveTicketConfig} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+              <p style={{ color: '#ccc', fontSize: '13px', margin: 0 }}>
+                Cuộc đua: <strong style={{ color: '#fff' }}>{selectedTicketRace.name}</strong> ({selectedTicketRace.tournament})
+              </p>
+              <p style={{ color: '#4ade80', fontSize: '12px', margin: 0 }}>
+                ✓ Trọng tài phụ trách: <strong>{selectedTicketRace.referee || 'Đã phân công'}</strong>
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giá vé khán giả (VND)</label>
+                <input
+                  required
+                  type="number"
+                  step="10000"
+                  className="admin-input"
+                  value={ticketFormData.ticketPrice}
+                  onChange={(e) => setTicketFormData({ ...ticketFormData, ticketPrice: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số lượng vé phát hành (Vé)</label>
+                <input
+                  required
+                  type="number"
+                  className="admin-input"
+                  value={ticketFormData.totalTickets}
+                  onChange={(e) => setTicketFormData({ ...ticketFormData, totalTickets: e.target.value })}
+                  style={{ width: '100%' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setShowTicketModal(false)}>Hủy</button>
+                <button type="submit" className="admin-btn admin-btn--gold">Mở Đặt Vé Ngay</button>
               </div>
             </form>
           </div>
