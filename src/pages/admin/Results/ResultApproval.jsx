@@ -1,63 +1,112 @@
-import React, { useState } from 'react'
-import { resultReports as initialReports } from '../../../data/adminMockData'
+import React, { useState, useEffect } from 'react'
 import { StatusBadge } from '../../../utils/adminHelpers'
+import { getPostRaceReports, getRaceResults, publishRaceResults, getRaces } from '../../../services/raceService'
 import './ResultApproval.css'
 
-// Mock ranking data for detailed report preview
-const MOCK_REPORT_DETAILS = {
-  'RES-801': [
-    { rank: 1, horse: 'Aurelius', jockey: 'L. Anderson', time: '1m 38.4s' },
-    { rank: 2, horse: 'Midnight Star', jockey: 'M. Rodriguez', time: '1m 39.1s' },
-    { rank: 3, horse: 'Golden Eagle', jockey: 'S. Nakamura', time: '1m 39.8s' }
-  ],
-  'RES-802': [
-    { rank: 1, horse: 'Midnight Star', jockey: 'M. Rodriguez', time: '1m 35.2s' },
-    { rank: 2, horse: 'Aurelius', jockey: 'L. Anderson', time: '1m 35.9s' },
-    { rank: 3, horse: 'Velvet Thunder', jockey: 'S. Nakamura', time: '1m 36.4s' }
-  ],
-  'RES-803': [
-    { rank: 1, horse: 'Velvet Thunder', jockey: 'S. Nakamura', time: '1m 12.0s' },
-    { rank: 2, horse: 'Midnight Star', jockey: 'M. Rodriguez', time: '1m 12.5s' },
-    { rank: 3, horse: 'Storm Rider', jockey: 'L. Anderson', time: '1m 13.1s' }
-  ]
-}
-
 export default function ResultApproval() {
-  const [reports, setReports] = useState(() => {
-    const stored = localStorage.getItem('mock_result_reports')
-    if (stored) {
-      try {
-        return JSON.parse(stored)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    localStorage.setItem('mock_result_reports', JSON.stringify(initialReports))
-    return initialReports
-  })
+  const [reports, setReports] = useState([])
+  const [races, setRaces] = useState([])
   const [selectedReport, setSelectedReport] = useState(null)
+  const [details, setDetails] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
 
-  const handleUpdateStatus = (id, newStatus) => {
-    const updated = reports.map(r => 
-      r.id === id ? { ...r, status: newStatus } : r
-    )
-    setReports(updated)
-    localStorage.setItem('mock_result_reports', JSON.stringify(updated))
-    if (selectedReport && selectedReport.id === id) {
-      setSelectedReport(prev => ({ ...prev, status: newStatus }))
-    }
-    
-    if (newStatus === 'approved') {
-      alert('Đã phê duyệt báo cáo kết quả! Bây giờ bạn có thể Công bố kết quả này.');
-    } else if (newStatus === 'published') {
-      alert('🎉 Đã công bố kết quả thi đấu thành công!\n\n- Kết quả đã đồng bộ lên Bảng xếp hạng công khai.\n- Hệ thống đã ghi nhận kết quả dự đoán của khán giả & kết toán trả thưởng tự động.\n- Cuộc đua đã chuyển sang trạng thái HOÀN THÀNH.');
-    } else if (newStatus === 'rejected') {
-      alert('Đã từ chối báo cáo kết quả từ trọng tài.');
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      const [racesRes, reportsRes] = await Promise.all([
+        getRaces(),
+        getPostRaceReports()
+      ])
+      
+      if (racesRes.data) {
+        setRaces(racesRes.data)
+      }
+      
+      if (reportsRes.data) {
+        const mappedReports = reportsRes.data
+          .filter(r => r.status !== 'PUBLISHED')
+          .map(r => {
+            const race = racesRes.data?.find(rc => rc.id === r.raceId)
+            
+            let st = 'pending'
+            if (r.status === 'REVIEW') st = 'approved'
+            else if (r.status === 'SUBMITTED') st = 'pending'
+            
+            return {
+              id: r.id,
+              raceId: r.raceId,
+              race: race ? race.name : `Cuộc đua #${r.raceId}`,
+              referee: race ? race.refereeName : 'Không xác định',
+              submitted: new Date(r.createdAt).toLocaleString(),
+              winner: 'Chưa xác định',
+              status: st,
+              originalStatus: r.status
+            }
+          })
+        setReports(mappedReports)
+      }
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  const getDetails = (id) => {
-    return MOCK_REPORT_DETAILS[id] || []
+  const handleViewReport = async (report) => {
+    setSelectedReport(report)
+    setDetails([])
+    setIsLoading(true)
+    try {
+      const res = await getRaceResults(report.raceId)
+      if (res.data) {
+        const sorted = res.data.sort((a, b) => a.rankPosition - b.rankPosition)
+        const mappedDetails = sorted.map(d => ({
+          rank: d.rankPosition,
+          horse: d.horseName || `Ngựa #${d.horseId}`,
+          jockey: 'Nài ngựa', // Placeholder if jockey name is not in DTO
+          time: d.finishTime
+        }))
+        setDetails(mappedDetails)
+        
+        if (mappedDetails.length > 0) {
+          const winnerName = mappedDetails[0].horse;
+          setReports(prev => prev.map(r => r.id === report.id ? { ...r, winner: winnerName } : r))
+          setSelectedReport(prev => ({ ...prev, winner: winnerName }))
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Không thể tải chi tiết kết quả')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const processAction = async () => {
+    if (!confirmAction) return
+    const { type, id, raceId } = confirmAction
+
+    if (type === 'publish') {
+      try {
+        await publishRaceResults(raceId)
+        alert('🎉 Đã công bố kết quả thi đấu thành công!\n\n- Kết quả đã đồng bộ lên Bảng xếp hạng công khai.\n- Hệ thống đã ghi nhận kết quả dự đoán của khán giả & kết toán trả thưởng tự động.\n- Cuộc đua đã chuyển sang trạng thái HOÀN THÀNH.')
+        setReports(prev => prev.filter(r => r.id !== id))
+        setSelectedReport(null)
+      } catch (err) {
+        alert('Có lỗi xảy ra khi công bố: ' + (err.response?.data?.message || err.message))
+      }
+    } else if (type === 'approve') {
+      const updated = reports.map(r => 
+        r.id === id ? { ...r, status: 'approved' } : r
+      )
+      setReports(updated)
+      if (selectedReport && selectedReport.id === id) {
+        setSelectedReport(prev => ({ ...prev, status: 'approved' }))
+      }
+    }
+    setConfirmAction(null)
   }
 
   return (
@@ -89,7 +138,7 @@ export default function ResultApproval() {
                 <button 
                   type="button" 
                   className="admin-btn admin-btn--ghost admin-btn--sm"
-                  onClick={() => setSelectedReport(r)}
+                  onClick={() => handleViewReport(r)}
                   style={{ flex: 1 }}
                 >
                   Xem biên bản
@@ -98,20 +147,18 @@ export default function ResultApproval() {
             </div>
           </div>
         ))}
+        {reports.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#666', gridColumn: '1 / -1' }}>
+            Không có báo cáo kết quả nào chờ duyệt.
+          </div>
+        )}
       </div>
 
       {/* Details View Modal */}
       {selectedReport && (
         <div className="modal-overlay" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.75)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '20px',
-          zIndex: 1000
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000
         }}>
           <div className="admin-card" style={{ width: '100%', maxWidth: '520px', border: '1px solid rgba(212,175,55,0.15)' }}>
             <div className="admin-card-head">
@@ -131,7 +178,7 @@ export default function ResultApproval() {
                 <strong style={{ color: '#fff' }}>{selectedReport.submitted}</strong>
               </div>
 
-              <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', letterSpacing: '0.05em' }}>Thứ tự về đích đề xuất</h4>
+              <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', letterSpacing: '0.05em' }}>Thứ tự về đích</h4>
               <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '20px' }}>
                 <table className="admin-table">
                   <thead>
@@ -143,10 +190,14 @@ export default function ResultApproval() {
                     </tr>
                   </thead>
                   <tbody>
-                    {getDetails(selectedReport.id).map(d => (
+                    {isLoading ? (
+                      <tr><td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>Đang tải...</td></tr>
+                    ) : details.length === 0 ? (
+                      <tr><td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>Không có dữ liệu kết quả</td></tr>
+                    ) : details.map(d => (
                       <tr key={d.rank}>
                         <td style={{ fontWeight: 'bold', color: d.rank === 1 ? '#d4af37' : d.rank === 2 ? '#c0c0c0' : '#cd7f32' }}>
-                          🏆 Hạng {d.rank}
+                          {d.rank === 1 ? '🏆 ' : ''}Hạng {d.rank}
                         </td>
                         <td style={{ color: '#fff', fontWeight: '500' }}>{d.horse}</td>
                         <td>{d.jockey}</td>
@@ -159,33 +210,65 @@ export default function ResultApproval() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedReport(null)}>Đóng</button>
+                
                 {selectedReport.status === 'pending' && (
-                  <>
-                    <button 
-                      type="button" 
-                      className="admin-btn admin-btn--success"
-                      onClick={() => handleUpdateStatus(selectedReport.id, 'approved')}
-                    >
-                      Duyệt báo cáo
-                    </button>
-                    <button 
-                      type="button" 
-                      className="admin-btn admin-btn--danger"
-                      onClick={() => handleUpdateStatus(selectedReport.id, 'rejected')}
-                    >
-                      Từ chối
-                    </button>
-                  </>
+                  <button 
+                    type="button" 
+                    className="admin-btn admin-btn--success"
+                    onClick={() => setConfirmAction({ type: 'approve', id: selectedReport.id, raceId: selectedReport.raceId })}
+                  >
+                    Duyệt kết quả
+                  </button>
                 )}
+                
                 {selectedReport.status === 'approved' && (
                   <button 
                     type="button" 
                     className="admin-btn admin-btn--gold"
-                    onClick={() => handleUpdateStatus(selectedReport.id, 'published')}
+                    onClick={() => setConfirmAction({ type: 'publish', id: selectedReport.id, raceId: selectedReport.raceId })}
                   >
-                    Công bố ngay
+                    Công bố kết quả
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div className="modal-overlay" style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 2000
+        }}>
+          <div className="admin-card" style={{ width: '100%', maxWidth: '400px', border: confirmAction.type === 'approve' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(212,175,55,0.3)' }}>
+            <div className="admin-card-head">
+              <h3 style={{ color: confirmAction.type === 'approve' ? '#22c55e' : '#d4af37' }}>
+                Xác nhận thao tác
+              </h3>
+            </div>
+            <div className="admin-card-body" style={{ padding: '20px' }}>
+              <p style={{ color: '#fff', fontSize: '15px', lineHeight: '1.5', marginBottom: '24px' }}>
+                {confirmAction.type === 'approve' 
+                  ? "Bạn có chắc chắn muốn duyệt kết quả này không?" 
+                  : "Bạn có chắc chắn muốn công bố? Dữ liệu sẽ hiển thị cho khán giả."}
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost"
+                  onClick={() => setConfirmAction(null)}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className={`admin-btn ${confirmAction.type === 'approve' ? 'admin-btn--success' : 'admin-btn--gold'}`}
+                  onClick={processAction}
+                >
+                  Xác nhận
+                </button>
               </div>
             </div>
           </div>

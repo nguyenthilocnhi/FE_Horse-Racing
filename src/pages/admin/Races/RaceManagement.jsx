@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom'
 import { races as initialRaces, tournaments as initialTournaments, mockJockeys } from '../../../data/adminMockData'
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
-import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, updateTournamentRegistration } from '../../../services/tournamentService'
+import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, openRaceRegistration } from '../../../services/tournamentService'
 import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
 import { closeDuePredictions, updateSystemRankings } from '../../../services/systemService'
 import './RaceManagement.css'
@@ -73,7 +73,9 @@ export default function RaceManagement() {
                 referee: s.refereeName,
                 date: dateStr,
                 time: timeStr,
-                endTime: endTimeStr
+                endTime: endTimeStr,
+                registrationStartDate: s.registrationStartDate,
+                registrationEndDate: s.registrationEndDate
               })
 
               return {
@@ -89,6 +91,9 @@ export default function RaceManagement() {
                 status: computedSt,
                 refereeId: s.refereeId,
                 referee: s.refereeName,
+                registrationOpen: s.registrationOpen,
+                registrationStartDate: s.registrationStartDate,
+                registrationEndDate: s.registrationEndDate,
                 horses: 0
               }
             })
@@ -103,27 +108,32 @@ export default function RaceManagement() {
           localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
         } catch (e) {}
 
-        const combined = [...localCreated]
-        allRaces.forEach(r => {
-          const localMatch = localCreated.find(c => String(c.id) === String(r.id) || String(c.originalId) === String(r.originalId))
-          if (!combined.some(c => String(c.id) === String(r.id) || String(c.originalId) === String(r.originalId))) {
-            combined.push({
-              ...r,
-              refereeId: localMatch?.refereeId || r.refereeId,
-              referee: localMatch?.referee || r.referee,
-              ticketOpen: localMatch?.ticketOpen || r.ticketOpen || false,
-              ticketPrice: localMatch?.ticketPrice || r.ticketPrice || 50000,
-              totalTickets: localMatch?.totalTickets || r.totalTickets || 5000
-            })
+        const combined = allRaces.map(r => {
+          const localMatch = localCreated.find(c => 
+            String(c.id) === String(r.id) || 
+            String(c.originalId) === String(r.originalId) || 
+            (c.name === r.name && String(c.tournamentId) === String(r.tournamentId))
+          )
+          return {
+            ...r,
+            refereeId: localMatch?.refereeId || r.refereeId,
+            referee: localMatch?.referee || r.referee,
+            ticketOpen: localMatch?.ticketOpen || r.ticketOpen || false,
+            ticketPrice: localMatch?.ticketPrice || r.ticketPrice || 50000,
+            totalTickets: localMatch?.totalTickets || r.totalTickets || 5000
           }
         })
+        
+        try {
+          // Lưu đè lại localStorage để tự động dọn rác (zombie races không nằm trong allRaces sẽ bị xóa)
+          localStorage.setItem('created_races', JSON.stringify(combined))
+        } catch(e) {}
+
         setRaces(combined)
       } else {
-        let localCreated = []
-        try {
-          localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
-        } catch (e) {}
-        setRaces(localCreated)
+        // Backend is online but has NO tournaments. We should clear local zombie races.
+        localStorage.removeItem('created_races')
+        setRaces([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -284,13 +294,25 @@ export default function RaceManagement() {
   }
 
   const handleStartRace = async (race) => {
+    // Frontend validation for start time
+    const IS_TESTING = true; // TODO: Khôi phục lại logic check thời gian khi release lên Production.
+    if (!IS_TESTING && race.date && race.time) {
+      const startDateTime = new Date(`${race.date}T${race.time}`);
+      if (new Date() < startDateTime) {
+        alert(`Không thể bắt đầu: Chưa đến thời gian thi đấu dự kiến (${startDateTime.toLocaleString('vi-VN')})!`);
+        return;
+      }
+    }
+
     if (!window.confirm(`Bạn có chắc muốn BẮT ĐẦU cuộc đua: ${race.name}?`)) return
     setIsProcessing(true)
     try {
       try {
         await startRace(race.originalId, { conditionsConfirmed: true })
       } catch (err) {
-        console.warn('API start failed, updating locally', err)
+        console.warn('API start failed', err)
+        alert('Lỗi từ hệ thống: ' + (err.response?.data?.message || err.message || 'Không thể bắt đầu cuộc đua lúc này.'));
+        return; // Do not proceed to update status locally
       }
       setRaces(prev => prev.map(r => r.id === race.id ? { ...r, status: 'running' } : r))
       alert('🚀 Cuộc đua đã BẮT ĐẦU! Trạng thái hiện tại: ĐANG CHẠY.')
@@ -342,7 +364,9 @@ export default function RaceManagement() {
       return
     }
 
-    const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
+    setIsProcessing(true)
+    try {
+      const selectedT = tournaments.find(t => t.id.toString() === formData.tournamentId.toString())
     if (selectedT && selectedT.startDate && selectedT.endDate) {
       const tStart = new Date(selectedT.startDate)
       tStart.setHours(0, 0, 0, 0)
@@ -385,7 +409,7 @@ export default function RaceManagement() {
         location: selectedT ? (selectedT.location || selectedT.venue || "Trường đua Phu Thọ") : "Trường đua Phu Thọ",
         startTime: `${formData.date}T${formData.time}:00`,
         endTime: `${formData.date}T${formData.endTime}:00`,
-        status: formData.status.toUpperCase(),
+        status: formData.status.toUpperCase() === 'UNASSIGNED' ? 'SCHEDULED' : formData.status.toUpperCase(),
         raceTrackId: 1,
         tournamentId: Number(formData.tournamentId)
       }
@@ -410,7 +434,7 @@ export default function RaceManagement() {
         location: selectedT ? (selectedT.location || selectedT.venue || "Trường đua Phu Thọ") : "Trường đua Phu Thọ",
         startTime: `${formData.date}T${formData.time}:00`,
         endTime: `${formData.date}T${formData.endTime}:00`,
-        status: 'UNASSIGNED',
+        status: 'SCHEDULED',
         raceTrackId: 1,
         tournamentId: Number(formData.tournamentId)
       }
@@ -430,6 +454,8 @@ export default function RaceManagement() {
         horses: 0
       }
 
+      let createdRaceData = null
+
       try {
         const result = await createRaceSchedule(formData.tournamentId, payload)
         const savedData = result?.data || result || {}
@@ -437,43 +463,68 @@ export default function RaceManagement() {
           newRace.id = `R-${savedData.id}`
           newRace.originalId = savedData.id
         }
+        createdRaceData = newRace
       } catch (error) {
-        console.warn("API Error creating race schedule, adding locally:", error)
+        console.warn("API Error creating race schedule:", error)
+        if (error.response?.status === 400 || error.response?.status === 409) {
+           alert("Không thể tạo cuộc đua. Server từ chối: " + (error.response?.data?.message || error.response?.data || "Dữ liệu không hợp lệ"))
+           return // Ngừng lại, không lưu offline
+        }
+        // Lưu offline nếu lỗi mạng
+        createdRaceData = newRace
       }
 
-      try {
-        const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
-        localStorage.setItem('created_races', JSON.stringify([newRace, ...stored.filter(r => String(r.id) !== String(newRace.id))]))
-      } catch (e) {
-        console.warn('LocalStorage save error:', e)
+      if (createdRaceData) {
+        // Chúng ta không lưu offline nữa để tránh tạo rác
+        setRaces(prev => [createdRaceData, ...prev])
       }
 
-      setRaces(prev => [newRace, ...prev])
       setShowForm(false)
       fetchData()
       alert('Tạo cuộc đua thành công!')
+    }
+    } finally {
+      setIsProcessing(false)
     }
   }
 
   const handleOpenRegistrationModal = (race) => {
     setSelectedRegRace(race)
-    const now = new Date()
-    const tomorrow = new Date(now.getTime() + 86400000)
     const formatDt = (d) => {
       const pad = (n) => String(n).padStart(2, '0')
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
     }
     
-    setRegDates({
-      registrationStartDate: formatDt(now),
-      registrationEndDate: formatDt(tomorrow)
-    })
+    if (race.registrationStartDate && race.registrationEndDate) {
+      // Prepopulate with existing dates
+      const start = new Date(race.registrationStartDate)
+      const end = new Date(race.registrationEndDate)
+      setRegDates({
+        registrationStartDate: formatDt(start),
+        registrationEndDate: formatDt(end)
+      })
+    } else {
+      const now = new Date()
+      const tomorrow = new Date(now.getTime() + 86400000)
+      setRegDates({
+        registrationStartDate: formatDt(now),
+        registrationEndDate: formatDt(tomorrow)
+      })
+    }
+    
     setShowRegModal(true)
   }
 
   const handleSaveRaceRegistration = async (e) => {
     e.preventDefault()
     if (!selectedRegRace) return
+    
+    if (selectedRegRace.registrationStartDate && selectedRegRace.registrationEndDate) {
+      if (!window.confirm('Bạn có chắc chắn muốn thay đổi thời gian đăng ký cho cuộc đua này?')) {
+        return
+      }
+    }
+
     if (!regDates.registrationStartDate || !regDates.registrationEndDate) {
       alert('Vui lòng chọn đầy đủ thời gian mở và đóng đăng ký!')
       return
@@ -483,18 +534,23 @@ export default function RaceManagement() {
       alert('⚠️ Thời gian đóng đăng ký phải sau thời gian mở đăng ký!')
       return
     }
+    
+    const raceStartStr = selectedRegRace.date + 'T' + selectedRegRace.time
+    const raceStart = new Date(raceStartStr)
+    if (new Date(regDates.registrationEndDate) >= raceStart) {
+      alert('⚠️ Thời gian đóng đăng ký phải TRƯỚC thời gian bắt đầu cuộc đua!')
+      return
+    }
 
     const updatedStatus = 'registration_open'
     try {
       try {
-        if (selectedRegRace.tournamentId) {
-          await updateTournamentRegistration(selectedRegRace.tournamentId, {
-            registrationStartDate: regDates.registrationStartDate,
-            registrationEndDate: regDates.registrationEndDate
-          })
-        }
+        await openRaceRegistration(selectedRegRace.tournamentId || 1, selectedRegRace.originalId || selectedRegRace.id, {
+          registrationStartDate: regDates.registrationStartDate,
+          registrationEndDate: regDates.registrationEndDate
+        })
         await updateRaceSchedule(selectedRegRace.tournamentId || 1, selectedRegRace.originalId || selectedRegRace.id, {
-          status: 'REGISTRATION_OPEN',
+          status: 'SCHEDULED', // Sau khi thiết lập đăng ký, cuộc đua sẵn sàng chờ phân công trọng tài
           registrationOpen: true,
           registrationStartDate: regDates.registrationStartDate,
           registrationEndDate: regDates.registrationEndDate
@@ -627,6 +683,7 @@ export default function RaceManagement() {
           >
             🏆 Cập nhật BXH hệ thống
           </button>
+
           <button
             type="button"
             className="admin-btn admin-btn--gold"
@@ -789,8 +846,9 @@ export default function RaceManagement() {
                 <button
                   type="submit"
                   className="admin-btn admin-btn--gold"
+                  disabled={isProcessing}
                 >
-                  Lưu cuộc đua
+                  {isProcessing ? 'Đang lưu...' : 'Lưu cuộc đua'}
                 </button>
               </div>
             </form>
@@ -859,7 +917,7 @@ export default function RaceManagement() {
                         </div>
                         <div className="admin-table-actions">
                           {/* Sửa button: CHỈ HIỂN THỊ KHI CHƯA HOÀN THÀNH */}
-                          {race.status !== 'completed' ? (
+                          {(race.status !== 'completed' && race.status !== 'published') ? (
                             <button
                               type="button"
                               className="admin-btn admin-btn--ghost admin-btn--sm"
@@ -874,117 +932,154 @@ export default function RaceManagement() {
                           )}
 
                           {/* Action Button theo Vòng Đời Trạng Thái */}
-                          {(race.status === 'pending_registration' || !race.status || race.status === 'scheduled') && (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--gold admin-btn--sm"
-                              style={{ backgroundColor: '#10B981', color: '#FFF' }}
-                              onClick={() => handleOpenRegistrationModal(race)}
-                              title="Mở thời gian đăng ký cho Chủ ngựa và Jockey"
-                            >
-                              📢 Mở đăng ký
-                            </button>
-                          )}
-
-                          {race.status === 'registration_open' && (
-                            <span className="admin-badge admin-badge--green" style={{ fontSize: '11px' }}>
-                              ✅ Đang mở đăng ký
-                            </span>
-                          )}
-
-                          {race.status === 'unassigned' && !race.refereeId && (!race.referee || race.referee === 'Chưa phân công') ? (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--outline admin-btn--sm"
-                              style={{ borderColor: '#a855f7', color: '#a855f7' }}
-                              onClick={() => navigate('/admin/referees')}
-                              title="Chuyển sang trang Phân công trọng tài"
-                            >
-                              Phân công TT
-                            </button>
-                          ) : (
-                            !race.ticketOpen ? (
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--gold admin-btn--sm"
-                                style={{ backgroundColor: '#D4AF37', color: '#111', fontWeight: 'bold' }}
-                                onClick={() => handleOpenTicketModal(race)}
-                                title="Đã phân công trọng tài: Bấm để mở cổng bán vé cho khán giả"
-                              >
-                                🎟️ Mở đặt vé
-                              </button>
-                            ) : (
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
-                                  🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
-                                </span>
+                          {(race.status !== 'completed' && race.status !== 'published') ? (
+                            <>
+                              {(!race.registrationStartDate) ? (
                                 <button
                                   type="button"
-                                  className="admin-btn admin-btn--ghost admin-btn--sm"
-                                  onClick={() => handleOpenTicketModal(race)}
-                                  title="Chỉnh sửa cấu hình đặt vé"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  style={{ backgroundColor: '#10B981', color: '#FFF' }}
+                                  onClick={() => handleOpenRegistrationModal(race)}
+                                  title="Mở thời gian đăng ký cho Chủ ngựa và Jockey"
                                 >
-                                  ⚙️ Vé
+                                  📢 Mở đăng ký
                                 </button>
-                              </div>
-                            )
-                          )}
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--outline admin-btn--sm"
+                                  style={{ borderColor: '#10B981', color: '#10B981' }}
+                                  onClick={() => handleOpenRegistrationModal(race)}
+                                  title="Chỉnh sửa thời gian đăng ký"
+                                >
+                                  ⚙️ Sửa đăng ký
+                                </button>
+                              )}
 
-                          {(race.status === 'unassigned' || race.status === 'scheduled' || race.status === 'ongoing') && (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--outline admin-btn--sm"
-                              onClick={() => openArrangement(race)}
-                            >
-                              Sắp xếp cuốc/vòng
-                            </button>
-                          )}
+                              {race.status === 'registration_open' && (
+                                <span className="admin-badge admin-badge--green" style={{ fontSize: '11px' }}>
+                                  ✅ Đang mở đăng ký
+                                </span>
+                              )}
 
-                          {(race.status === 'scheduled' || race.status === 'ongoing') && (
-                            <>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--outline admin-btn--sm"
-                                style={{ borderColor: '#22c55e', color: '#22c55e' }}
-                                onClick={() => handleStartRace(race)}
-                                disabled={isProcessing}
-                              >
-                                🚀 Bắt đầu
-                              </button>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--danger admin-btn--sm"
-                                onClick={() => {
-                                  setDelayingRace(race)
-                                  setDelayForm({ reason: '', newStartTime: '', newEndTime: '' })
-                                }}
-                                disabled={isProcessing}
-                              >
-                                Hoãn
-                              </button>
+                              {race.status === 'unassigned' && !race.refereeId && (!race.referee || race.referee === 'Chưa phân công') ? (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--outline admin-btn--sm"
+                                  style={{ borderColor: '#a855f7', color: '#a855f7' }}
+                                  onClick={() => navigate('/admin/referees')}
+                                  title="Chuyển sang trang Phân công trọng tài"
+                                >
+                                  Phân công TT
+                                </button>
+                              ) : (
+                                !race.ticketOpen ? (
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--gold admin-btn--sm"
+                                    style={{ backgroundColor: '#D4AF37', color: '#111', fontWeight: 'bold' }}
+                                    onClick={() => handleOpenTicketModal(race)}
+                                    title="Đã phân công trọng tài: Bấm để mở cổng bán vé cho khán giả"
+                                  >
+                                    🎟️ Mở đặt vé
+                                  </button>
+                                ) : (
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
+                                      🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="admin-btn admin-btn--ghost admin-btn--sm"
+                                      onClick={() => handleOpenTicketModal(race)}
+                                      title="Chỉnh sửa cấu hình đặt vé"
+                                    >
+                                      ⚙️ Vé
+                                    </button>
+                                  </div>
+                                )
+                              )}
+
+                              {(race.status === 'unassigned' || race.status === 'scheduled' || race.status === 'ongoing') && (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--outline admin-btn--sm"
+                                  onClick={() => openArrangement(race)}
+                                >
+                                  Sắp xếp cuốc/vòng
+                                </button>
+                              )}
+
+                              {(race.status === 'scheduled' || race.status === 'ongoing') && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--outline admin-btn--sm"
+                                    style={{ borderColor: '#22c55e', color: '#22c55e' }}
+                                    onClick={() => handleStartRace(race)}
+                                    disabled={isProcessing}
+                                  >
+                                    🚀 Bắt đầu
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--danger admin-btn--sm"
+                                    onClick={() => {
+                                      setDelayingRace(race)
+                                      setDelayForm({ reason: '', newStartTime: '', newEndTime: '' })
+                                    }}
+                                    disabled={isProcessing}
+                                  >
+                                    Hoãn
+                                  </button>
+                                </>
+                              )}
+
+                              {race.status === 'running' && (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  onClick={() => handleFinishRace(race)}
+                                  disabled={isProcessing}
+                                >
+                                  🏁 Kết thúc đua
+                                </button>
+                              )}
+
+                              {race.status === 'reviewing' && (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  onClick={() => handleApproveResult(race)}
+                                  disabled={isProcessing}
+                                >
+                                  ✓ Duyệt & Công bố KQ
+                                </button>
+                              )}
                             </>
-                          )}
-
-                          {race.status === 'running' && (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--gold admin-btn--sm"
-                              onClick={() => handleFinishRace(race)}
-                              disabled={isProcessing}
-                            >
-                              🏁 Kết thúc đua
-                            </button>
-                          )}
-
-                          {race.status === 'reviewing' && (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--gold admin-btn--sm"
-                              onClick={() => handleApproveResult(race)}
-                              disabled={isProcessing}
-                            >
-                              ✓ Duyệt & Công bố KQ
-                            </button>
+                          ) : (
+                            <>
+                              {race.status === 'completed' && (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
+                                  onClick={() => navigate('/admin/results')}
+                                >
+                                  📊 Xem kết quả
+                                </button>
+                              )}
+                              {race.status === 'published' && (
+                                <button
+                                  type="button"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
+                                  onClick={() => navigate('/admin/results')}
+                                >
+                                  📊 Xem kết quả
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

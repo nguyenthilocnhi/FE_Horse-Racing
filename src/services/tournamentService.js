@@ -136,6 +136,31 @@ export async function updateRaceSchedule(tournamentId, scheduleId, payload) {
 }
 
 /**
+ * Mở đăng ký tham gia cuộc đua.
+ */
+export async function openRaceRegistration(tournamentId, scheduleId, payload) {
+  try {
+    const res = await apiClient.post(`/tournaments/${tournamentId}/race-schedules/${scheduleId}/open-registration`, payload)
+    return res.data
+  } catch (err) {
+    console.warn(`POST /tournaments/${tournamentId}/race-schedules/${scheduleId}/open-registration failed`, err)
+    throw err
+  }
+}
+
+/**
+ * Đóng đăng ký tham gia cuộc đua.
+ */
+export async function closeRaceRegistration(tournamentId, scheduleId) {
+  try {
+    const res = await apiClient.post(`/tournaments/${tournamentId}/race-schedules/${scheduleId}/close-registration`)
+    return res.data
+  } catch (err) {
+    console.warn(`POST /tournaments/${tournamentId}/race-schedules/${scheduleId}/close-registration failed`, err)
+    throw err
+  }
+}
+/**
  * Xem lịch thi đấu của giải đấu.
  * @param {string|number} tournamentId
  */

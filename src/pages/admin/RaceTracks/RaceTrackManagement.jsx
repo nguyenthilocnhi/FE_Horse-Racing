@@ -64,7 +64,7 @@ export default function RaceTrackManagement() {
     try {
       const res = await getAllRaceTracks()
       const data = res?.data || res
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const formatted = data.map((item) => ({
           id: item.id,
           name: item.name,

@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 
 const spectatorNavItems = [
   { path: '/spectator', label: 'Giải Đấu & Lịch Đua', icon: '◈' },
+  { path: '/spectator/races', label: 'Cuộc Đua', icon: '🐎' },
   { path: '/spectator/rankings', label: 'Bảng Xếp Hạng', icon: '▲' },
   { path: '/spectator/predictions', label: 'Dự Đoán & Thưởng', icon: '⚖' },
   { path: '/spectator/profile', label: 'Tài Khoản Cá Nhân', icon: '👤' },

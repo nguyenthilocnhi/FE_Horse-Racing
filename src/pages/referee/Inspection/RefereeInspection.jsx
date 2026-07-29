@@ -95,6 +95,9 @@ export default function RefereeInspection() {
     }))
   }
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmRaceId, setConfirmRaceId] = useState(null)
+
   const handleApproveRaceStart = async (raceId) => {
     const list = vettingData[raceId] || []
     
@@ -104,10 +107,15 @@ export default function RefereeInspection() {
       return
     }
 
-    if (!window.confirm('Bạn có chắc chắn nộp báo cáo và chốt danh sách xuất phát? Thao tác này không thể hoàn tác.')) {
-      return
-    }
+    setConfirmRaceId(raceId)
+    setShowConfirmModal(true)
+  }
 
+  const executeApproveRaceStart = async () => {
+    const raceId = confirmRaceId
+    if (!raceId) return
+
+    const list = vettingData[raceId] || []
     try {
       setSubmitting(true)
       const inspectionItems = list.map(h => {
@@ -136,6 +144,7 @@ export default function RefereeInspection() {
       setInspectedRaces(prev => ({ ...prev, [raceId]: true }))
       alert('🟢 Xác nhận: Ghi nhận thanh tra và nộp báo cáo thành công!')
       setSelectedRace(null)
+      setShowConfirmModal(false)
       fetchRaces()
     } catch (err) {
       console.error(err)
@@ -214,9 +223,24 @@ export default function RefereeInspection() {
               <div className="admin-card-body" style={{ padding: '20px' }}>
                 
                 {loadingDetails ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Đang tải danh sách ngựa tham gia...</div>
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                    <div className="spinner" style={{ margin: '0 auto 16px', width: '30px', height: '30px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                    <p>Đang tải dữ liệu thanh tra...</p>
+                  </div>
                 ) : errorDetails ? (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>{errorDetails}</div>
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444', border: '1px dashed rgba(239, 68, 68, 0.3)', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)' }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px', opacity: 0.8 }}>⚠️</span>
+                    <p style={{ marginBottom: '16px' }}>{errorDetails}</p>
+                    <button type="button" className="admin-btn admin-btn--primary" onClick={() => handleSelectRace(selectedRace)}>
+                      ↻ Thử lại
+                    </button>
+                  </div>
+                ) : (vettingData[selectedRace.id] && vettingData[selectedRace.id].length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#888', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px', opacity: 0.5 }}>📭</span>
+                    <p>Chưa có danh sách đăng ký cho cuộc đua này.</p>
+                  </div>
                 ) : (
                   <>
                     <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#3b82f6', marginBottom: '12px', letterSpacing: '0.05em' }}>Đánh giá thể trạng & Trang bị</h4>
@@ -334,6 +358,74 @@ export default function RefereeInspection() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="admin-card" style={{
+            width: '100%',
+            maxWidth: '450px',
+            border: '1px solid rgba(239, 68, 68, 0.3)', // red theme for warning
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(239,68,68,0.15)',
+          }}>
+            <div className="admin-card-head" style={{ borderBottomColor: 'rgba(255,255,255,0.1)', background: 'rgba(239, 68, 68, 0.1)' }}>
+              <h3 style={{ color: '#ef4444' }}>⚠️ Xác nhận gửi thanh tra</h3>
+              <button
+                type="button"
+                className="admin-btn admin-btn--ghost admin-btn--sm"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={submitting}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '15px', color: '#fff', marginBottom: '16px', lineHeight: '1.5' }}>
+                Bạn có chắc chắn nộp báo cáo và chốt danh sách xuất phát?
+              </p>
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', marginBottom: '24px' }}>
+                <strong style={{ color: '#ef4444', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Đây là thao tác không thể chỉnh sửa
+                </strong>
+                <p style={{ fontSize: '12px', color: '#ccc', marginTop: '4px' }}>
+                  Hệ thống sẽ khóa danh sách ngựa tham gia và công bố thông tin này cho giải đấu.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost" 
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={submitting}
+                  style={{ minWidth: '100px' }}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--danger"
+                  onClick={executeApproveRaceStart}
+                  disabled={submitting}
+                  style={{ minWidth: '150px' }}
+                >
+                  {submitting ? 'Đang xử lý...' : 'Xác nhận gửi'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

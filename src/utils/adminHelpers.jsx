@@ -92,7 +92,7 @@ export function computeRaceStatus(race) {
   const rawStatus = (race.status || '').toLowerCase()
 
   // Các trạng thái đã chốt cố định
-  if (rawStatus === 'completed' || rawStatus === 'cancelled' || rawStatus === 'delayed') {
+  if (rawStatus === 'completed' || rawStatus === 'cancelled' || rawStatus === 'delayed' || rawStatus === 'published') {
     return rawStatus
   }
 
@@ -100,7 +100,14 @@ export function computeRaceStatus(race) {
     return 'reviewing'
   }
 
-  // Kiểm tra đã gán trọng tài chưa
+  // 1. Kiểm tra thời gian đăng ký (Registration)
+  if (!race.registrationStartDate || !race.registrationEndDate) {
+    return 'pending_registration' // Chưa mở đăng ký
+  }
+  // Nếu ĐÃ mở đăng ký (có thời gian), với Admin thì cuộc đua lập tức chuyển sang Chờ phân công trọng tài.
+  // Quá trình đăng ký của chủ ngựa sẽ diễn ra song song bên phía user, không cản trở Admin phân công.
+
+  // 2. Kiểm tra đã gán trọng tài chưa
   const hasReferee = !!race.refereeId || (race.referee && race.referee !== 'Chưa phân công')
   if (!hasReferee) {
     return 'unassigned'
