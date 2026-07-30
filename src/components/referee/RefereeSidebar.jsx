@@ -14,7 +14,7 @@ export default function RefereeSidebar() {
       <NavLink to="/referee" className="admin-sidebar-brand">
         <span>⚖</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>REFEREE PANEL</small>
         </div>
       </NavLink>

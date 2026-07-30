@@ -14,7 +14,7 @@ export default function SpectatorSidebar() {
       <NavLink to="/spectator" className="admin-sidebar-brand">
         <span>♞</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>SPECTATOR PANEL</small>
         </div>
       </NavLink>

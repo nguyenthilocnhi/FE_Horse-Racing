@@ -145,7 +145,7 @@ function RegisterForm({ onDone }) {
           onChange={(e) => set('agreeTerms', e.target.checked)}
           className="profile-checkbox"
         />
-        <span>Tôi đồng ý với <a href="#!" style={{ color: '#d4af37' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#d4af37' }}>Chính sách bảo mật</a> của HORSIE.</span>
+        <span>Tôi đồng ý với <a href="#!" style={{ color: '#d4af37' }}>Điều khoản sử dụng</a> và <a href="#!" style={{ color: '#d4af37' }}>Chính sách bảo mật</a> của Horse Racing.</span>
       </label>
       {errors.agreeTerms && <span className="profile-err">{errors.agreeTerms}</span>}
 

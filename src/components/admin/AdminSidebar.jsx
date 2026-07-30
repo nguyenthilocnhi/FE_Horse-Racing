@@ -8,7 +8,7 @@ export default function AdminSidebar() {
       <NavLink to="/admin" className="admin-sidebar-brand">
         <span>♞</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>ADMIN PANEL</small>
         </div>
       </NavLink>
@@ -30,7 +30,7 @@ export default function AdminSidebar() {
       </nav>
 
       <div className="admin-sidebar-footer">
-        © 2026 HORSIE Admin
+        © 2026 Horse Racing Admin
       </div>
     </aside>
   )

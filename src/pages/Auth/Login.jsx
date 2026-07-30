@@ -66,7 +66,7 @@ export default function Login() {
           alt="Ngựa đang phi"
         />
         <div className="auth-image-overlay">
-          <span className="hero-label">HORSIE</span>
+          <span className="hero-label">Horse Racing</span>
           <h2>Trải nghiệm đua ngựa đỉnh cao</h2>
           <p>Tham gia cộng đồng yêu thích môn thể thao đua ngựa</p>
         </div>

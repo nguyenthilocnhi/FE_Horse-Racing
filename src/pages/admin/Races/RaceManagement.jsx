@@ -4,7 +4,6 @@ import { races as initialRaces, tournaments as initialTournaments, mockJockeys }
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, updateTournamentRegistration } from '../../../services/tournamentService'
 import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
-import { closeDuePredictions, updateSystemRankings } from '../../../services/systemService'
 import './RaceManagement.css'
 
 // Default horses if localStorage is empty
@@ -585,24 +584,6 @@ export default function RaceManagement() {
     }
   }
 
-  const handleCloseDuePredictions = async () => {
-    try {
-      await closeDuePredictions()
-      alert('🔒 Đã đóng tất cả cổng dự đoán/đặt cược đã quá giờ thi đấu!')
-    } catch (e) {
-      alert('🔒 Đã cập nhật trạng thái đóng cược quá hạn (Local Fallback)!')
-    }
-  }
-
-  const handleUpdateSystemRankings = async () => {
-    try {
-      await updateSystemRankings()
-      alert('🏆 Đã cập nhật Bảng xếp hạng toàn hệ thống thành công!')
-    } catch (e) {
-      alert('🏆 Đã cập nhật Bảng xếp hạng toàn hệ thống (Local Fallback)!')
-    }
-  }
-
   return (
     <div className="race-page">
       <div className="admin-page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -611,22 +592,6 @@ export default function RaceManagement() {
           <p className="admin-page-sub">Theo dõi vòng đời cuộc đua, phân công trọng tài, điều khiển giải đấu và duyệt kết quả</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button 
-            type="button" 
-            className="admin-btn admin-btn--ghost admin-btn--sm"
-            onClick={handleCloseDuePredictions}
-            title="Tự động đóng tất cả dự đoán quá hạn"
-          >
-            🔒 Đóng cược quá hạn
-          </button>
-          <button 
-            type="button" 
-            className="admin-btn admin-btn--ghost admin-btn--sm"
-            onClick={handleUpdateSystemRankings}
-            title="Đồng bộ lại Bảng xếp hạng toàn hệ thống"
-          >
-            🏆 Cập nhật BXH hệ thống
-          </button>
           <button
             type="button"
             className="admin-btn admin-btn--gold"
@@ -892,41 +857,44 @@ export default function RaceManagement() {
                             </span>
                           )}
 
-                          {race.status === 'unassigned' && !race.refereeId && (!race.referee || race.referee === 'Chưa phân công') ? (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--outline admin-btn--sm"
-                              style={{ borderColor: '#a855f7', color: '#a855f7' }}
-                              onClick={() => navigate('/admin/referees')}
-                              title="Chuyển sang trang Phân công trọng tài"
-                            >
-                              Phân công TT
-                            </button>
-                          ) : (
-                            !race.ticketOpen ? (
+                          {/* Mở đặt vé / Phân công TT: chỉ hiển thị khi đã qua bước mở đăng ký (không phải pending_registration) */}
+                          {race.status !== 'pending_registration' && (
+                            race.status === 'unassigned' && !race.refereeId && (!race.referee || race.referee === 'Chưa phân công') ? (
                               <button
                                 type="button"
-                                className="admin-btn admin-btn--gold admin-btn--sm"
-                                style={{ backgroundColor: '#D4AF37', color: '#111', fontWeight: 'bold' }}
-                                onClick={() => handleOpenTicketModal(race)}
-                                title="Đã phân công trọng tài: Bấm để mở cổng bán vé cho khán giả"
+                                className="admin-btn admin-btn--outline admin-btn--sm"
+                                style={{ borderColor: '#a855f7', color: '#a855f7' }}
+                                onClick={() => navigate('/admin/referees')}
+                                title="Chuyển sang trang Phân công trọng tài"
                               >
-                                🎟️ Mở đặt vé
+                                Phân công TT
                               </button>
                             ) : (
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
-                                  🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
-                                </span>
+                              !race.ticketOpen ? (
                                 <button
                                   type="button"
-                                  className="admin-btn admin-btn--ghost admin-btn--sm"
+                                  className="admin-btn admin-btn--gold admin-btn--sm"
+                                  style={{ backgroundColor: '#D4AF37', color: '#111', fontWeight: 'bold' }}
                                   onClick={() => handleOpenTicketModal(race)}
-                                  title="Chỉnh sửa cấu hình đặt vé"
+                                  title="Đã phân công trọng tài: Bấm để mở cổng bán vé cho khán giả"
                                 >
-                                  ⚙️ Vé
+                                  🎟️ Mở đặt vé
                                 </button>
-                              </div>
+                              ) : (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
+                                    🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--ghost admin-btn--sm"
+                                    onClick={() => handleOpenTicketModal(race)}
+                                    title="Chỉnh sửa cấu hình đặt vé"
+                                  >
+                                    ⚙️ Vé
+                                  </button>
+                                </div>
+                              )
                             )
                           )}
 

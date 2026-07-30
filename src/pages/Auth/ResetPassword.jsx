@@ -80,7 +80,7 @@ export default function ResetPassword() {
                     alt="Ngựa đang phi"
                 />
                 <div className="auth-image-overlay">
-                    <span className="hero-label">HORSIE</span>
+                    <span className="hero-label">Horse Racing</span>
                     <h2>Khôi phục tài khoản của bạn</h2>
                     <p>Lấy lại mật khẩu để tiếp tục theo dõi các vòng đua kịch tính.</p>
                 </div>

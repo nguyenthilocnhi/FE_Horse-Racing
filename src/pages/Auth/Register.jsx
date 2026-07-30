@@ -194,6 +194,8 @@ export default function Register() {
   }
 
   if (success) {
+    const isPendingApproval = role === 'JOCKEY' || role === 'REFEREE' || role === 'HORSE_OWNER' || role === 'HORSE OWNER'
+
     const roleLabel = role === 'JOCKEY'
       ? 'Kỵ Sĩ'
       : role === 'REFEREE'
@@ -334,6 +336,22 @@ export default function Register() {
             letter-spacing: 0.05em;
             text-transform: uppercase;
           }
+          .status-pending-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: 44px;
+            width: 260px;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+            font-weight: 700;
+            font-size: 14px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.1);
+          }
           .success-btn-login {
             text-decoration: none;
             display: inline-flex;
@@ -377,7 +395,7 @@ export default function Register() {
             style={{ height: '100%', objectFit: 'cover' }}
           />
           <div className="auth-image-overlay">
-            <span className="hero-label">HORSIE</span>
+            <span className="hero-label">Horse Racing</span>
             <h2>Gia nhập cộng đồng đua ngựa</h2>
             <p>Tạo tài khoản để theo dõi giải đấu, xếp hạng và dự đoán</p>
           </div>
@@ -397,7 +415,9 @@ export default function Register() {
 
           <h2 className="success-title">Đăng ký thành công!</h2>
           <p className="success-desc">
-            Tài khoản của bạn đã được thiết lập thành công. Chào mừng bạn gia nhập cộng đồng HORSIE!
+            {isPendingApproval
+              ? 'Tài khoản của bạn đã được gửi thành công. Vui lòng chờ admin phê duyệt trước khi đăng nhập.'
+              : 'Tài khoản của bạn đã được thiết lập thành công. Chào mừng bạn gia nhập cộng đồng Horse Racing!'}
           </p>
 
           <div className="account-details-card">
@@ -411,11 +431,27 @@ export default function Register() {
                 <span className="badge-role">{roleLabel}</span>
               </span>
             </div>
+            {isPendingApproval && (
+              <div className="details-row">
+                <span className="details-label">Trạng thái</span>
+                <span className="details-val" style={{ color: '#f59e0b' }}>
+                  Chờ admin duyệt tài khoản
+                </span>
+              </div>
+            )}
           </div>
 
-          <Link to="/login" className="success-btn-login">
-            Đăng nhập ngay
-          </Link>
+          {isPendingApproval ? (
+            <div className="status-pending-box">
+              <span>⏳</span>
+              <span>Chờ admin duyệt tài khoản</span>
+            </div>
+          ) : (
+            <Link to="/login" className="success-btn-login">
+              Đăng nhập ngay
+            </Link>
+          )}
+
           <Link to="/" className="success-link-home">
             Quay về trang chủ
           </Link>
@@ -434,7 +470,7 @@ export default function Register() {
             style={{ height: '100%', objectFit: 'cover' }}
           />
           <div className="auth-image-overlay">
-            <span className="hero-label">HORSIE</span>
+            <span className="hero-label">Horse Racing</span>
             <h2>Thông tin vai trò</h2>
             <p>Bổ sung thông tin chi tiết cho vai trò bạn đã chọn để hoàn tất thủ tục đăng ký.</p>
           </div>
@@ -610,7 +646,7 @@ export default function Register() {
           style={{ height: '100%', objectFit: 'cover' }}
         />
         <div className="auth-image-overlay">
-          <span className="hero-label">HORSIE</span>
+          <span className="hero-label">Horse Racing</span>
           <h2>Gia nhập cộng đồng đua ngựa</h2>
           <p>Tạo tài khoản để theo dõi giải đấu, xếp hạng và dự đoán</p>
         </div>

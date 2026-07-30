@@ -32,7 +32,7 @@ export default function Navbar({ searchQuery, setSearchQuery, onAddClick }) {
       <nav className="admin-breadcrumb" aria-label="Breadcrumb">
         <Link to="/horses" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}>
           <span style={{ fontSize: '16px', color: '#d4af37' }}>♞</span>
-          <strong style={{ fontSize: '12px', letterSpacing: '0.1em', color: '#d4af37' }}>HORSIE</strong>
+          <strong style={{ fontSize: '12px', letterSpacing: '0.1em', color: '#d4af37' }}>Horse Racing</strong>
         </Link>
         <span className="admin-breadcrumb-sep">›</span>
         <span>{pageLabel}</span>

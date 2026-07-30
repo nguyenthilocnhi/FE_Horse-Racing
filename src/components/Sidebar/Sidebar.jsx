@@ -15,7 +15,7 @@ export default function Sidebar() {
       <NavLink to="/horses" className="admin-sidebar-brand">
         <span>♞</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>HORSE PANEL</small>
         </div>
       </NavLink>
@@ -36,7 +36,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="admin-sidebar-footer">
-        © 2026 HORSIE App
+        © 2026 Horse Racing App
       </div>
     </aside>
   )

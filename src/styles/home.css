@@ -828,16 +828,22 @@
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  max-width: 1020px;
+  margin: 0 auto;
 }
 
 .feature-card {
-  padding: 28px 24px;
+  padding: 32px 24px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
-  transition: border-color 0.3s ease, background 0.3s ease;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color 0.3s ease, background 0.3s ease, transform 0.3s ease;
 }
 
 .feature-card:hover {
@@ -922,23 +928,29 @@
   padding: 64px 0 32px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   background: #080808;
+  text-align: center;
 }
 
 .footer-top {
   display: grid;
-  grid-template-columns: 1.8fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 40px;
   align-items: start;
+  max-width: 1020px;
+  margin: 0 auto;
+  text-align: center;
 }
 
 .footer-brand {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
 }
 
 .footer-brand h3 {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-size: 18px;
   letter-spacing: 0.28em;
   text-transform: uppercase;
@@ -947,11 +959,18 @@
 }
 
 .footer-brand p {
-  margin: 0;
+  margin: 0 auto;
   max-width: 320px;
   color: #666;
   line-height: 1.75;
   font-size: 14px;
+}
+
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .footer-links h4,
@@ -977,11 +996,19 @@
   color: #d4af37;
 }
 
+.footer-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
 .footer-contact p {
   margin: 0 0 8px;
   color: #666;
   font-size: 14px;
   line-height: 1.6;
+  justify-content: center;
 }
 
 .footer-bottom {
@@ -989,12 +1016,14 @@
   padding-top: 24px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   color: #444;
   font-size: 12px;
   letter-spacing: 0.04em;
+  text-align: center;
 }
 
 /* ── Animations ── */

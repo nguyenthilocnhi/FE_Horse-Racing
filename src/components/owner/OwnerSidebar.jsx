@@ -8,7 +8,7 @@ export default function OwnerSidebar({ pendingConfirmations = 0 }) {
       <NavLink to="/owner" className="owner-sidebar-brand">
         <span>👑</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>OWNER PORTAL</small>
         </div>
       </NavLink>
@@ -32,7 +32,7 @@ export default function OwnerSidebar({ pendingConfirmations = 0 }) {
         ))}
       </nav>
 
-      <div className="owner-sidebar-footer">© 2026 HORSIE Owner</div>
+      <div className="owner-sidebar-footer">© 2026 Horse Racing Owner</div>
     </aside>
   )
 }

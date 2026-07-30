@@ -8,7 +8,7 @@ export default function JockeySidebar({ inviteCount = 0 }) {
       <NavLink to="/jockey" className="jockey-sidebar-brand">
         <span>🏇</span>
         <div>
-          <strong>HORSIE</strong>
+          <strong>Horse Racing</strong>
           <small>JOCKEY PORTAL</small>
         </div>
       </NavLink>
@@ -32,7 +32,7 @@ export default function JockeySidebar({ inviteCount = 0 }) {
         ))}
       </nav>
 
-      <div className="jockey-sidebar-footer">© 2026 HORSIE Jockey</div>
+      <div className="jockey-sidebar-footer">© 2026 Horse Racing Jockey</div>
     </aside>
   )
 }

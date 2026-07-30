@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="footer-section">
       <div className="footer-bottom">
-        <p>© 2026 Equinox Racing. Tất cả quyền được bảo lưu.</p>
+        <p>© {new Date().getFullYear()} Horse Racing. Tất cả quyền được bảo lưu.</p>
         <div className="footer-links">
           <a href="#privacy">Quyền riêng tư</a>
           <span>·</span>
@@ -13,8 +13,8 @@ export default function Footer() {
           <span>·</span>
           <a href="#support">Hỗ trợ</a>
             <ul>
-            <li><a href="mailto:support@equinoxracing.com">support@equinoxracing.com</a></li>
-            <li><a href="tel:+15551234567">+1 (555) 123-4567</a></li>
+            <li><a href="mailto:support@horseracing.com">support@horseracing.com</a></li>
+            <li><a href="tel:+84123456789">+84 123 456 789</a></li>
             </ul>
         </div>
       </div>
