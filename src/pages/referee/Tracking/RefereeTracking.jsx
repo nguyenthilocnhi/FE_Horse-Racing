@@ -17,6 +17,7 @@ export default function RefereeTracking() {
   const [confirmed, setConfirmed] = useState(false)
   const [notes, setNotes] = useState('')
   const [successModal, setSuccessModal] = useState(false)
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -59,9 +60,9 @@ export default function RefereeTracking() {
         if (pRes.data) {
           // Chỉ lấy những ngựa đã được chuẩn y tham gia (CONFIRMED)
           const validParticipants = pRes.data.filter(p => p.status === 'CONFIRMED')
-          const mapped = validParticipants.map((p, index) => ({
+          const mapped = validParticipants.map(p => ({
             participationId: p.id,
-            lane: index + 1,
+            lane: p.laneNumber || 1,
             horse: p.horseName || 'Chưa có',
             jockey: p.jockeyName || 'Chưa có',
             progress: 0,
@@ -184,8 +185,13 @@ export default function RefereeTracking() {
       return
     }
 
+    setShowConfirmModal(true)
+  }
+
+  const executeSubmitReport = async () => {
     setIsSubmitting(true)
     try {
+      const list = runners[selectedRace.id] || []
       const resultsPayload = {
         results: list.map(r => {
           let t = r.time;
@@ -208,6 +214,7 @@ export default function RefereeTracking() {
       await submitPostRaceReport(selectedRace.id, reportPayload)
 
       setRaces(races.map(r => r.id === selectedRace.id ? { ...r, status: 'COMPLETED' } : r))
+      setShowConfirmModal(false)
       setSuccessModal(true)
     } catch (err) {
       alert('Có lỗi xảy ra khi nộp biên bản: ' + (err.response?.data?.message || err.message))
@@ -224,7 +231,7 @@ export default function RefereeTracking() {
     fetchRaces()
   }
 
-  const selectedRunners = selectedRace ? (runners[selectedRace.id] || []) : []
+  const selectedRunners = selectedRace ? [...(runners[selectedRace.id] || [])].sort((a, b) => a.lane - b.lane) : []
 
   return (
     <div className="referee-tracking-page">
@@ -355,33 +362,32 @@ export default function RefereeTracking() {
                                 <span style={{ fontSize: '11px', color: '#888' }}>{r.jockey}</span>
                               </td>
                               <td>
-                                <select 
-                                  className="admin-select"
-                                  style={{ width: '100%', padding: '4px 8px', fontSize: '12px' }}
-                                  value={r.rank}
-                                  onChange={(e) => handleRankChange(r.lane, e.target.value)}
-                                  disabled={selectedRace.status === 'COMPLETED'}
-                                >
-                                  <option value="">-- Chọn hạng --</option>
-                                  <option value="1">🥇 Hạng 1</option>
-                                  <option value="2">🥈 Hạng 2</option>
-                                  <option value="3">🥉 Hạng 3</option>
-                                  <option value="4">Hạng 4</option>
-                                  {selectedRunners.length > 4 && <option value="5">Hạng 5</option>}
-                                  {selectedRunners.length > 5 && <option value="6">Hạng 6</option>}
-                                  {selectedRunners.length > 6 && <option value="7">Hạng 7</option>}
-                                  {selectedRunners.length > 7 && <option value="8">Hạng 8</option>}
-                                </select>
+                                {r.rank ? (
+                                  <span style={{ 
+                                    display: 'inline-block', 
+                                    padding: '4px 12px', 
+                                    borderRadius: '12px', 
+                                    background: r.rank === '1' ? 'rgba(212, 175, 55, 0.2)' : 'rgba(255,255,255,0.1)', 
+                                    color: r.rank === '1' ? '#d4af37' : '#fff', 
+                                    fontWeight: 'bold', 
+                                    fontSize: '12px', 
+                                    border: `1px solid ${r.rank === '1' ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255,255,255,0.2)'}` 
+                                  }}>
+                                    {r.rank === '1' ? '🥇 Hạng 1' : `Hạng ${r.rank}`}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: '12px', color: '#666' }}>--</span>
+                                )}
                               </td>
                               <td>
                                 <input 
                                   type="text"
                                   className="admin-input"
-                                  style={{ width: '100%', textAlign: 'right', padding: '4px 8px', fontSize: '12px' }}
+                                  style={{ width: '100%', textAlign: 'right', padding: '4px 8px', fontSize: '12px', opacity: 0.8, cursor: 'not-allowed' }}
                                   placeholder="00:01:35"
                                   value={r.time}
                                   onChange={(e) => handleTimeChange(r.lane, e.target.value)}
-                                  disabled={selectedRace.status === 'COMPLETED'}
+                                  disabled={true}
                                 />
                               </td>
                             </tr>
@@ -450,6 +456,74 @@ export default function RefereeTracking() {
           )}
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(5px)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="admin-card" style={{
+            width: '100%',
+            maxWidth: '450px',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(16,185,129,0.15)',
+          }}>
+            <div className="admin-card-head" style={{ borderBottomColor: 'rgba(255,255,255,0.1)', background: 'rgba(16, 185, 129, 0.1)' }}>
+              <h3 style={{ color: '#10b981' }}>Xác nhận gửi kết quả</h3>
+              <button
+                type="button"
+                className="admin-btn admin-btn--ghost admin-btn--sm"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isSubmitting}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="admin-card-body" style={{ padding: '24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '15px', color: '#fff', marginBottom: '16px', lineHeight: '1.5' }}>
+                Bạn có chắc chắn muốn nộp biên bản và kết quả cuộc đua?
+              </p>
+              <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)', marginBottom: '24px' }}>
+                <strong style={{ color: '#10b981', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Hành động này không thể hoàn tác
+                </strong>
+                <p style={{ fontSize: '12px', color: '#ccc', marginTop: '4px' }}>
+                  Kết quả sẽ được gửi lên Ban tổ chức để kiểm duyệt và công bố chính thức.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--ghost" 
+                  onClick={() => setShowConfirmModal(false)}
+                  disabled={isSubmitting}
+                  style={{ minWidth: '100px' }}
+                >
+                  Hủy bỏ
+                </button>
+                <button 
+                  type="button" 
+                  className="admin-btn admin-btn--success"
+                  onClick={executeSubmitReport}
+                  disabled={isSubmitting}
+                  style={{ minWidth: '150px' }}
+                >
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi Biên Bản'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {successModal && (
         <div className="modal-overlay" style={{

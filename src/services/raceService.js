@@ -25,6 +25,12 @@ export async function getRaces(params) {
   return res.data
 }
 
+/** Lấy danh sách ngựa tham gia của một cuộc đua */
+export async function getRaceParticipations(raceId) {
+  const res = await apiClient.get(`/races/${raceId}/participations`)
+  return res.data
+}
+
 /**
  * Hoãn cuộc đua.
  * @param {string|number} raceId
@@ -102,6 +108,23 @@ export async function submitPostRaceReport(raceId, payload) {
 
 // ─────────────────────────────────────────
 // VI PHẠM
+/**
+ * Lấy danh sách báo cáo sau cuộc đua.
+ */
+export async function getPostRaceReports() {
+  const res = await apiClient.get(`/races/reports/post-race`)
+  return res.data
+}
+
+/**
+ * Lấy danh sách kết quả của một cuộc đua.
+ * @param {string|number} raceId
+ */
+export async function getRaceResults(raceId) {
+  const res = await apiClient.get(`/races/${raceId}/results`)
+  return res.data
+}
+
 // ─────────────────────────────────────────
 
 /**

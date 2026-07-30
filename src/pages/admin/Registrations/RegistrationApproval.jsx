@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { getAllRegistrations } from '../../../services/adminService'
-import { getAllTournaments } from '../../../services/tournamentService'
+import { getRaces, getRaceParticipations } from '../../../services/raceService'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import './RegistrationApproval.css'
 
@@ -15,47 +15,41 @@ const LANE_COLORS = [
   '#F97316', // Làn 8 - Cam
 ]
 
-const DEFAULT_RACES = [
-  { id: 'R-1042', name: 'Derby Một Dặm (1600m)', tournament: 'Derby Quốc Gia', date: '2026-06-03' },
-  { id: 'R-1043', name: 'Đua Nước Rút Sprint (1200m)', tournament: 'Derby Quốc Gia', date: '2026-06-03' },
-  { id: 'R-1044', name: 'Cúp Nhà Vô Địch (2000m)', tournament: 'Cúp Vàng Hoàng Gia', date: '2026-09-12' },
-  { id: 'R-1040', name: 'Sprint Classic (1400m)', tournament: 'Championship Sprint', date: '2026-04-21' }
-]
-
-const INITIAL_PARTICIPANTS = {
-  'R-1042': [
-    { id: 'REG-501', horse: 'Aurelius', breed: 'Thoroughbred', owner: 'Stable Alpha', jockey: 'Nguyễn Văn A', color: '#EF4444', lane: 1, status: 'confirmed' },
-    { id: 'REG-502', horse: 'Midnight Star', breed: 'Arabian', owner: 'Blue Ridge Farm', jockey: 'Trần Văn B', color: '#3B82F6', lane: 2, status: 'confirmed' },
-    { id: 'REG-504', horse: 'Storm Rider', breed: 'Thoroughbred', owner: 'Wind Valley', jockey: 'Lê Văn C', color: '#10B981', lane: 3, status: 'confirmed' },
-    { id: 'REG-505', horse: 'Golden Arrow', breed: 'Quarter Horse', owner: 'Golden Hooves', jockey: 'Phạm Văn D', color: '#F59E0B', lane: 4, status: 'confirmed' },
-    { id: 'REG-506', horse: 'Silver Bullet', breed: 'Thoroughbred', owner: 'Royal Stables', jockey: 'Hoàng Văn E', color: '#8B5CF6', lane: 5, status: 'confirmed' },
-    { id: 'REG-507', horse: 'Thunder Flash', breed: 'Appaloosa', owner: 'Dragon Stables', jockey: 'Vũ Văn F', color: '#EC4899', lane: 6, status: 'confirmed' }
-  ],
-  'R-1043': [
-    { id: 'REG-601', horse: 'Red Comet', breed: 'Thoroughbred', owner: 'Fire Stables', jockey: 'Trần Văn B', color: '#EF4444', lane: 1, status: 'confirmed' },
-    { id: 'REG-602', horse: 'Blue Lightning', breed: 'Arabian', owner: 'Ocean Ridge', jockey: 'Nguyễn Văn A', color: '#3B82F6', lane: 2, status: 'confirmed' },
-    { id: 'REG-603', horse: 'Shadow Runner', breed: 'Thoroughbred', owner: 'Night Stables', jockey: 'Lê Văn C', color: '#10B981', lane: 3, status: 'confirmed' },
-    { id: 'REG-604', horse: 'Wind Whisper', breed: 'Quarter Horse', owner: 'Sky Farm', jockey: 'Phạm Văn D', color: '#F59E0B', lane: 4, status: 'confirmed' }
-  ],
-  'R-1044': [
-    { id: 'REG-701', horse: 'Velvet Thunder', breed: 'Thoroughbred', owner: 'Golden Hooves', jockey: 'Phạm Văn D', color: '#EF4444', lane: 1, status: 'confirmed' },
-    { id: 'REG-702', horse: 'Iron Pegasus', breed: 'Arabian', owner: 'Steel Stables', jockey: 'Hoàng Văn E', color: '#3B82F6', lane: 2, status: 'confirmed' },
-    { id: 'REG-703', horse: 'Diamond King', breed: 'Thoroughbred', owner: 'Crown Stables', jockey: 'Vũ Văn F', color: '#10B981', lane: 3, status: 'confirmed' }
-  ]
-}
-
 export default function RegistrationApproval() {
-  const [races, setRaces] = useState(DEFAULT_RACES)
-  const [selectedRaceId, setSelectedRaceId] = useState('R-1042')
+  const [races, setRaces] = useState([])
+  const [selectedRaceId, setSelectedRaceId] = useState('')
   const [participants, setParticipants] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isDrawing, setIsDrawing] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [viewMode, setViewMode] = useState('both') // 'both' | 'diagram' | 'table'
 
-  // Load participants for selected race
   useEffect(() => {
-    loadRaceParticipants(selectedRaceId)
+    const fetchRaces = async () => {
+      try {
+        const res = await getRaces()
+        const fetchedRaces = res?.data || res || []
+        const mappedRaces = fetchedRaces.map(r => ({
+          id: r.id,
+          name: r.name,
+          tournament: r.tournament?.name || 'Chưa cập nhật',
+          date: r.startTime ? r.startTime.substring(0, 10) : 'Chưa cập nhật'
+        }))
+        setRaces(mappedRaces)
+        if (mappedRaces.length > 0) {
+          setSelectedRaceId(mappedRaces[0].id)
+        }
+      } catch (err) {
+        console.error("Failed to fetch races:", err)
+      }
+    }
+    fetchRaces()
+  }, [])
+
+  useEffect(() => {
+    if (selectedRaceId) {
+      loadRaceParticipants(selectedRaceId)
+    }
   }, [selectedRaceId])
 
   const showToast = (msg) => {
@@ -64,23 +58,63 @@ export default function RegistrationApproval() {
   }
 
   const loadRaceParticipants = async (raceId) => {
-    // 1. Check local storage first
-    const localSaved = localStorage.getItem(`lane_assignments_${raceId}`)
-    if (localSaved) {
-      try {
-        setParticipants(JSON.parse(localSaved))
-        return
-      } catch (e) {}
-    }
+    try {
+      const res = await getRaceParticipations(raceId)
+      const data = res?.data || res || []
+      
+      const confirmed = data.filter(p => p.status === 'CONFIRMED' || p.laneNumber != null)
 
-    // 2. Initial default fallback
-    const list = INITIAL_PARTICIPANTS[raceId] || [
-      { id: 'REG-801', horse: 'Aurelius', breed: 'Thoroughbred', owner: 'Stable Alpha', jockey: 'Nguyễn Văn A', color: '#EF4444', lane: 1, status: 'confirmed' },
-      { id: 'REG-802', horse: 'Midnight Star', breed: 'Arabian', owner: 'Blue Ridge Farm', jockey: 'Trần Văn B', color: '#3B82F6', lane: 2, status: 'confirmed' },
-      { id: 'REG-803', horse: 'Velvet Thunder', breed: 'Thoroughbred', owner: 'Golden Hooves', jockey: 'Phạm Văn D', color: '#10B981', lane: 3, status: 'confirmed' },
-      { id: 'REG-804', horse: 'Storm Rider', breed: 'Thoroughbred', owner: 'Wind Valley', jockey: 'Lê Văn C', color: '#F59E0B', lane: 4, status: 'confirmed' }
-    ]
-    setParticipants(list)
+      let localSaved = []
+      try {
+        const localStr = localStorage.getItem(`lane_assignments_${raceId}`)
+        if (localStr) localSaved = JSON.parse(localStr)
+      } catch (e) {}
+
+      // First pass: preserve existing lanes from backend or local storage
+      const existingLanes = new Set()
+      const initialMap = confirmed.map(p => {
+        let laneVal = p.laneNumber
+        if (laneVal == null) {
+          const localMatch = localSaved.find(loc => String(loc.id) === String(p.id))
+          if (localMatch && localMatch.lane != null) {
+            laneVal = localMatch.lane
+          }
+        }
+        if (laneVal != null) {
+          existingLanes.add(laneVal)
+        }
+        return { ...p, tempLane: laneVal }
+      })
+
+      // Second pass: assign empty lanes sequentially, avoiding occupied ones
+      let nextAvailableLane = 1
+      const getNextLane = () => {
+        while (existingLanes.has(nextAvailableLane)) {
+          nextAvailableLane++
+        }
+        existingLanes.add(nextAvailableLane)
+        return nextAvailableLane
+      }
+
+      const mapped = initialMap.map((p) => {
+        const laneVal = p.tempLane != null ? p.tempLane : getNextLane()
+
+        return {
+          id: p.id,
+          horse: p.horseName || 'Không rõ',
+          breed: p.horseBreed || 'Không rõ',
+          owner: p.ownerName || 'Không rõ',
+          jockey: p.jockeyName || 'Không rõ',
+          color: laneVal ? LANE_COLORS[(laneVal - 1) % LANE_COLORS.length] : '#666',
+          lane: laneVal,
+          status: p.status === 'CONFIRMED' ? 'confirmed' : p.status?.toLowerCase() || 'confirmed'
+        }
+      })
+      setParticipants(mapped)
+    } catch (err) {
+      console.error("Failed to load race participants:", err)
+      setParticipants([])
+    }
   }
 
   const saveParticipantsState = (newList) => {
@@ -206,7 +240,7 @@ export default function RegistrationApproval() {
           <button
             type="button"
             className="admin-btn admin-btn--gold"
-            disabled={isDrawing}
+            disabled={isDrawing || participants.length === 0}
             onClick={handleRandomDraw}
           >
             {isDrawing ? '🎲 Đang bốc thăm...' : '🎲 Bốc thăm ngẫu nhiên'}
@@ -215,6 +249,7 @@ export default function RegistrationApproval() {
           <button
             type="button"
             className="admin-btn admin-btn--ghost"
+            disabled={participants.length === 0}
             onClick={handleResetLanes}
           >
             ↺ Xóa phân làn
@@ -304,144 +339,150 @@ export default function RegistrationApproval() {
         </div>
       </div>
 
-      {/* VISUAL TRACK & GATES DIAGRAM */}
-      {(viewMode === 'both' || viewMode === 'diagram') && (
-        <div className="admin-card lane-diagram-card">
-          <div className="admin-card-head">
-            <h3>🏟️ Mô Phỏng Cửa Xuất Phát & Làn Chạy ({selectedRace?.name})</h3>
-            <span style={{ fontSize: '12px', color: '#d4af37' }}>Cửa 1 ➔ Cửa {totalCount}</span>
-          </div>
-          <div className="admin-card-body">
-            <div className="track-diagram-container">
-              {Array.from({ length: Math.max(totalCount, 6) }, (_, i) => i + 1).map((laneNum) => {
-                const participant = participants.find((p) => p.lane === laneNum)
-                const laneColor = LANE_COLORS[(laneNum - 1) % LANE_COLORS.length]
-
-                return (
-                  <div
-                    key={laneNum}
-                    className={`gate-box ${participant ? 'is-filled' : 'is-empty'} ${isDrawing ? 'is-animating' : ''}`}
-                    style={{ borderTop: `4px solid ${participant ? laneColor : '#444'}` }}
-                  >
-                    <div className="gate-number" style={{ background: participant ? laneColor : '#333' }}>
-                      Làn {laneNum}
-                    </div>
-
-                    {participant ? (
-                      <div className="gate-content">
-                        <div className="gate-horse-icon">🐎</div>
-                        <div className="gate-horse-name">{participant.horse}</div>
-                        <div className="gate-jockey-name">👤 Nài: {participant.jockey}</div>
-                        <div className="gate-owner-name">🏡 {participant.owner}</div>
-                      </div>
-                    ) : (
-                      <div className="gate-empty-lbl">Cửa trống</div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+      {/* EMPTY STATE */}
+      {participants.length === 0 ? (
+        <div className="admin-card" style={{ border: '1px dashed rgba(255,255,255,0.1)', background: 'transparent', height: '100%', minHeight: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '24px' }}>
+          <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
+            <span style={{ fontSize: '64px', display: 'block', marginBottom: '16px', opacity: 0.5 }}>📭</span>
+            <h4 style={{ fontSize: '20px', color: '#eee', marginBottom: '8px' }}>Chưa có đơn đăng ký nào</h4>
+            <p style={{ fontSize: '14px', maxWidth: '350px', margin: '0 auto', lineHeight: '1.5' }}>
+              Hiện tại cuộc đua này chưa có bất kỳ đơn đăng ký tham gia nào được xác nhận. Vui lòng chờ các chủ ngựa đăng ký tham gia cuộc đua này và được kỵ sĩ chấp nhận lời mời.
+            </p>
           </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* VISUAL TRACK & GATES DIAGRAM */}
+          {(viewMode === 'both' || viewMode === 'diagram') && (
+            <div className="admin-card lane-diagram-card" style={{ marginTop: '24px' }}>
+              <div className="admin-card-head">
+                <h3>🏟️ Mô Phỏng Cửa Xuất Phát & Làn Chạy ({selectedRace?.name})</h3>
+                <span style={{ fontSize: '12px', color: '#d4af37' }}>Cửa 1 ➔ Cửa {totalCount}</span>
+              </div>
+              <div className="admin-card-body">
+                <div className="track-diagram-container">
+                  {Array.from({ length: Math.max(totalCount, 6) }, (_, i) => i + 1).map((laneNum) => {
+                    const participant = participants.find((p) => p.lane === laneNum)
+                    const laneColor = LANE_COLORS[(laneNum - 1) % LANE_COLORS.length]
 
-      {/* INTERACTIVE TABLE FOR LANE CONFIGURATION */}
-      {(viewMode === 'both' || viewMode === 'table') && (
-        <div className="admin-card">
-          <div className="admin-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3>📋 Bảng Danh Sách & Điều Chỉnh Làn Chạy</h3>
-            <span style={{ fontSize: '12px', color: '#aaa' }}>Thay đổi làn chạy để tự động sắp xếp</span>
-          </div>
-
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '120px' }}>Làn Chạy</th>
-                  <th>Ngựa Đua</th>
-                  <th>Giống Loài</th>
-                  <th>Chủ Stables</th>
-                  <th>Nài Ngựa (Jockey)</th>
-                  <th>Màu Áo Làn</th>
-                  <th>Trạng Thái</th>
-                  <th style={{ textAlign: 'right' }}>Chọn Làn</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedByLane.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: '#666' }}>
-                      Không tìm thấy ngựa đua nào phù hợp.
-                    </td>
-                  </tr>
-                ) : (
-                  sortedByLane.map((p) => (
-                    <tr key={p.id} className={p.lane ? 'row-assigned' : ''}>
-                      <td>
-                        {p.lane ? (
-                          <span className="lane-badge" style={{ backgroundColor: p.color }}>
-                            Làn {p.lane}
-                          </span>
-                        ) : (
-                          <span className="lane-badge lane-badge--none">
-                            Chưa chọn
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <strong style={{ color: '#fff', fontSize: '14px' }}>{p.horse}</strong>
-                      </td>
-                      <td>{p.breed}</td>
-                      <td>{p.owner}</td>
-                      <td>{p.jockey}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span
-                            style={{
-                              width: '14px',
-                              height: '14px',
-                              borderRadius: '50%',
-                              backgroundColor: p.lane ? p.color : '#555',
-                              display: 'inline-block'
-                            }}
-                          />
-                          <span style={{ fontSize: '12px', color: '#ccc' }}>
-                            {p.lane ? `Màu Làn ${p.lane}` : 'Chưa gán'}
-                          </span>
+                    return (
+                      <div
+                        key={laneNum}
+                        className={`gate-box ${participant ? 'is-filled' : 'is-empty'} ${isDrawing ? 'is-animating' : ''}`}
+                        style={{ borderTop: `4px solid ${participant ? laneColor : '#444'}` }}
+                      >
+                        <div className="gate-number" style={{ background: participant ? laneColor : '#333' }}>
+                          Làn {laneNum}
                         </div>
-                      </td>
-                      <td>
-                        <StatusBadge status={p.lane ? 'approved' : 'pending'} />
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <select
-                          className="admin-select"
-                          value={p.lane || ''}
-                          onChange={(e) => handleLaneChange(p.id, e.target.value)}
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: '13px',
-                            background: '#111',
-                            color: p.lane ? '#fff' : '#aaa',
-                            borderColor: p.lane ? p.color : 'rgba(255,255,255,0.2)',
-                            borderRadius: '4px'
-                          }}
-                        >
-                          <option value="">-- Chưa gán --</option>
-                          {Array.from({ length: totalCount }, (_, i) => i + 1).map((n) => (
-                            <option key={n} value={n}>
-                              Làn {n}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+
+                        {participant ? (
+                          <div className="gate-content">
+                            <div className="gate-horse-icon">🐎</div>
+                            <div className="gate-horse-name">{participant.horse}</div>
+                            <div className="gate-jockey-name">👤 Nài: {participant.jockey}</div>
+                            <div className="gate-owner-name">🏡 {participant.owner}</div>
+                          </div>
+                        ) : (
+                          <div className="gate-empty-lbl">Cửa trống</div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* INTERACTIVE TABLE FOR LANE CONFIGURATION */}
+          {(viewMode === 'both' || viewMode === 'table') && (
+            <div className="admin-card" style={{ marginTop: '24px' }}>
+              <div className="admin-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>📋 Bảng Danh Sách & Điều Chỉnh Làn Chạy</h3>
+                <span style={{ fontSize: '12px', color: '#aaa' }}>Thay đổi làn chạy để tự động sắp xếp</span>
+              </div>
+
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '120px' }}>Làn Chạy</th>
+                      <th>Ngựa Đua</th>
+                      <th>Giống Loài</th>
+                      <th>Chủ Stables</th>
+                      <th>Nài Ngựa (Jockey)</th>
+                      <th>Màu Áo Làn</th>
+                      <th>Trạng Thái</th>
+                      <th style={{ textAlign: 'right' }}>Chọn Làn</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                  </thead>
+                  <tbody>
+                    {sortedByLane.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: '#666' }}>
+                          Không tìm thấy ngựa đua nào phù hợp với từ khóa tìm kiếm.
+                        </td>
+                      </tr>
+                    ) : (
+                      sortedByLane.map((p) => (
+                        <tr key={p.id} className={p.lane ? 'row-assigned' : ''}>
+                          <td>
+                            {p.lane ? (
+                              <span className="lane-badge" style={{ backgroundColor: p.color }}>
+                                Làn {p.lane}
+                              </span>
+                            ) : (
+                              <span className="lane-badge lane-badge--none">
+                                Chưa chọn
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <strong style={{ color: '#fff', fontSize: '14px' }}>{p.horse}</strong>
+                          </td>
+                          <td>{p.breed}</td>
+                          <td>{p.owner}</td>
+                          <td>{p.jockey}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '50%',
+                                  backgroundColor: p.lane ? p.color : '#555',
+                                  display: 'inline-block'
+                                }}
+                              />
+                              <span style={{ fontSize: '12px', color: '#ccc' }}>
+                                {p.lane ? `Màu Làn ${p.lane}` : 'Chưa gán'}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <StatusBadge status={p.status} />
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <select
+                              className="admin-select"
+                              value={p.lane || ''}
+                              onChange={(e) => handleLaneChange(p.id, e.target.value)}
+                              style={{ width: '120px' }}
+                            >
+                              <option value="">-- Chọn --</option>
+                              {Array.from({ length: Math.max(totalCount, 8) }, (_, i) => i + 1).map((num) => (
+                                <option key={num} value={num}>Làn {num}</option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

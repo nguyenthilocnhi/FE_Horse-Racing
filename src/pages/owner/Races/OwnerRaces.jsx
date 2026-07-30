@@ -41,29 +41,12 @@ export default function OwnerRaces() {
 
       const apiData = res.status === 'fulfilled' ? (res.value?.data || res.value || []) : []
       
-      let localRegs = []
-      try {
-        // Load registrations SPECIFICALLY for THIS logged-in Horse Owner
-        const ownerRegs = JSON.parse(localStorage.getItem('mock_registrations_' + ownerKey) || '[]')
-        
-        // Also check global mock_registrations filtered by ownerKey
-        const legacyRegs = JSON.parse(localStorage.getItem('mock_registrations') || '[]')
-        const filteredLegacy = legacyRegs.filter(r => r.ownerKey === ownerKey)
-
-        localRegs = [...ownerRegs]
-        filteredLegacy.forEach(fl => {
-          if (!localRegs.some(l => String(l.id) === String(fl.id))) {
-            localRegs.push(fl)
-          }
-        })
-      } catch (e) {}
+      // Clean up ALL mock registrations to ensure we strictly use real API data in E2E testing
+      localStorage.removeItem('mock_registrations_' + ownerKey)
+      localStorage.removeItem('owner_registered_races_' + ownerKey)
+      localStorage.removeItem('mock_registrations')
 
       const allData = [...apiData]
-      localRegs.forEach(lr => {
-        if (!allData.some(a => String(a.id) === String(lr.id))) {
-          allData.unshift(lr)
-        }
-      })
 
       const mappedRaces = allData.map(p => {
         let mappedStatus = 'pending_jockey'
@@ -122,7 +105,7 @@ export default function OwnerRaces() {
       let regRaceIds = []
       try {
         const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
-        openCreatedRaces = stored.filter(r => r.status === 'registration_open' || r.registrationOpen === true)
+        openCreatedRaces = stored.filter(r => r.status !== 'completed' && r.status !== 'cancelled')
         regRaceIds = JSON.parse(localStorage.getItem('owner_registered_races_' + ownerKey) || '[]')
       } catch (e) {}
 
@@ -132,21 +115,26 @@ export default function OwnerRaces() {
         const isAlreadyInMapped = mappedRaces.some(m => String(m.originalId) === String(openR.id) || String(m.id) === String(openR.id) || m.name === openR.name)
 
         if (!isRegisteredLocally && !isAlreadyInMapped) {
+          const now = new Date()
+          const start = new Date(openR.registrationStartDate)
+          const end = new Date(openR.registrationEndDate)
+          const IS_TESTING = true; // TODO: Khôi phục lại logic check thời gian khi release lên Production.
+          const isOpen = IS_TESTING || (now >= start && now <= end)
+
           mappedRaces.unshift({
             id: openR.id,
             originalId: openR.originalId || openR.id,
             name: openR.name,
-            tournamentName: openR.tournament || 'Giải đấu',
+            tournamentName: openR.tournament || openR.tournamentName || 'Giải đấu',
             date: openR.date,
             time: openR.time,
-            venue: 'Trường đua Phú Thọ',
+            venue: openR.venue || 'Trường đua Phú Thọ',
             distance: openR.distance || '1600m',
             registeredHorse: 'Chưa đăng ký',
             assignedJockey: 'Chưa chỉ định',
-            prizePool: '200,000,000 VND',
-            status: 'registration_open',
-            displayLabel: 'Đang mở đăng ký - Đăng ký ngay',
-            badgeColor: 'green',
+            status: isOpen ? 'registration_open' : 'registration_closed',
+            displayLabel: isOpen ? 'Đang mở đăng ký' : 'Đã đóng đăng ký',
+            badgeColor: isOpen ? 'green' : 'red',
             result: null
           })
         }
@@ -242,6 +230,35 @@ export default function OwnerRaces() {
     const ownerKey = getCurrentOwnerKey()
 
     try {
+      // Local/offline validation first
+      const selTournName = (selectedRaceForReg.tournamentName || '').trim().toLowerCase();
+      const sameTournamentRaces = races.filter(r => 
+        (r.tournamentName || '').trim().toLowerCase() === selTournName && 
+        String(r.originalId) !== String(selectedRaceForReg.originalId || selectedRaceForReg.id)
+      );
+
+      const horseNameLower = (horseObj.name || '').trim().toLowerCase();
+      const horseConflict = sameTournamentRaces.some(r => 
+        (r.registeredHorse || '').trim().toLowerCase() === horseNameLower && 
+        r.status !== 'canceled' && 
+        r.status !== 'jockey_rejected'
+      );
+      if (horseConflict) {
+        alert(`Ngựa "${horseObj.name}" đã được đăng ký trong một cuộc đua khác của giải này!`);
+        return;
+      }
+
+      const jockeyNameLower = (jockeyObj.fullName || jockeyObj.userName || jockeyObj.name || '').trim().toLowerCase();
+      const jockeyConflict = sameTournamentRaces.some(r => 
+        (r.assignedJockey || '').trim().toLowerCase() === jockeyNameLower && 
+        r.status !== 'canceled' && 
+        r.status !== 'jockey_rejected'
+      );
+      if (jockeyConflict) {
+        alert(`Nài ngựa "${jockeyObj.fullName || jockeyObj.userName || jockeyObj.name}" đã được mời/đăng ký trong một cuộc đua khác của giải này!`);
+        return;
+      }
+
       try {
         const regRes = await registerHorseToRace({
           raceScheduleId: selectedRaceForReg.originalId || selectedRaceForReg.id,
@@ -252,32 +269,13 @@ export default function OwnerRaces() {
           await assignJockeyToParticipation(regData.id, { jockeyId: Number(selectedJockeyId) })
         }
       } catch (err) {
+        if (err.response && err.response.data) {
+           const msg = typeof err.response.data === 'string' ? err.response.data : err.response.data.message || 'Lỗi hệ thống';
+           alert('Lỗi: ' + msg);
+           return;
+        }
         console.warn('API register error, adding locally:', err)
       }
-
-      // 1. Add to owner-scoped local registrations AND global registrations
-      const newParticipation = {
-        id: Date.now(),
-        ownerKey: ownerKey,
-        raceScheduleId: selectedRaceForReg.originalId || selectedRaceForReg.id,
-        raceSchedule: {
-          name: selectedRaceForReg.name,
-          tournament: { name: selectedRaceForReg.tournamentName },
-          startTime: `${selectedRaceForReg.date}T${selectedRaceForReg.time}:00`
-        },
-        horse: { name: horseObj?.name || 'Aurelius', horseOwner: { fullName: ownerKey.split('@')[0] } },
-        jockey: { fullName: jockeyObj?.fullName || jockeyObj?.userName || 'S. Nakamura' },
-        jockeyInvitationStatus: 'PENDING',
-        status: 'PENDING'
-      }
-
-      // Save to owner-scoped list
-      const ownerRegs = JSON.parse(localStorage.getItem('mock_registrations_' + ownerKey) || '[]')
-      localStorage.setItem('mock_registrations_' + ownerKey, JSON.stringify([newParticipation, ...ownerRegs]))
-
-      // Save to global list for Admin approval view
-      const globalRegs = JSON.parse(localStorage.getItem('mock_registrations') || '[]')
-      localStorage.setItem('mock_registrations', JSON.stringify([newParticipation, ...globalRegs]))
 
       // 2. Mark this race ID as registered by THIS owner
       const regRaceIds = JSON.parse(localStorage.getItem('owner_registered_races_' + ownerKey) || '[]')
@@ -355,7 +353,6 @@ export default function OwnerRaces() {
                 <th>Thông tin đua</th>
                 <th>Chiến mã</th>
                 <th>Jockey đảm nhiệm</th>
-                <th>Thưởng giải</th>
                 <th>Trạng thái</th>
                 <th>Hành động</th>
               </tr>
@@ -380,14 +377,12 @@ export default function OwnerRaces() {
                     <span style={{ fontSize: 11, color: '#666' }}>{race.tournamentName}</span>
                   </td>
                   <td>
-                    📅 {race.date} · {race.time}<br />
-                    📍 {race.venue} · 📏 {race.distance}
+                    📅 {race.date} · {race.time}
                   </td>
                   <td style={{ color: '#d4af37', fontWeight: 500 }}>
                     {race.registeredHorse || 'Chưa đăng ký'}
                   </td>
                   <td>{race.assignedJockey || 'Chưa chỉ định'}</td>
-                  <td style={{ color: '#4ade80' }}>{race.prizePool}</td>
                   <td>
                     <span className={`owner-badge owner-badge--${race.badgeColor || 'gray'}`}>
                       {race.displayLabel}
@@ -397,10 +392,19 @@ export default function OwnerRaces() {
                     <div className="owner-table-actions">
                       {race.status === 'registration_open' ? (
                         <button 
-                          className="owner-btn owner-btn--gold owner-btn--sm" 
+                          className="owner-btn owner-btn--sm" 
+                          style={{ backgroundColor: '#10B981', color: '#fff' }}
                           onClick={() => handleOpenRegisterModal(race)}
                         >
-                          🏇 Đăng Ký Ngựa & Mời Nài
+                          ĐĂNG KÝ
+                        </button>
+                      ) : race.status === 'registration_closed' ? (
+                        <button 
+                          className="owner-btn owner-btn--sm" 
+                          style={{ backgroundColor: '#EF4444', color: '#fff', cursor: 'not-allowed' }}
+                          disabled
+                        >
+                          ĐÃ ĐÓNG ĐĂNG KÝ
                         </button>
                       ) : (
                         <button className="owner-btn owner-btn--ghost owner-btn--sm" onClick={() => openDetails(race)}>

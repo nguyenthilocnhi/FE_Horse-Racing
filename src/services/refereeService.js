@@ -6,11 +6,10 @@ import apiClient from './apiClient'
  */
 export async function getRaceParticipations(raceId) {
   try {
-    const res = await apiClient.get(`/races/${raceId}/participants`)
+    const res = await apiClient.get(`/races/${raceId}/participations`)
     return res.data
   } catch (err) {
-    const res = await apiClient.get(`/races/${raceId}`)
-    return res.data
+    throw err
   }
 }
 
@@ -19,16 +18,16 @@ export async function getRaceParticipations(raceId) {
  * POST /races/{raceId}/pre-inspection
  */
 export async function inspectRaceParticipants(raceId, payload) {
-  const res = await apiClient.post(`/races/${raceId}/pre-inspection`, payload)
+  const res = await apiClient.post(`/races/${raceId}/inspection`, payload)
   return res.data
 }
 
 /**
  * Nộp báo cáo trước trận
- * POST /races/{raceId}/pre-report
+ * POST /races/{raceId}/reports/pre-race
  */
 export async function submitPreRaceReport(raceId, payload) {
-  const res = await apiClient.post(`/races/${raceId}/pre-report`, payload)
+  const res = await apiClient.post(`/races/${raceId}/reports/pre-race`, payload)
   return res.data
 }
 
@@ -37,7 +36,7 @@ export async function submitPreRaceReport(raceId, payload) {
  * POST /races/{raceId}/post-report
  */
 export async function submitPostRaceReport(raceId, payload) {
-  const res = await apiClient.post(`/races/${raceId}/post-report`, payload)
+  const res = await apiClient.post(`/races/${raceId}/reports/post-race`, payload)
   return res.data
 }
 

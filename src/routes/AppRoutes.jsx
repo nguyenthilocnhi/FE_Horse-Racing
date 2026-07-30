@@ -35,6 +35,7 @@ import SpectatorRankings from '../pages/spectator/Rankings/SpectatorRankings'
 import SpectatorPredictions from '../pages/spectator/Predictions/SpectatorPredictions'
 import PaymentResult from '../pages/payment/PaymentResult'
 import SpectatorProfile from '../pages/spectator/Profile/SpectatorProfile'
+import SpectatorRaces from '../pages/spectator/Races/SpectatorRaces'
 // Referee pages
 import RefereeLayout from '../layouts/RefereeLayout'
 import RefereeInspection from '../pages/referee/Inspection/RefereeInspection'
@@ -169,6 +170,7 @@ export default function AppRoutes() {
       {/* ── Spectator Portal ── */}
       <Route element={<ProtectedRoute allowedRoles={['SPECTATOR']}><SpectatorLayout /></ProtectedRoute>}>
         <Route path="/spectator" element={<SpectatorDashboard />} />
+        <Route path="/spectator/races" element={<SpectatorRaces />} />
         <Route path="/spectator/rankings" element={<SpectatorRankings />} />
         <Route path="/spectator/predictions" element={<SpectatorPredictions />} />
         <Route path="/spectator/profile" element={<SpectatorProfile />} />

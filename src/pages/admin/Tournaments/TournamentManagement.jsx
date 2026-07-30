@@ -99,11 +99,9 @@ export default function TournamentManagement() {
               }
             }
 
-            const localMatches = localCreated.filter(r =>
-              String(r.tournamentId) === String(t.id) || r.tournament === t.name
-            ).length
-
-            raceCount += localMatches
+            // Prevent double counting since localCreated usually contains cached backend races
+            // We only rely on backend raceCount.
+            // raceCount += localMatches
 
             return {
               id: t.id,
@@ -650,15 +648,6 @@ export default function TournamentManagement() {
                               >
                                 📅 + Lịch thi đấu
                               </button>
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--sm"
-                                style={{ backgroundColor: '#1A73E8', color: '#FFF' }}
-                                onClick={() => handleOpenRegistration(t)}
-                                title="Thiết lập đăng ký"
-                              >
-                                Chỉnh sửa ngày đăng ký
-                              </button>
                             </>
                           )}
                           <button
@@ -780,59 +769,7 @@ export default function TournamentManagement() {
           </div>
         )}
 
-        {/* REGISTRATION MODAL */}
-        {showRegModal && selectedRegTournament && (
-          <div className="modal-overlay" style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.75)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            zIndex: 1000
-          }}>
-            <div className="admin-card" style={{ width: '100%', maxWidth: '460px', border: '1px solid rgba(212,175,55,0.2)' }}>
-              <div className="admin-card-head">
-                <h3>Thiết Lập Thời Gian Đăng Ký</h3>
-                <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setShowRegModal(false)}>✕</button>
-              </div>
-              <form onSubmit={handleSaveRegistration} className="admin-card-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <p style={{ color: '#ccc', fontSize: '13px', margin: 0 }}>Giải đấu: <strong style={{ color: '#D4AF37' }}>{selectedRegTournament.name}</strong></p>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thời gian Mở đăng ký</label>
-                  <input
-                    required
-                    type="datetime-local"
-                    className="admin-input"
-                    value={regFormData.registrationStartDate}
-                    onChange={(e) => setRegFormData({ ...regFormData, registrationStartDate: e.target.value })}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Thời gian Đóng đăng ký</label>
-                  <input
-                    required
-                    type="datetime-local"
-                    className="admin-input"
-                    value={regFormData.registrationEndDate}
-                    onChange={(e) => setRegFormData({ ...regFormData, registrationEndDate: e.target.value })}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                  <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setShowRegModal(false)}>Hủy bỏ</button>
-                  <button type="submit" className="admin-btn admin-btn--gold">Lưu thiết lập</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* REGISTRATION MODAL MOVED TO RACE MANAGEMENT */}
 
         {/* REPORT & RANKINGS MODAL */}
         {reportModalTournament && (
