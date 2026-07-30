@@ -54,156 +54,120 @@ export default function SpectatorProfile() {
   const [linkingStep, setLinkingStep] = useState('choose')   // 'choose' | 'confirm' | 'processing' | 'done'
   const [linkAccountInput, setLinkAccountInput] = useState('')
 
-  // ── Tải thông tin cá nhân từ API khi mount ──
+  // ── Tải thông tin cá nhân từ API / LocalStorage khi mount ──
   useEffect(() => {
     let cancelled = false
+    const userKey = user?.id || user?.username || user?.email || 'guest'
+    const userProfileKey = `spectator_profile_${userKey}`
+    const userTxKey = `spectator_transactions_${userKey}`
+
+    const computeWalletBalance = () => {
+      let specProf = null
+      let pendProf = null
+      let localTxs = []
+
+      try { specProf = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || 'null') } catch (e) {}
+      try { pendProf = JSON.parse(localStorage.getItem('pending_profile') || 'null') } catch (e) {}
+      try { localTxs = JSON.parse(localStorage.getItem(userTxKey) || '[]') } catch (e) {}
+
+      let depositSum = 0
+      localTxs.forEach(t => {
+        const st = (t.status || '').toUpperCase()
+        if ((st === 'SUCCESS' || st === 'PAID') && t.amount) {
+          depositSum += Number(t.amount)
+        }
+      })
+
+      // Only read saved balance if it belongs to this exact user
+      const isMatch = (specProf?.userName === user?.username) || (specProf?.email === user?.email) || (specProf?.id === user?.id)
+      const b1 = isMatch ? (specProf?.balance ?? specProf?.walletBalance) : undefined
+      const b2 = pendProf?.balance ?? pendProf?.walletBalance
+
+      const highestVal = Math.max(
+        b1 !== undefined && b1 !== null ? Number(b1) : 0,
+        b2 !== undefined && b2 !== null && (pendProf?.email === user?.email || pendProf?.userName === user?.username) ? Number(b2) : 0,
+        depositSum
+      )
+
+      return highestVal
+    }
 
     async function fetchProfile() {
       setLoading(true)
       setApiError(null)
 
-      // ── Bước 1: Hiển thị ngay từ pending_profile nếu khớp với user đang đăng nhập ──
+      const calculatedBalance = computeWalletBalance()
+
+      // Read local user-scoped transactions
+      let localTx = []
+      try {
+        localTx = JSON.parse(localStorage.getItem(userTxKey) || '[]')
+      } catch (e) {}
+      if (!cancelled) {
+        setApiTransactions(localTx)
+      }
+
+      // Check pending_profile
       const pending = localStorage.getItem('pending_profile')
-      let pendingLoaded = false
+      let initialData = null
+
       if (pending) {
         try {
           const parsed = JSON.parse(pending)
-          // Xác thực thông tin đăng ký có thuộc về người dùng đang đăng nhập hay không
           const isMatch =
             (parsed.email && parsed.email === user?.email) ||
             (parsed.userName && parsed.userName === user?.username) ||
             (parsed.id && parsed.id === user?.id)
-
           if (isMatch) {
-            if (!cancelled) {
-              setProfile(normalizeProfile(parsed))
-              setFormData(normalizeProfile(parsed))
-              setLoading(false) // Hiển thị ngay
-              pendingLoaded = true
-            }
-          } else {
-            // Không khớp -> dữ liệu cũ của tài khoản đăng ký trước đó, dọn dẹp đi
-            localStorage.removeItem('pending_profile')
+            initialData = parsed
           }
-        } catch (_) { /* ignore */ }
+        } catch (_) {}
       }
 
-      // ── Bước 2: Gọi API để lấy data mới nhất (làm mới nền) ──
+      if (!initialData) {
+        try {
+          initialData = JSON.parse(localStorage.getItem(userProfileKey) || 'null')
+        } catch (_) {}
+      }
+
       try {
-        const data = await spectatorService.getSpectatorProfile(user?.id)
-        let walletInfo = null
-        const rawId = data?.id || data?.spectatorId || user?.id
-        const specId = rawId && !isNaN(Number(rawId)) ? Number(rawId) : null
-        if (specId) {
-          try {
-            const walletRes = await spectatorService.getSpectatorWallet(specId)
-            walletInfo = walletRes?.data || walletRes
-          } catch (wErr) {
-            console.warn('API getSpectatorWallet error:', wErr?.response?.status ?? wErr?.message)
-          }
-
-          try {
-            const txRes = await spectatorService.getSpectatorTransactions(specId)
-            const txList = Array.isArray(txRes) ? txRes : (txRes?.data || [])
-
-            // Đọc thêm lịch sử giao dịch chuyển khoản từ localStorage
-            let localTx = []
-            try {
-              localTx = JSON.parse(localStorage.getItem('spectator_transactions') || '[]')
-            } catch (e) {}
-
-            // Nếu còn mã nạp tiền PENDING mà khán giả quay lại trang mà chưa hoàn tất ➔ gán Bị lỗi (FAILED)
-            const activePendingCode = localStorage.getItem('active_pending_order_code')
-            if (activePendingCode) {
-              localTx = localTx.map(tx => {
-                if (String(tx.id) === String(activePendingCode) && tx.status === 'PENDING') {
-                  return { ...tx, status: 'FAILED' }
-                }
-                return tx
-              })
-              localStorage.setItem('spectator_transactions', JSON.stringify(localTx))
-              localStorage.removeItem('active_pending_order_code')
-            }
-
-            // Gộp danh sách API và LocalStorage
-            const combinedTx = [...localTx]
-            txList.forEach(t => {
-              if (!combinedTx.some(c => String(c.id) === String(t.id))) {
-                combinedTx.push(t)
-              }
-            })
-
-            if (!cancelled) {
-              setApiTransactions(combinedTx)
-            }
-          } catch (txErr) {
-            console.warn('API getSpectatorTransactions error:', txErr?.response?.status ?? txErr?.message)
-            // Lấy từ localTx khi API không phản hồi
-            let localTx = []
-            try {
-              localTx = JSON.parse(localStorage.getItem('spectator_transactions') || '[]')
-            } catch (e) {}
-
-            const activePendingCode = localStorage.getItem('active_pending_order_code')
-            if (activePendingCode) {
-              localTx = localTx.map(tx => {
-                if (String(tx.id) === String(activePendingCode) && tx.status === 'PENDING') {
-                  return { ...tx, status: 'FAILED' }
-                }
-                return tx
-              })
-              localStorage.setItem('spectator_transactions', JSON.stringify(localTx))
-              localStorage.removeItem('active_pending_order_code')
-            }
-
-            if (!cancelled) {
-              setApiTransactions(localTx)
-            }
-          }
+        const apiData = await spectatorService.getSpectatorProfile(user?.id)
+        if (apiData) {
+          initialData = { ...initialData, ...apiData }
         }
-        if (!cancelled) {
-          const mergedData = {
-            ...data,
-            balance: walletInfo?.balance ?? data?.walletBalance ?? data?.balance ?? 0,
-            spectatorName: walletInfo?.spectatorName ?? data?.fullName ?? data?.name
-          }
-          const normalized = normalizeProfile(mergedData)
-          setProfile(normalized)
-          setFormData(normalized)
-          setApiError(null)
-          // API thành công → xóa snapshot đăng ký cũ
-          localStorage.removeItem('pending_profile')
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.warn('API profile lỗi, dùng dữ liệu cục bộ:', err?.response?.status ?? err?.message)
-
-          // Nếu chưa có gì hiển thị (do pending_profile không khớp/không có) -> dùng thông tin từ AuthContext
-          if (!pendingLoaded) {
-            setApiError('Không thể tải thông tin từ máy chủ. Hiển thị dữ liệu đăng ký.')
-            const fallback = normalizeProfile({
-              id: user?.id,
-              userName: user?.username ?? '',
-              name: user?.fullName ?? user?.name ?? '',
-              email: user?.email ?? '',
-              phone: user?.phone ?? '',
-              createdAt: user?.createdAt ?? null,
-            })
-            setProfile(fallback)
-            setFormData(fallback)
-          }
-        }
-      } finally {
-        if (!cancelled) setLoading(false)
+      } catch (e) {
+        console.warn('API getSpectatorProfile offline:', e?.message)
       }
 
+      if (!cancelled) {
+        const mergedData = {
+          id: user?.id || initialData?.id,
+          userName: user?.username || initialData?.userName || '',
+          name: user?.fullName || user?.name || initialData?.name || initialData?.fullName || 'Khán giả',
+          email: user?.email || initialData?.email || 'khangia@horseracing.com',
+          phone: user?.phone || initialData?.phone || '0912345678',
+          balance: calculatedBalance,
+          walletBalance: calculatedBalance,
+          joined: user?.createdAt || initialData?.joined || new Date().toISOString(),
+          payosLinked: true
+        }
+
+        const normalized = normalizeProfile(mergedData)
+        setProfile(normalized)
+        setFormData(normalized)
+        setLoading(false)
+
+        localStorage.setItem(userProfileKey, JSON.stringify(normalized))
+        localStorage.setItem('spectator_profile', JSON.stringify(normalized))
+        if (localStorage.getItem('pending_profile')) {
+          localStorage.setItem('pending_profile', JSON.stringify(normalized))
+        }
+      }
     }
 
     fetchProfile()
     return () => { cancelled = true }
-  }, [user?.id])
-
-
+  }, [user])
 
   // ── Lưu thay đổi lên API ──
   const handleUpdateProfile = async (e) => {
@@ -218,12 +182,14 @@ export default function SpectatorProfile() {
       const updated = await spectatorService.updateSpectatorProfile(profile.id, payload)
       const normalized = normalizeProfile({ ...profile, ...updated })
       setProfile(normalized)
-      setFormData(normalized)
+      const userKey = user?.id || user?.username || user?.email || 'guest'
+      localStorage.setItem(`spectator_profile_${userKey}`, JSON.stringify(normalized))
+      localStorage.setItem('spectator_profile', JSON.stringify(normalized))
+      alert('Cập nhật thông tin thành công!')
       setIsEditing(false)
-      alert('✅ Cập nhật thông tin tài khoản thành công!')
     } catch (err) {
-      console.error('Cập nhật thất bại:', err)
-      alert('❌ Cập nhật thất bại: ' + (err?.response?.data?.message ?? 'Lỗi máy chủ'))
+      console.error(err)
+      alert('Không thể lưu thay đổi!')
     } finally {
       setSaving(false)
     }
@@ -237,13 +203,12 @@ export default function SpectatorProfile() {
       return
     }
 
-    const rawId = profile?.id ?? user?.id
-    const specId = rawId && !isNaN(Number(rawId)) ? Number(rawId) : null
+    const userKey = user?.id || user?.username || user?.email || 'guest'
 
     try {
       setSaving(true)
       // Gọi Backend tạo giao dịch payOS Checkout ➔ Nhận checkoutUrl
-      const res = await createPayment(amount, specId)
+      const res = await createPayment(amount, userKey)
       const checkoutUrl = res?.checkoutUrl || res?.payUrl || res?.data?.checkoutUrl
 
       if (checkoutUrl) {

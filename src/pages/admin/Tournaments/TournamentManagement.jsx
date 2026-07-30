@@ -8,11 +8,7 @@ import {
   createTournament,
   updateTournament,
   cancelTournament,
-  updateTournamentRegistration,
-  getTournamentReport,
-  exportTournament,
-  getTournamentRankings,
-  recalculateTournamentRankings
+  updateTournamentRegistration
 } from '../../../services/tournamentService'
 import { getAllRaceTracks } from '../../../services/adminService'
 import './TournamentManagement.css'
@@ -29,13 +25,6 @@ export default function TournamentManagement() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [sortOrder, setSortOrder] = useState('NEWEST')
 
-  // Report & Rankings Modal States
-  const [reportModalTournament, setReportModalTournament] = useState(null)
-  const [reportData, setReportData] = useState(null)
-  const [rankingsData, setRankingsData] = useState([])
-  const [activeReportTab, setActiveReportTab] = useState('rankings')
-  const [isExporting, setIsExporting] = useState(false)
-  const [isRecalculating, setIsRecalculating] = useState(false)
 
   useEffect(() => {
     fetchTournaments()
@@ -203,79 +192,6 @@ export default function TournamentManagement() {
     })
   }
 
-  const handleOpenReportModal = async (t) => {
-    setReportModalTournament(t)
-    setActiveReportTab('rankings')
-    try {
-      const [rankRes, reportRes] = await Promise.allSettled([
-        getTournamentRankings(t.id),
-        getTournamentReport(t.id)
-      ])
-
-      if (rankRes.status === 'fulfilled') {
-        const ranks = rankRes.value?.data || rankRes.value || []
-        setRankingsData(Array.isArray(ranks) && ranks.length > 0 ? ranks : [
-          { rank: 1, horse: 'Aurelius', owner: 'Stable Alpha', points: 450, wins: 3 },
-          { rank: 2, horse: 'Midnight Star', owner: 'Blue Ridge Farm', points: 380, wins: 2 },
-          { rank: 3, horse: 'Velvet Thunder', owner: 'Golden Hooves', points: 310, wins: 1 },
-          { rank: 4, horse: 'Storm Rider', owner: 'Wind Valley', points: 260, wins: 1 }
-        ])
-      } else {
-        setRankingsData([
-          { rank: 1, horse: 'Aurelius', owner: 'Stable Alpha', points: 450, wins: 3 },
-          { rank: 2, horse: 'Midnight Star', owner: 'Blue Ridge Farm', points: 380, wins: 2 },
-          { rank: 3, horse: 'Velvet Thunder', owner: 'Golden Hooves', points: 310, wins: 1 },
-          { rank: 4, horse: 'Storm Rider', owner: 'Wind Valley', points: 260, wins: 1 }
-        ])
-      }
-
-      if (reportRes.status === 'fulfilled') {
-        setReportData(reportRes.value?.data || reportRes.value || {
-          totalRaces: t.races || 12,
-          totalPrize: t.prize || '50,000,000 VND',
-          totalSpectators: 1240,
-          totalRevenue: '180,000,000 VND'
-        })
-      } else {
-        setReportData({
-          totalRaces: t.races || 12,
-          totalPrize: t.prize || '50,000,000 VND',
-          totalSpectators: 1240,
-          totalRevenue: '180,000,000 VND'
-        })
-      }
-    } catch (e) {
-      console.warn('Error loading report/rankings:', e)
-    }
-  }
-
-  const handleRecalculateRankings = async () => {
-    if (!reportModalTournament) return
-    setIsRecalculating(true)
-    try {
-      await recalculateTournamentRankings(reportModalTournament.id)
-      alert('✅ Đã tính toán lại Bảng xếp hạng giải đấu thành công!')
-      const res = await getTournamentRankings(reportModalTournament.id)
-      setRankingsData(res?.data || res || [])
-    } catch (e) {
-      alert('✅ Đã cập nhật tính toán lại bảng xếp hạng (Local Fallback)!')
-    } finally {
-      setIsRecalculating(false)
-    }
-  }
-
-  const handleExport = async (format) => {
-    if (!reportModalTournament) return
-    setIsExporting(true)
-    try {
-      await exportTournament(reportModalTournament.id, { format })
-      alert(`📥 Đã tạo yêu cầu xuất báo cáo định dạng ${format.toUpperCase()} thành công! File đang được tải xuống.`)
-    } catch (e) {
-      alert(`📥 Đã xuất báo cáo ${format.toUpperCase()} thành công (Local Fallback)!`)
-    } finally {
-      setIsExporting(false)
-    }
-  }
 
   const handleOpenRegistration = (t) => {
     if (t.status === 'completed') {
@@ -650,15 +566,7 @@ export default function TournamentManagement() {
                               </button>
                             </>
                           )}
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn--ghost admin-btn--sm"
-                            style={{ color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' }}
-                            onClick={() => handleOpenReportModal(t)}
-                            title="Xem Báo cáo & Bảng xếp hạng"
-                          >
-                            📊 Báo cáo & BXH
-                          </button>
+
                         </div>
                       </td>
                     </tr>
@@ -771,121 +679,7 @@ export default function TournamentManagement() {
 
         {/* REGISTRATION MODAL MOVED TO RACE MANAGEMENT */}
 
-        {/* REPORT & RANKINGS MODAL */}
-        {reportModalTournament && (
-          <div className="modal-overlay" style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1050
-          }}>
-            <div className="admin-card" style={{ width: '100%', maxWidth: '640px', border: '1px solid rgba(212,175,55,0.2)' }}>
-              <div className="admin-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3>📊 Báo Cáo & Bảng Xếp Hạng Giải Đấu</h3>
-                  <span style={{ fontSize: '12px', color: '#d4af37' }}>{reportModalTournament.name} (Mã: {reportModalTournament.id})</span>
-                </div>
-                <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setReportModalTournament(null)}>✕</button>
-              </div>
 
-              <div className="admin-tabs" style={{ padding: '10px 20px 0 20px' }}>
-                <button
-                  className={`admin-tab${activeReportTab === 'rankings' ? ' is-active' : ''}`}
-                  onClick={() => setActiveReportTab('rankings')}
-                >
-                  🏆 Bảng Xếp Hạng
-                </button>
-                <button
-                  className={`admin-tab${activeReportTab === 'report' ? ' is-active' : ''}`}
-                  onClick={() => setActiveReportTab('report')}
-                >
-                  📈 Báo Cáo & Xuất Dữ Liệu
-                </button>
-              </div>
-
-              <div className="admin-card-body" style={{ padding: '20px' }}>
-                {activeReportTab === 'rankings' ? (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                      <h4 style={{ margin: 0, color: '#fff', fontSize: '14px' }}>Bảng Điểm Chiến Mã Tích Lũy</h4>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--ghost admin-btn--sm"
-                        onClick={handleRecalculateRankings}
-                        disabled={isRecalculating}
-                      >
-                        🔄 {isRecalculating ? 'Đang tính lại...' : 'Tính lại BXH'}
-                      </button>
-                    </div>
-                    <table className="admin-table">
-                      <thead>
-                        <tr>
-                          <th>Hạng</th>
-                          <th>Chiến Mã</th>
-                          <th>Chủ Stable</th>
-                          <th>Số Trận Thắng</th>
-                          <th style={{ textAlign: 'right' }}>Điểm Tích Lũy</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rankingsData.map((item, idx) => (
-                          <tr key={idx}>
-                            <td style={{ fontWeight: 'bold', color: idx === 0 ? '#d4af37' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#cd7f32' : '#888' }}>
-                              #{item.rank || idx + 1}
-                            </td>
-                            <td style={{ color: '#fff', fontWeight: '500' }}>{item.horse}</td>
-                            <td>{item.owner}</td>
-                            <td>{item.wins} trận</td>
-                            <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#d4af37' }}>{item.points} PTS</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div>
-                    <h4 style={{ margin: '0 0 14px 0', color: '#fff', fontSize: '14px' }}>Thống Kê Tổng Kết Giải Đấu</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Tổng số cuộc đua</span>
-                        <strong style={{ display: 'block', fontSize: '16px', color: '#fff', marginTop: '4px' }}>{reportData?.totalRaces} cuộc đua</strong>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Tổng quỹ giải thưởng</span>
-                        <strong style={{ display: 'block', fontSize: '16px', color: '#d4af37', marginTop: '4px' }}>{reportData?.totalPrize}</strong>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Lượt khán giả theo dõi</span>
-                        <strong style={{ display: 'block', fontSize: '16px', color: '#60a5fa', marginTop: '4px' }}>{reportData?.totalSpectators} lượt</strong>
-                      </div>
-                      <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <span style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>Doanh thu bán vé & cược</span>
-                        <strong style={{ display: 'block', fontSize: '16px', color: '#4ade80', marginTop: '4px' }}>{reportData?.totalRevenue}</strong>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--ghost"
-                        onClick={() => handleExport('pdf')}
-                        disabled={isExporting}
-                      >
-                        📥 Xuất File PDF
-                      </button>
-                      <button
-                        type="button"
-                        className="admin-btn admin-btn--gold"
-                        onClick={() => handleExport('excel')}
-                        disabled={isExporting}
-                      >
-                        📥 Xuất File Excel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

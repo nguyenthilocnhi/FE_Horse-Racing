@@ -40,25 +40,31 @@ export default function SpectatorPredictions() {
   const [selectedJockeyDetail, setSelectedJockeyDetail] = useState(null)
   const [successModal, setSuccessModal] = useState(null)
 
+  const { user } = useAuth()
+  const userKey = user?.id || user?.username || user?.email || 'guest'
+  const userProfileKey = `spectator_profile_${userKey}`
+
   // Load profile from localStorage to check/deduct balance
   const [profile, setProfile] = useState(() => {
-    const stored = localStorage.getItem('spectator_profile')
+    const stored = localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile')
     if (stored) {
       try {
-        return JSON.parse(stored)
+        const parsed = JSON.parse(stored)
+        if (parsed.email === user?.email || parsed.userName === user?.username || parsed.id === user?.id) {
+          return parsed
+        }
       } catch (e) {
         console.error(e)
       }
     }
-    const INITIAL_PROFILE = {
-      name: 'Hoang Van E',
-      email: 'hoangvane@email.com',
-      phone: '0987 654 321',
-      balance: 5500000,
-      joined: '2025-02-14',
+    return {
+      name: user?.fullName || user?.name || 'Khán giả',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      balance: 0,
+      joined: new Date().toISOString(),
       payosLinked: true
     }
-    return INITIAL_PROFILE
   })
 
   // Load userPreds to append new predictions
@@ -82,18 +88,19 @@ export default function SpectatorPredictions() {
       } catch (e) {
         console.warn('API cancel failed, refunding locally', e)
       }
-      
+
       const canceledItem = userPreds.find(p => p.id === predId || p.predictionId === predId)
       const refundAmount = canceledItem ? (canceledItem.amount || canceledItem.stakeAmount || 100000) : 100000
-      
+
       const updatedPreds = userPreds.filter(p => p.id !== predId && p.predictionId !== predId)
       setUserPreds(updatedPreds)
       localStorage.setItem('spectator_user_preds', JSON.stringify(updatedPreds))
 
       const updatedProfile = { ...profile, balance: profile.balance + refundAmount }
       setProfile(updatedProfile)
+      localStorage.setItem(userProfileKey, JSON.stringify(updatedProfile))
       localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
-      
+
       alert(`✅ Hủy cược thành công! Đã hoàn trả ${formatCurrency(refundAmount)} vào ví tài khoản của bạn.`)
     } catch (err) {
       alert('Lỗi khi hủy cược: ' + err.message)
@@ -127,7 +134,7 @@ export default function SpectatorPredictions() {
                   runners: MOCK_RUNNERS
                 })
               })
-            } catch (_) {}
+            } catch (_) { }
           }
           if (apiPools.length > 0) {
             setPools(apiPools)
@@ -180,6 +187,7 @@ export default function SpectatorPredictions() {
     // Deduct balance and sync to localStorage
     const updatedProfile = { ...profile, balance: profile.balance - finalAmount }
     setProfile(updatedProfile)
+    localStorage.setItem(userProfileKey, JSON.stringify(updatedProfile))
     localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
 
     // Add new prediction entry and sync to localStorage
@@ -536,7 +544,7 @@ export default function SpectatorPredictions() {
           <div className="admin-card" style={{ width: '100%', maxWidth: '420px', border: '1px solid rgba(74, 222, 128, 0.3)', background: '#121212', textAlign: 'center', padding: '24px' }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>👍</div>
             <h3 style={{ color: '#4ade80', marginBottom: '20px', fontSize: '18px' }}>Đặt dự đoán và mua vé thành công!</h3>
-            
+
             <div style={{ textAlign: 'left', background: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '16px', fontSize: '13px', lineHeight: '1.6' }}>
               <div><span style={{ color: '#888' }}>- Cuộc đua:</span> <strong style={{ color: '#fff' }}>{successModal.race}</strong></div>
               <div><span style={{ color: '#888' }}>- Loại vé:</span> <strong style={{ color: '#fff' }}>Vé {successModal.ticketType}</strong></div>
@@ -549,9 +557,9 @@ export default function SpectatorPredictions() {
               (Bạn có thể xem lịch sử vé đã mua tại trang "Tài Khoản Cá Nhân")
             </p>
 
-            <button 
-              type="button" 
-              className="admin-btn admin-btn--gold" 
+            <button
+              type="button"
+              className="admin-btn admin-btn--gold"
               style={{ width: '100%', padding: '10px' }}
               onClick={() => setSuccessModal(null)}
             >

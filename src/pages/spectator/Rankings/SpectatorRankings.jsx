@@ -85,8 +85,8 @@ export default function SpectatorRankings() {
                     <td>{r.submitted}</td>
                     <td><strong style={{ color: '#4ade80' }}>🥇 {r.winner}</strong></td>
                     <td>
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--outline admin-btn--sm"
                         onClick={() => setSelectedResult(r)}
                       >

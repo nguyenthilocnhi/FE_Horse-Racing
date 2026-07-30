@@ -8,7 +8,7 @@ import '../../admin/Races/RaceManagement.css'
 export default function SpectatorRaces() {
   const [races, setRaces] = useState([])
   const [tournaments, setTournaments] = useState([])
-  
+
   const [showResultModal, setShowResultModal] = useState(false)
   const [selectedRace, setSelectedRace] = useState(null)
   const [results, setResults] = useState([])
@@ -86,7 +86,7 @@ export default function SpectatorRaces() {
     setShowResultModal(true)
     setLoadingResults(true)
     setResults([])
-    
+
     try {
       const res = await getRaceResults(race.originalId)
       if (res.data) {
@@ -102,9 +102,9 @@ export default function SpectatorRaces() {
   const activeSearchQuery = (searchQuery || localSearchQuery).toLowerCase()
   let filtered = races.filter(r => {
     const matchSearch = r.name.toLowerCase().includes(activeSearchQuery) ||
-                        r.tournament.toLowerCase().includes(activeSearchQuery)
+      r.tournament.toLowerCase().includes(activeSearchQuery)
     const matchTour = tournamentFilter === 'all' || r.tournamentId.toString() === tournamentFilter
-    
+
     return matchSearch && matchTour
   })
 
@@ -194,8 +194,8 @@ export default function SpectatorRaces() {
                       <span>📏 Cự ly: {r.distance}</span>
                     </div>
                     <div className="admin-table-actions">
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="admin-btn admin-btn--gold"
                         style={{ width: '100%', padding: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}
                         onClick={() => handleViewResults(r)}

@@ -21,21 +21,21 @@ export default function ResultApproval() {
         getRaces(),
         getPostRaceReports()
       ])
-      
+
       if (racesRes.data) {
         setRaces(racesRes.data)
       }
-      
+
       if (reportsRes.data) {
         const mappedReports = reportsRes.data
           .filter(r => r.status !== 'PUBLISHED')
           .map(r => {
             const race = racesRes.data?.find(rc => rc.id === r.raceId)
-            
+
             let st = 'pending'
             if (r.status === 'REVIEW') st = 'approved'
             else if (r.status === 'SUBMITTED') st = 'pending'
-            
+
             return {
               id: r.id,
               raceId: r.raceId,
@@ -69,7 +69,7 @@ export default function ResultApproval() {
           time: d.finishTime
         }))
         setDetails(mappedDetails)
-        
+
         if (mappedDetails.length > 0) {
           const winnerName = mappedDetails[0].horse;
           setReports(prev => prev.map(r => r.id === report.id ? { ...r, winner: winnerName } : r))
@@ -98,7 +98,7 @@ export default function ResultApproval() {
         alert('Có lỗi xảy ra khi công bố: ' + (err.response?.data?.message || err.message))
       }
     } else if (type === 'approve') {
-      const updated = reports.map(r => 
+      const updated = reports.map(r =>
         r.id === id ? { ...r, status: 'approved' } : r
       )
       setReports(updated)
@@ -135,8 +135,8 @@ export default function ResultApproval() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><label style={{ color: '#666' }}>Ngựa về nhất</label><span className="result-winner" style={{ color: '#d4af37', fontWeight: 'bold' }}>{r.winner}</span></div>
               </div>
               <div className="admin-table-actions" style={{ marginTop: 'auto', display: 'flex', gap: '6px' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="admin-btn admin-btn--ghost admin-btn--sm"
                   onClick={() => handleViewReport(r)}
                   style={{ flex: 1 }}
@@ -191,9 +191,9 @@ export default function ResultApproval() {
                   </thead>
                   <tbody>
                     {isLoading ? (
-                      <tr><td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>Đang tải...</td></tr>
+                      <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>Đang tải...</td></tr>
                     ) : details.length === 0 ? (
-                      <tr><td colSpan="4" style={{textAlign: 'center', padding: '20px'}}>Không có dữ liệu kết quả</td></tr>
+                      <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>Không có dữ liệu kết quả</td></tr>
                     ) : details.map(d => (
                       <tr key={d.rank}>
                         <td style={{ fontWeight: 'bold', color: d.rank === 1 ? '#d4af37' : d.rank === 2 ? '#c0c0c0' : '#cd7f32' }}>
@@ -210,20 +210,20 @@ export default function ResultApproval() {
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                 <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedReport(null)}>Đóng</button>
-                
+
                 {selectedReport.status === 'pending' && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="admin-btn admin-btn--success"
                     onClick={() => setConfirmAction({ type: 'approve', id: selectedReport.id, raceId: selectedReport.raceId })}
                   >
                     Duyệt kết quả
                   </button>
                 )}
-                
+
                 {selectedReport.status === 'approved' && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="admin-btn admin-btn--gold"
                     onClick={() => setConfirmAction({ type: 'publish', id: selectedReport.id, raceId: selectedReport.raceId })}
                   >
@@ -250,20 +250,20 @@ export default function ResultApproval() {
             </div>
             <div className="admin-card-body" style={{ padding: '20px' }}>
               <p style={{ color: '#fff', fontSize: '15px', lineHeight: '1.5', marginBottom: '24px' }}>
-                {confirmAction.type === 'approve' 
-                  ? "Bạn có chắc chắn muốn duyệt kết quả này không?" 
+                {confirmAction.type === 'approve'
+                  ? "Bạn có chắc chắn muốn duyệt kết quả này không?"
                   : "Bạn có chắc chắn muốn công bố? Dữ liệu sẽ hiển thị cho khán giả."}
               </p>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="admin-btn admin-btn--ghost"
                   onClick={() => setConfirmAction(null)}
                 >
                   Hủy bỏ
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className={`admin-btn ${confirmAction.type === 'approve' ? 'admin-btn--success' : 'admin-btn--gold'}`}
                   onClick={processAction}
                 >

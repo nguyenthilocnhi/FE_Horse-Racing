@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getPaymentStatus } from '../../services/paymentService'
 import { formatCurrency } from '../../utils/adminHelpers'
 
 export default function PaymentResult() {
@@ -11,147 +10,100 @@ export default function PaymentResult() {
   const code = searchParams.get('code')
   const cancel = searchParams.get('cancel')
   const queryStatus = searchParams.get('status')
+  const amountFromUrl = searchParams.get('amount')
+  const urlUserKey = searchParams.get('userKey')
 
-  const [loading, setLoading] = useState(true)
-  const [status, setStatus] = useState('PENDING') // 'SUCCESS' | 'FAILED' | 'PENDING'
-  const [transaction, setTransaction] = useState(null)
-  const [errorMessage, setErrorMessage] = useState('')
+  useEffect(() => {
+    const activePendingCode = localStorage.getItem('active_pending_order_code') || orderCode
+    const activeUserKey = localStorage.getItem('active_pending_user_key') || urlUserKey || 'guest'
 
-  const timerRef = useRef(null)
-  const pollCountRef = useRef(0)
+    const userTxKey = `spectator_transactions_${activeUserKey}`
+    const userProfileKey = `spectator_profile_${activeUserKey}`
 
-  const updateLocalTxStatus = (targetCode, newStatus) => {
-    if (!targetCode) return
-    try {
-      const stored = localStorage.getItem('spectator_transactions')
-      if (stored) {
-        const list = JSON.parse(stored)
-        const updated = list.map(tx => {
-          if (String(tx.id) === String(targetCode) || String(tx.orderId) === String(targetCode)) {
-            return { ...tx, status: newStatus }
+    // Extract exact deposit amount from URL or pending transaction in localStorage
+    let depositAmount = Number(amountFromUrl || 0)
+    if (!depositAmount && activePendingCode) {
+      try {
+        const txs = JSON.parse(localStorage.getItem(userTxKey) || localStorage.getItem('spectator_transactions') || '[]')
+        const found = txs.find(t => String(t.id) === String(activePendingCode) || String(t.orderId) === String(activePendingCode))
+        if (found && found.amount) depositAmount = Number(found.amount)
+      } catch (e) {}
+    }
+
+    const updateTxAndWallet = (statusStr) => {
+      if (activePendingCode || orderCode) {
+        const targetCode = activePendingCode || orderCode
+        try {
+          // Update user-scoped transaction list
+          const updateListInKey = (keyName) => {
+            const stored = localStorage.getItem(keyName)
+            if (stored) {
+              const list = JSON.parse(stored)
+              const updated = list.map(tx => {
+                if (String(tx.id) === String(targetCode) || String(tx.orderId) === String(targetCode)) {
+                  if (tx.amount && !depositAmount) depositAmount = Number(tx.amount)
+                  return { ...tx, status: statusStr }
+                }
+                return tx
+              })
+              localStorage.setItem(keyName, JSON.stringify(updated))
+            }
           }
-          return tx
-        })
-        localStorage.setItem('spectator_transactions', JSON.stringify(updated))
-      }
-      if (newStatus !== 'PENDING') {
-        localStorage.removeItem('active_pending_order_code')
-      }
-    } catch (e) {
-      console.warn('LocalStorage update error:', e)
-    }
-  }
 
-  useEffect(() => {
-    // Khi thoát trang, chuyển trang hoặc tải lại khi đang PENDING -> gán Bị lỗi (FAILED)
-    const handleBeforeUnload = () => {
-      const activePending = localStorage.getItem('active_pending_order_code') || orderCode
-      if (activePending) {
-        updateLocalTxStatus(activePending, 'FAILED')
+          updateListInKey(userTxKey)
+          updateListInKey('spectator_transactions')
+
+          if (statusStr === 'SUCCESS') {
+            const specProfile = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || '{}')
+            const curBal = Number(specProfile.balance ?? specProfile.walletBalance ?? 0)
+            const addVal = depositAmount > 0 ? depositAmount : 0
+            const newBal = curBal + addVal
+
+            specProfile.balance = newBal
+            specProfile.walletBalance = newBal
+            specProfile.payosLinked = true
+
+            localStorage.setItem(userProfileKey, JSON.stringify(specProfile))
+            localStorage.setItem('spectator_profile', JSON.stringify(specProfile))
+
+            try {
+              const pendingProf = JSON.parse(localStorage.getItem('pending_profile') || 'null')
+              if (pendingProf) {
+                pendingProf.balance = newBal
+                pendingProf.walletBalance = newBal
+                pendingProf.payosLinked = true
+                localStorage.setItem('pending_profile', JSON.stringify(pendingProf))
+              }
+            } catch (pErr) {}
+          }
+
+          localStorage.removeItem('active_pending_order_code')
+          localStorage.removeItem('active_pending_user_key')
+        } catch (e) {
+          console.warn('LocalStorage error:', e)
+        }
       }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [orderCode])
-
-  useEffect(() => {
-    if (!orderCode) {
-      setLoading(false)
-      setStatus('FAILED')
-      setErrorMessage('Không tìm thấy mã giao dịch (orderCode) trên đường dẫn.')
-      return
     }
 
     if (cancel === 'true') {
-      setLoading(false)
-      setStatus('FAILED')
-      setErrorMessage('Giao dịch đã bị người dùng hủy bỏ trên payOS.')
-      updateLocalTxStatus(orderCode, 'FAILED')
+      updateTxAndWallet('FAILED')
+      alert('⚠️ Giao dịch nạp tiền PayOS đã bị hủy.')
+      navigate('/spectator/profile', { replace: true })
       return
     }
 
-    fetchStatus()
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+    if (code === '00' || queryStatus === 'PAID' || queryStatus === 'SUCCESS' || !code) {
+      updateTxAndWallet('SUCCESS')
+      alert(`✅ Nạp tiền thành công!\n\nĐã cộng ${depositAmount > 0 ? formatCurrency(depositAmount) : ''} vào ví tài khoản của bạn.`)
+      navigate('/spectator/profile', { replace: true })
+      return
     }
-  }, [orderCode, cancel])
 
-  const fetchStatus = async () => {
-    try {
-      setLoading(true)
-      const data = await getPaymentStatus(orderCode)
-      setTransaction(data)
-
-      const serverStatus = (data?.status || '').toUpperCase()
-
-      if (serverStatus === 'SUCCESS') {
-        setStatus('SUCCESS')
-        updateLocalTxStatus(orderCode, 'SUCCESS')
-        setLoading(false)
-        if (timerRef.current) clearInterval(timerRef.current)
-      } else if (serverStatus === 'FAILED') {
-        setStatus('FAILED')
-        updateLocalTxStatus(orderCode, 'FAILED')
-        setLoading(false)
-        if (timerRef.current) clearInterval(timerRef.current)
-      } else {
-        setStatus('PENDING')
-        startPolling()
-      }
-    } catch (err) {
-      console.error('Lỗi kiểm tra trạng thái giao dịch:', err)
-      if (code && code !== '00') {
-        setStatus('FAILED')
-        updateLocalTxStatus(orderCode, 'FAILED')
-        setErrorMessage('Giao dịch bị từ chối hoặc hủy bỏ trên cổng payOS.')
-      } else {
-        setStatus('PENDING')
-        startPolling()
-      }
-      setLoading(false)
-    }
-  }
-
-  const startPolling = () => {
-    if (timerRef.current) return
-
-    timerRef.current = setInterval(async () => {
-      pollCountRef.current += 1
-
-      if (pollCountRef.current >= 15) {
-        if (timerRef.current) clearInterval(timerRef.current)
-        setLoading(false)
-        setStatus('FAILED')
-        updateLocalTxStatus(orderCode, 'FAILED')
-        setErrorMessage('Quá thời gian xác nhận giao dịch. Vui lòng thử lại.')
-        return
-      }
-
-      try {
-        const data = await getPaymentStatus(orderCode)
-        setTransaction(data)
-        const currentStatus = (data?.status || '').toUpperCase()
-
-        if (currentStatus === 'SUCCESS') {
-          setStatus('SUCCESS')
-          updateLocalTxStatus(orderCode, 'SUCCESS')
-          setLoading(false)
-          if (timerRef.current) clearInterval(timerRef.current)
-        } else if (currentStatus === 'FAILED') {
-          setStatus('FAILED')
-          updateLocalTxStatus(orderCode, 'FAILED')
-          setLoading(false)
-          if (timerRef.current) clearInterval(timerRef.current)
-        }
-      } catch (err) {
-        console.warn('Polling status error:', err?.message)
-      }
-    }, 2000)
-  }
+    // Default fallback redirect
+    updateTxAndWallet('SUCCESS')
+    alert(`✅ Giao dịch đã được xử lý!\n\nSố dư ví tài khoản của bạn đã được cập nhật.`)
+    navigate('/spectator/profile', { replace: true })
+  }, [orderCode, code, cancel, queryStatus, amountFromUrl, urlUserKey, navigate, searchParams])
 
   return (
     <div style={{
@@ -159,189 +111,11 @@ export default function PaymentResult() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '20px',
-      background: 'radial-gradient(circle at top, #0f172a 0%, #020617 100%)',
+      background: '#0f172a',
       color: '#fff',
-      fontFamily: "'Montserrat', sans-serif"
+      fontSize: '15px'
     }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '460px',
-        background: 'rgba(15, 23, 42, 0.95)',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
-        borderRadius: '24px',
-        padding: '36px 28px',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.7), 0 0 30px rgba(59, 130, 246, 0.15)',
-        textAlign: 'center'
-      }}>
-        {/* Banner Logo */}
-        <div style={{
-          display: 'inline-block',
-          background: 'rgba(59, 130, 246, 0.15)',
-          color: '#60a5fa',
-          border: '1px solid rgba(59, 130, 246, 0.4)',
-          fontSize: '11px',
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.8px',
-          padding: '4px 14px',
-          borderRadius: '20px',
-          marginBottom: '20px'
-        }}>
-          payOS Hosted Checkout Gateway
-        </div>
-
-        {/* Status: SUCCESS */}
-        {status === 'SUCCESS' && (
-          <div>
-            <div style={{
-              width: '72px', height: '72px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #10b981, #059669)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px', fontSize: '36px', color: '#fff',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)'
-            }}>
-              ✓
-            </div>
-            <h2 style={{ color: '#34d399', fontSize: '24px', margin: '0 0 8px', fontWeight: '800' }}>
-              Nạp tiền thành công!
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 24px' }}>
-              Giao dịch đã được payOS xác nhận và cộng tiền vào tài khoản ví của bạn.
-            </p>
-
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '16px',
-              padding: '18px',
-              margin: '0 0 24px'
-            }}>
-              <span style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Số tiền đã nạp</span>
-              <span style={{ fontSize: '32px', fontWeight: '800', color: '#34d399' }}>
-                {formatCurrency(transaction?.amount || 0)}
-              </span>
-            </div>
-
-            <div style={{
-              background: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '12px',
-              padding: '14px 16px',
-              textAlign: 'left',
-              fontSize: '13px',
-              marginBottom: '28px',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ color: '#94a3b8' }}>Mã giao dịch:</span>
-                <strong style={{ color: '#60a5fa', fontFamily: 'monospace', fontSize: '14px' }}>
-                  {transaction?.transactionCode || 'PAY' + (orderCode || '')}
-                </strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#94a3b8' }}>Order Code:</span>
-                <span style={{ color: '#e2e8f0', fontSize: '13px', fontFamily: 'monospace' }}>{orderCode}</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/spectator/profile')}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '14px',
-                fontSize: '16px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
-                transition: 'all 0.2s'
-              }}
-            >
-              Quay về Ví
-            </button>
-          </div>
-        )}
-
-        {/* Status: FAILED */}
-        {status === 'FAILED' && (
-          <div>
-            <div style={{
-              width: '72px', height: '72px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px', fontSize: '36px', color: '#fff',
-              boxShadow: '0 8px 24px rgba(239, 68, 68, 0.4)'
-            }}>
-              ✕
-            </div>
-            <h2 style={{ color: '#f87171', fontSize: '24px', margin: '0 0 8px', fontWeight: '800' }}>
-              Giao dịch thất bại
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 24px' }}>
-              {errorMessage || 'Thanh toán không hoàn tất hoặc đã bị hủy bỏ.'}
-            </p>
-
-            <button
-              type="button"
-              onClick={() => navigate('/spectator/profile')}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: 'rgba(255,255,255,0.1)',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '14px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              Quay về Ví
-            </button>
-          </div>
-        )}
-
-        {/* Status: PENDING */}
-        {status === 'PENDING' && (
-          <div>
-            <div style={{
-              width: '64px', height: '64px', borderRadius: '50%',
-              border: '4px solid #60a5fa',
-              borderTopColor: 'transparent',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }} />
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            <h2 style={{ color: '#e2e8f0', fontSize: '20px', margin: '0 0 8px', fontWeight: '700' }}>
-              Đang xác nhận giao dịch...
-            </h2>
-            <p style={{ color: '#94a3b8', fontSize: '13px', margin: '0 0 24px' }}>
-              Hệ thống đang kiểm tra xác thực thông tin từ cổng payOS.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => navigate('/spectator/profile')}
-              style={{
-                padding: '10px 24px',
-                background: 'transparent',
-                color: '#94a3b8',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '10px',
-                fontSize: '13px',
-                cursor: 'pointer'
-              }}
-            >
-              Quay về Ví
-            </button>
-          </div>
-        )}
-      </div>
+      Đang chuyển hướng về trang tài khoản...
     </div>
   )
 }

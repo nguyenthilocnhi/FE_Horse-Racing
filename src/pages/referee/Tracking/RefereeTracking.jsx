@@ -12,7 +12,7 @@ export default function RefereeTracking() {
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [errorList, setErrorList] = useState('')
   const [errorDetails, setErrorDetails] = useState('')
-  
+
   const [isSimulating, setIsSimulating] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [notes, setNotes] = useState('')
@@ -34,7 +34,7 @@ export default function RefereeTracking() {
       for (const t of tList) {
         const sRes = await getTournamentSchedule(t.id)
         if (sRes?.data) {
-          allSchedules = [...allSchedules, ...sRes.data.map(r => ({...r, tournamentName: t.name}))]
+          allSchedules = [...allSchedules, ...sRes.data.map(r => ({ ...r, tournamentName: t.name }))]
         }
       }
       const relevantRaces = allSchedules.filter(r => r.status === 'RUNNING' || r.status === 'COMPLETED')
@@ -88,7 +88,7 @@ export default function RefereeTracking() {
         setRunners(prev => {
           const currentList = prev[selectedRace.id] || []
           let finishedCount = 0
-          
+
           const updated = currentList.map(r => {
             if (r.progress >= 100) {
               finishedCount++
@@ -102,7 +102,7 @@ export default function RefereeTracking() {
           if (finishedCount === updated.length) {
             setIsSimulating(false)
             clearInterval(interval)
-            
+
             const withRanks = updated.map((r, i) => {
               const rnk = i + 1
               const mockSec = (90 + rnk * 1.5 + Math.random()).toFixed(1)
@@ -115,14 +115,16 @@ export default function RefereeTracking() {
               }
             })
             // Quick format fix for HH:mm:ss
-            return { ...prev, [selectedRace.id]: updated.map((r, i) => {
-              const mockSec = 90 + (i+1) * 2
-              return {
-                ...r,
-                rank: (i + 1).toString(),
-                time: `00:01:${(mockSec%60).toString().padStart(2, '0')}` 
-              }
-            }) }
+            return {
+              ...prev, [selectedRace.id]: updated.map((r, i) => {
+                const mockSec = 90 + (i + 1) * 2
+                return {
+                  ...r,
+                  rank: (i + 1).toString(),
+                  time: `00:01:${(mockSec % 60).toString().padStart(2, '0')}`
+                }
+              })
+            }
           }
 
           return { ...prev, [selectedRace.id]: updated }
@@ -135,7 +137,7 @@ export default function RefereeTracking() {
 
   const handleStartSimulation = () => {
     if (!selectedRace) return
-    
+
     setRunners(prev => ({
       ...prev,
       [selectedRace.id]: prev[selectedRace.id].map(r => ({ ...r, progress: 0, rank: '', time: '' }))
@@ -147,7 +149,7 @@ export default function RefereeTracking() {
     if (!selectedRace) return
     setRunners(prev => ({
       ...prev,
-      [selectedRace.id]: prev[selectedRace.id].map(r => 
+      [selectedRace.id]: prev[selectedRace.id].map(r =>
         r.lane === lane ? { ...r, rank: val } : r
       )
     }))
@@ -157,7 +159,7 @@ export default function RefereeTracking() {
     if (!selectedRace) return
     setRunners(prev => ({
       ...prev,
-      [selectedRace.id]: prev[selectedRace.id].map(r => 
+      [selectedRace.id]: prev[selectedRace.id].map(r =>
         r.lane === lane ? { ...r, time: val } : r
       )
     }))
@@ -166,9 +168,9 @@ export default function RefereeTracking() {
   const handleSubmitReport = async (e) => {
     e.preventDefault()
     if (!selectedRace) return
-    
+
     const list = runners[selectedRace.id] || []
-    
+
     if (list.length === 0) {
       alert('Danh sách ngựa rỗng, không thể nộp kết quả.')
       return
@@ -203,7 +205,7 @@ export default function RefereeTracking() {
           }
         })
       }
-      
+
       const reportPayload = {
         content: notes || 'Không có sự cố bất thường.',
         hasComplaint: false,
@@ -259,7 +261,7 @@ export default function RefereeTracking() {
                 <div style={{ textAlign: 'center', padding: '30px', color: '#666' }}>Không có cuộc đua nào đang chạy.</div>
               ) : (
                 races.map(r => (
-                  <div 
+                  <div
                     key={r.id}
                     onClick={() => handleSelectRace(r)}
                     style={{
@@ -297,18 +299,18 @@ export default function RefereeTracking() {
                 <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedRace(null)}>✕</button>
               </div>
               <div className="admin-card-body" style={{ padding: '20px' }}>
-                
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '20px' }}>
                   <div>
                     <span style={{ color: '#888', fontSize: '11px', display: 'block', textTransform: 'uppercase' }}>Trạng thái cuộc đua</span>
                     <StatusBadge status={selectedRace.status} />
                   </div>
-                  
+
                   {selectedRace.status === 'RUNNING' && (
-                    <button 
-                      type="button" 
-                      className="admin-btn admin-btn--sm" 
-                      onClick={handleStartSimulation} 
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn--sm"
+                      onClick={handleStartSimulation}
                       disabled={isSimulating}
                       style={{ background: '#10b981', color: '#fff', border: 'none' }}
                     >
@@ -330,19 +332,19 @@ export default function RefereeTracking() {
                           </div>
                         </div>
                       ))}
-                      {selectedRunners.length === 0 && <span style={{color: '#666'}}>Chưa có thông tin xuất phát.</span>}
+                      {selectedRunners.length === 0 && <span style={{ color: '#666' }}>Chưa có thông tin xuất phát.</span>}
                     </div>
                   </div>
                 )}
 
                 {loadingDetails ? (
-                   <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Đang tải danh sách thi đấu...</div>
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>Đang tải danh sách thi đấu...</div>
                 ) : errorDetails ? (
-                   <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>{errorDetails}</div>
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>{errorDetails}</div>
                 ) : (
                   <form onSubmit={handleSubmitReport} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                     <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#10b981', margin: '0 0 4px 0', letterSpacing: '0.05em' }}>Bảng điểm và Thành tích về đích</h4>
-                    
+
                     <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
                       <table className="admin-table" style={{ fontSize: '13px' }}>
                         <thead>
@@ -363,15 +365,15 @@ export default function RefereeTracking() {
                               </td>
                               <td>
                                 {r.rank ? (
-                                  <span style={{ 
-                                    display: 'inline-block', 
-                                    padding: '4px 12px', 
-                                    borderRadius: '12px', 
-                                    background: r.rank === '1' ? 'rgba(212, 175, 55, 0.2)' : 'rgba(255,255,255,0.1)', 
-                                    color: r.rank === '1' ? '#d4af37' : '#fff', 
-                                    fontWeight: 'bold', 
-                                    fontSize: '12px', 
-                                    border: `1px solid ${r.rank === '1' ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255,255,255,0.2)'}` 
+                                  <span style={{
+                                    display: 'inline-block',
+                                    padding: '4px 12px',
+                                    borderRadius: '12px',
+                                    background: r.rank === '1' ? 'rgba(212, 175, 55, 0.2)' : 'rgba(255,255,255,0.1)',
+                                    color: r.rank === '1' ? '#d4af37' : '#fff',
+                                    fontWeight: 'bold',
+                                    fontSize: '12px',
+                                    border: `1px solid ${r.rank === '1' ? 'rgba(212, 175, 55, 0.5)' : 'rgba(255,255,255,0.2)'}`
                                   }}>
                                     {r.rank === '1' ? '🥇 Hạng 1' : `Hạng ${r.rank}`}
                                   </span>
@@ -380,7 +382,7 @@ export default function RefereeTracking() {
                                 )}
                               </td>
                               <td>
-                                <input 
+                                <input
                                   type="text"
                                   className="admin-input"
                                   style={{ width: '100%', textAlign: 'right', padding: '4px 8px', fontSize: '12px', opacity: 0.8, cursor: 'not-allowed' }}
@@ -405,9 +407,9 @@ export default function RefereeTracking() {
                       <>
                         <div>
                           <label className="admin-form-label">Ghi chú sự cố / Biên bản trận đấu (Nếu có)</label>
-                          <textarea 
-                            className="admin-input" 
-                            rows="3" 
+                          <textarea
+                            className="admin-input"
+                            rows="3"
                             style={{ width: '100%', resize: 'none' }}
                             placeholder="Mô tả các vấn đề về thời tiết, sự cố kỹ thuật hoặc hành vi xảy ra trong cuộc đua..."
                             value={notes}
@@ -416,9 +418,9 @@ export default function RefereeTracking() {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(16, 185, 129, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                          <input 
-                            type="checkbox" 
-                            id="confirmResults" 
+                          <input
+                            type="checkbox"
+                            id="confirmResults"
                             checked={confirmed}
                             onChange={(e) => setConfirmed(e.target.checked)}
                             style={{ cursor: 'pointer' }}
@@ -430,8 +432,8 @@ export default function RefereeTracking() {
 
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                           <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedRace(null)} disabled={isSubmitting}>Hủy bỏ</button>
-                          <button 
-                            type="submit" 
+                          <button
+                            type="submit"
                             className="admin-btn admin-btn--gold"
                             style={{ background: '#10b981', borderColor: '#10b981', color: '#fff' }}
                             disabled={isSubmitting || selectedRunners.length === 0}
@@ -501,17 +503,17 @@ export default function RefereeTracking() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--ghost" 
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--ghost"
                   onClick={() => setShowConfirmModal(false)}
                   disabled={isSubmitting}
                   style={{ minWidth: '100px' }}
                 >
                   Hủy bỏ
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="admin-btn admin-btn--success"
                   onClick={executeSubmitReport}
                   disabled={isSubmitting}
@@ -536,9 +538,9 @@ export default function RefereeTracking() {
             <p style={{ color: '#ccc', fontSize: '13px', marginBottom: '20px', lineHeight: '1.5' }}>
               Biên bản cuộc đua <strong>{selectedRace?.name}</strong> đã được lưu trữ và gửi lên hệ thống. Kết quả đang chờ Ban tổ chức (Admin) công bố chính thức.
             </p>
-            <button 
-              type="button" 
-              className="admin-btn" 
+            <button
+              type="button"
+              className="admin-btn"
               style={{ width: '100%', padding: '10px', background: '#10b981', color: '#fff', border: 'none' }}
               onClick={handleCloseSuccessModal}
             >

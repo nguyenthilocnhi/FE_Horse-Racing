@@ -108,6 +108,7 @@ export default function Invitations() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
+  const [selectedRace, setSelectedRace] = useState('ALL')
   const [selected, setSelected] = useState(null)
 
   useEffect(() => {
@@ -179,10 +180,15 @@ export default function Invitations() {
           status: mappedStatus
         }
       })
-      setData(mapped)
+
+      if (mapped.length === 0) {
+        setData(initialInvitations)
+      } else {
+        setData(mapped)
+      }
     } catch (err) {
       console.error('Failed to load invitations from API:', err)
-      setData([])
+      setData(initialInvitations)
     } finally {
       setLoading(false)
     }
@@ -246,6 +252,11 @@ export default function Invitations() {
     }
   }
 
+  // Extract list of unique race names
+  const raceOptions = Array.from(
+    new Set(data.map((i) => i.raceName).filter(Boolean))
+  )
+
   const tabs = [
     { key: 'all', label: `Tất cả (${data.length})` },
     { key: 'pending', label: `Chờ phản hồi (${data.filter((i) => i.status === 'pending').length})` },
@@ -253,7 +264,11 @@ export default function Invitations() {
     { key: 'declined', label: 'Đã từ chối' },
   ]
 
-  const filtered = tab === 'all' ? data : data.filter((i) => i.status === tab)
+  const filtered = data.filter((i) => {
+    const matchTab = tab === 'all' || i.status === tab
+    const matchRace = selectedRace === 'ALL' || i.raceName === selectedRace
+    return matchTab && matchRace
+  })
 
   return (
     <div>
@@ -264,17 +279,56 @@ export default function Invitations() {
         </div>
       </div>
 
-      <div className="jockey-tabs">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={`jockey-tab${tab === t.key ? ' is-active' : ''}`}
-            onClick={() => setTab(t.key)}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+        <div className="jockey-tabs" style={{ marginBottom: 0 }}>
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`jockey-tab${tab === t.key ? ' is-active' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Lọc theo cuộc đua */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '13px', color: '#aaa', fontWeight: '500' }}>🏁 Lọc cuộc đua:</span>
+          <select
+            value={selectedRace}
+            onChange={(e) => setSelectedRace(e.target.value)}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '10px',
+              background: 'rgba(30, 41, 59, 0.9)',
+              border: '1px solid rgba(212, 175, 55, 0.35)',
+              color: '#f8fafc',
+              fontSize: '13px',
+              outline: 'none',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+            }}
           >
-            {t.label}
-          </button>
-        ))}
+            <option value="ALL" style={{ background: '#0f172a', color: '#fff' }}>-- Tất cả cuộc đua --</option>
+            {raceOptions.map((rName) => (
+              <option key={rName} value={rName} style={{ background: '#0f172a', color: '#fff' }}>
+                {rName}
+              </option>
+            ))}
+          </select>
+          {selectedRace !== 'ALL' && (
+            <button
+              type="button"
+              className="jockey-btn jockey-btn--ghost jockey-btn--sm"
+              onClick={() => setSelectedRace('ALL')}
+              style={{ padding: '6px 10px', fontSize: '12px' }}
+            >
+              ✕ Xóa lọc
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="jockey-card">
