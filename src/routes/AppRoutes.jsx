@@ -23,12 +23,10 @@ import RankingManagement from '../pages/admin/Rankings/RankingManagement'
 import ViolationManagement from '../pages/admin/Violations/ViolationManagement'
 import ComplaintManagement from '../pages/admin/Complaints/ComplaintManagement'
 import TicketManagement from '../pages/admin/Tickets/TicketManagement'
-import PaymentManagement from '../pages/admin/Payments/PaymentManagement'
 import NotificationManagement from '../pages/admin/Notifications/NotificationManagement'
 import ReportsAnalytics from '../pages/admin/Reports/ReportsAnalytics'
 import JockeyManagement from '../pages/admin/Jockeys/JockeyManagement'
 import HorseManagement from '../pages/admin/Horses/HorseManagement'
-import PredictionManagement from '../pages/admin/Predictions/PredictionManagement'
 import SpectatorLayout from '../layouts/SpectatorLayout'
 import SpectatorDashboard from '../pages/spectator/Dashboard/SpectatorDashboard'
 import SpectatorRankings from '../pages/spectator/Rankings/SpectatorRankings'
@@ -124,12 +122,10 @@ export default function AppRoutes() {
         <Route path="/admin/registrations" element={<RegistrationApproval />} />
         <Route path="/admin/referees" element={<RefereeAssignment />} />
         <Route path="/admin/results" element={<ResultApproval />} />
-        <Route path="/admin/predictions" element={<PredictionManagement />} />
+        <Route path="/admin/tickets" element={<TicketManagement />} />
         <Route path="/admin/rankings" element={<RankingManagement />} />
         <Route path="/admin/violations" element={<ViolationManagement />} />
         <Route path="/admin/complaints" element={<ComplaintManagement />} />
-        <Route path="/admin/tickets" element={<TicketManagement />} />
-        <Route path="/admin/payments" element={<PaymentManagement />} />
         <Route path="/admin/notifications" element={<NotificationManagement />} />
         <Route path="/admin/reports" element={<ReportsAnalytics />} />
       </Route>
@@ -169,7 +165,6 @@ export default function AppRoutes() {
       {/* ── Spectator Portal ── */}
       <Route element={<ProtectedRoute allowedRoles={['SPECTATOR']}><SpectatorLayout /></ProtectedRoute>}>
         <Route path="/spectator" element={<SpectatorDashboard />} />
-        <Route path="/spectator/races" element={<SpectatorDashboard />} />
         <Route path="/spectator/rankings" element={<SpectatorRankings />} />
         <Route path="/spectator/predictions" element={<SpectatorPredictions />} />
         <Route path="/spectator/profile" element={<SpectatorProfile />} />

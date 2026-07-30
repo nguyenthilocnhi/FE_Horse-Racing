@@ -296,7 +296,7 @@ export default function SpectatorProfile() {
         <div className="admin-page-head">
           <div>
             <h1 className="admin-page-title">Quản Lý Tài Khoản</h1>
-            <p className="admin-page-sub">Xem thông tin cá nhân, số dư ví, quản lý giao dịch và lịch sử đặt vé xem đua ngựa</p>
+            <p className="admin-page-sub">Xem thông tin cá nhân, số dư ví và quản lý giao dịch nạp tiền</p>
           </div>
         </div>
 
@@ -473,46 +473,6 @@ export default function SpectatorProfile() {
                     <span style={{ fontSize: '10px', color: '#666' }}>{n.date}</span>
                   </div>
                 ))}
-              </div>
-            </div>
-
-            {/* Ticket & Prediction History Card */}
-            <div className="admin-card">
-              <div className="admin-card-head">
-                <h3>🎟️ Lịch Sử Đặt Vé & Dự Đoán</h3>
-              </div>
-              <div className="admin-card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {userPreds && userPreds.length > 0 ? (
-                  userPreds.map(up => (
-                    <div
-                      key={up.id}
-                      style={{
-                        padding: '14px',
-                        borderRadius: '10px',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.04)',
-                        fontSize: '13px'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <strong style={{ color: '#fff', fontSize: '14px' }}>{up.race}</strong>
-                        <span style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(up.amount)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#888' }}>
-                        <span>Ngựa dự đoán: <strong style={{ color: '#fff' }}>{up.horse}</strong> · Loại vé: <strong style={{ color: up.ticketType === 'VIP' ? '#c084fc' : '#e6c564' }}>{up.ticketType || 'Standard'}</strong></span>
-                        <span>
-                          {up.status === 'won' && <span style={{ color: '#4ade80', fontWeight: 'bold' }}>Thắng (+{formatCurrency(up.payout)})</span>}
-                          {up.status === 'lost' && <span style={{ color: '#f87171' }}>Thua</span>}
-                          {up.status === 'pending' && <span style={{ color: '#e6c564' }}>Chờ kết quả đua</span>}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p style={{ color: '#888', textAlign: 'center', margin: '16px 0', fontSize: '13px' }}>
-                    Chưa có lịch sử đặt vé nào.
-                  </p>
-                )}
               </div>
             </div>
 

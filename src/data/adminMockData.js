@@ -97,9 +97,14 @@ export const complaints = [
 ]
 
 export const tickets = [
-  { id: 'TKT-9001', buyer: 'Nguyen Van A', email: 'nguyenvana@email.com', race: 'Derby Một Dặm', type: 'VIP', quantity: 2, amount: 300000, paymentStatus: 'paid' },
-  { id: 'TKT-9002', buyer: 'Tran Thi B', email: 'tranthib@email.com', race: 'Đua nước rút', type: 'Standard', quantity: 4, amount: 100000, paymentStatus: 'paid' },
-  { id: 'TKT-9003', buyer: 'Le Van C', email: 'levanc@email.com', race: 'Cúp Nhà Vô Địch', type: 'Standard', quantity: 1, amount: 100000, paymentStatus: 'pending' },
+  { id: 'TKT-9001', buyer: 'Nguyễn Văn A', email: 'nguyenvana@email.com', race: 'Derby Một Dặm', horse: 'Aurelius', type: 'VIP', quantity: 2, amount: 600000, paymentStatus: 'paid', date: '2026-06-01 10:30' },
+  { id: 'TKT-9002', buyer: 'Trần Thị B', email: 'tranthib@email.com', race: 'Đua nước rút', horse: 'Midnight Star', type: 'Standard', quantity: 4, amount: 400000, paymentStatus: 'paid', date: '2026-06-02 14:15' },
+  { id: 'TKT-9003', buyer: 'Lê Văn C', email: 'levanc@email.com', race: 'Cúp Nhà Vô Địch', horse: 'Velvet Thunder', type: 'Standard', quantity: 1, amount: 100000, paymentStatus: 'pending', date: '2026-06-03 09:00' },
+  { id: 'TKT-9004', buyer: 'Phạm Hoàng D', email: 'phamhoangd@gmail.com', race: 'Derby Một Dặm', horse: 'Storm Rider', type: 'VIP', quantity: 1, amount: 300000, paymentStatus: 'paid', date: '2026-06-02 11:20' },
+  { id: 'TKT-9005', buyer: 'Vũ Thị E', email: 'vuthie@outlook.com', race: 'Derby Một Dặm', horse: 'Thunder Bolt', type: 'Standard', quantity: 3, amount: 300000, paymentStatus: 'paid', date: '2026-06-02 16:45' },
+  { id: 'TKT-9006', buyer: 'Đặng Minh F', email: 'dangminhf@yahoo.com', race: 'Đua nước rút', horse: 'Golden Eagle', type: 'VIP', quantity: 2, amount: 600000, paymentStatus: 'paid', date: '2026-06-03 08:10' },
+  { id: 'TKT-9007', buyer: 'Bùi Anh G', email: 'buianhg@gmail.com', race: 'Sprint Classic', horse: 'Pegasus', type: 'Standard', quantity: 2, amount: 200000, paymentStatus: 'paid', date: '2026-04-19 13:00' },
+  { id: 'TKT-9008', buyer: 'Ngô Quốc H', email: 'ngoquoch@gmail.com', race: 'Cúp Nhà Vô Địch', horse: 'Shadow Dancer', type: 'VIP', quantity: 1, amount: 300000, paymentStatus: 'paid', date: '2026-06-03 10:15' },
 ]
 
 export const payments = [
@@ -135,12 +140,10 @@ export const adminNavItems = [
   { path: '/admin/registrations', label: 'Phân làn chạy', icon: '🏁' },
   { path: '/admin/referees', label: 'Phân công TT', icon: '◐' },
   { path: '/admin/results', label: 'Duyệt kết quả', icon: '✓' },
-  { path: '/admin/predictions', label: 'Quản lý Dự đoán', icon: '⚖' },
+  { path: '/admin/tickets', label: 'Vé', icon: '◫' },
   { path: '/admin/rankings', label: 'Xếp hạng', icon: '▲' },
   { path: '/admin/violations', label: 'Vi phạm', icon: '⚠' },
   { path: '/admin/complaints', label: 'Khiếu nại', icon: '✉' },
-  { path: '/admin/tickets', label: 'Vé', icon: '◫' },
-  { path: '/admin/payments', label: 'Thanh toán', icon: '$' },
   { path: '/admin/notifications', label: 'Thông báo', icon: '◔' },
 ]
 
@@ -155,12 +158,10 @@ export const breadcrumbLabels = {
   '/admin/registrations': 'Phân Làn Chạy',
   '/admin/referees': 'Phân công Trọng tài',
   '/admin/results': 'Duyệt Kết quả',
-  '/admin/predictions': 'Quản lý Dự đoán',
+  '/admin/tickets': 'Quản lý Vé',
   '/admin/rankings': 'Quản lý Xếp hạng',
   '/admin/violations': 'Quản lý Vi phạm',
   '/admin/complaints': 'Quản lý Khiếu nại',
-  '/admin/tickets': 'Quản lý Vé',
-  '/admin/payments': 'Quản lý Thanh toán',
   '/admin/notifications': 'Quản lý Thông báo',
   '/admin/reports': 'Báo cáo & Phân tích',
 }

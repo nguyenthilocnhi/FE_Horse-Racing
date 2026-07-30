@@ -3,6 +3,7 @@ import { mockPredictions as initialPools, mockUserPredictions as initialUserPred
 import { StatusBadge, formatCurrency } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
 import { createPrediction, cancelPrediction } from '../../../services/predictionService'
+import { useAuth } from '../../../contexts/AuthContext'
 import './SpectatorPredictions.css'
 
 const MOCK_HORSES_DETAILS = [
@@ -107,41 +108,67 @@ export default function SpectatorPredictions() {
     }
   }
 
-  // Tải danh sách cuộc đua của các giải đấu MỞ ĐĂNG KÝ từ API
+  // Tải danh sách cuộc đua MỞ BÁN VÉ từ LocalStorage & API
   useEffect(() => {
     async function loadOpenRegistrationPools() {
       try {
+        const localRaces = JSON.parse(localStorage.getItem('created_races') || '[]')
+        const openLocal = localRaces.filter(r => r.ticketOpen)
+
+        let loadedPools = []
+
+        if (openLocal.length > 0) {
+          loadedPools = openLocal.map(r => ({
+            id: r.id,
+            raceName: `${r.name} - ${r.tournament || 'Giải Đấu'}`,
+            totalPool: 5000000,
+            participants: r.totalTickets ? Math.floor(Math.random() * 20) + 5 : 12,
+            status: 'open',
+            endDate: r.date ? `${r.date} ${r.time || '15:00'}` : '2026-12-31',
+            runners: MOCK_RUNNERS
+          }))
+        }
+
         const res = await getAllTournaments()
         const allTournaments = Array.isArray(res) ? res : (res?.data || [])
-        // Chỉ lấy các giải đấu được Admin mở cổng đăng ký
         const openTournaments = allTournaments.filter(t => Boolean(t.registrationOpen) === true)
 
         if (openTournaments.length > 0) {
-          const apiPools = []
           for (const tour of openTournaments) {
             try {
               const schedRes = await getTournamentSchedule(tour.id)
               const schedules = Array.isArray(schedRes) ? schedRes : (schedRes?.data || [])
               schedules.forEach(s => {
-                apiPools.push({
-                  id: s.id,
-                  tournamentId: tour.id,
-                  raceName: `${s.name || 'Vòng đua'} - ${tour.name}`,
-                  totalPool: 5000000,
-                  participants: 8,
-                  status: 'open',
-                  endDate: tour.endDate || '2026-12-31',
-                  runners: MOCK_RUNNERS
-                })
+                if (!loadedPools.some(p => p.id === s.id || p.raceName.includes(s.name))) {
+                  loadedPools.push({
+                    id: s.id,
+                    tournamentId: tour.id,
+                    raceName: `${s.name || 'Vòng đua'} - ${tour.name}`,
+                    totalPool: 5000000,
+                    participants: 8,
+                    status: 'open',
+                    endDate: tour.endDate || '2026-12-31',
+                    runners: MOCK_RUNNERS
+                  })
+                }
               })
             } catch (_) { }
           }
-          if (apiPools.length > 0) {
-            setPools(apiPools)
-          }
+        }
+
+        if (loadedPools.length > 0) {
+          setPools(loadedPools)
+        } else if (initialPools && initialPools.length > 0) {
+          setPools(initialPools)
+        } else {
+          setPools([
+            { id: 'P-1', raceName: 'Derby Một Dặm - Derby Quốc Gia', totalPool: 15000000, participants: 24, status: 'open', endDate: '2026-06-03 15:00', runners: MOCK_RUNNERS },
+            { id: 'P-2', raceName: 'Đua nước rút - Derby Quốc Gia', totalPool: 8000000, participants: 16, status: 'open', endDate: '2026-06-03 14:30', runners: MOCK_RUNNERS },
+            { id: 'P-3', raceName: 'Cúp Nhà Vô Địch - Cúp Vàng Hoàng Gia', totalPool: 22000000, participants: 32, status: 'open', endDate: '2026-09-12 16:00', runners: MOCK_RUNNERS }
+          ])
         }
       } catch (err) {
-        console.warn('Lỗi kết nối API giải đấu mở đăng ký:', err?.message)
+        console.warn('Lỗi tải cuộc đua mở vé:', err?.message)
       }
     }
     loadOpenRegistrationPools()
@@ -431,9 +458,6 @@ export default function SpectatorPredictions() {
                 <th>Mã vé</th>
                 <th>Cuộc đua</th>
                 <th>Ngựa cược</th>
-                <th>Loại vé</th>
-                <th>Số tiền cọc</th>
-                <th>Trạng thái</th>
                 <th style={{ textAlign: 'right' }}>Thao tác</th>
               </tr>
             </thead>
@@ -444,9 +468,6 @@ export default function SpectatorPredictions() {
                     <td><code>#{item.id || item.predictionId}</code></td>
                     <td style={{ color: '#fff', fontWeight: '500' }}>{item.raceName || item.race}</td>
                     <td style={{ color: '#4ade80', fontWeight: 'bold' }}>🏇 {item.horse || item.horseName}</td>
-                    <td><span className="admin-badge admin-badge--purple">{item.type || item.ticketType || 'Standard'}</span></td>
-                    <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(item.amount || item.stakeAmount || 100000)}</td>
-                    <td><StatusBadge status={item.status || 'open'} /></td>
                     <td style={{ textAlign: 'right' }}>
                       {(item.status === 'open' || item.status === 'pending' || !item.status) && (
                         <button
@@ -463,7 +484,7 @@ export default function SpectatorPredictions() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
                     Bạn chưa mua vé cược nào. Chọn một cuộc đua ở trên để tham gia dự đoán!
                   </td>
                 </tr>

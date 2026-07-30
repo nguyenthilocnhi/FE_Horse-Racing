@@ -11,8 +11,8 @@ const SPECTATOR_NOTIFICATIONS = [
 
 const breadcrumbLabels = {
   '/spectator': 'Giải Đấu & Lịch Đua',
+  '/spectator/predictions': 'Mua Vé & Dự Đoán',
   '/spectator/rankings': 'Bảng Xếp Hạng',
-  '/spectator/predictions': 'Dự Đoán & Thưởng',
   '/spectator/profile': 'Tài Khoản Cá Nhân',
 }
 

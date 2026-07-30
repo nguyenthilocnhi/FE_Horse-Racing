@@ -38,7 +38,6 @@ export default function RaceManagement() {
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [selectedTicketRace, setSelectedTicketRace] = useState(null)
   const [ticketFormData, setTicketFormData] = useState({
-    ticketPrice: 50000,
     totalTickets: 5000
   })
 
@@ -593,7 +592,6 @@ export default function RaceManagement() {
   const handleOpenTicketModal = (race) => {
     setSelectedTicketRace(race)
     setTicketFormData({
-      ticketPrice: race.ticketPrice || 50000,
       totalTickets: race.totalTickets || 5000
     })
     setShowTicketModal(true)
@@ -605,7 +603,6 @@ export default function RaceManagement() {
 
     try {
       const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
-      const priceNum = Number(ticketFormData.ticketPrice) || 50000
       const countNum = Number(ticketFormData.totalTickets) || 5000
 
       const updatedList = stored.map(r => {
@@ -613,7 +610,6 @@ export default function RaceManagement() {
           return {
             ...r,
             ticketOpen: true,
-            ticketPrice: priceNum,
             totalTickets: countNum,
             ticketOpenDate: new Date().toISOString()
           }
@@ -625,7 +621,6 @@ export default function RaceManagement() {
         updatedList.push({
           ...selectedTicketRace,
           ticketOpen: true,
-          ticketPrice: priceNum,
           totalTickets: countNum,
           ticketOpenDate: new Date().toISOString()
         })
@@ -952,7 +947,7 @@ export default function RaceManagement() {
                                   ) : (
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                       <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
-                                        🎟️ Vé: {Number(race.ticketPrice || 50000).toLocaleString('vi-VN')}đ
+                                        🎟️ {Number(race.totalTickets || 5000).toLocaleString('vi-VN')} vé
                                       </span>
                                       <button
                                         type="button"
@@ -1161,23 +1156,11 @@ export default function RaceManagement() {
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Giá vé khán giả (VND)</label>
-                <input
-                  required
-                  type="number"
-                  step="10000"
-                  className="admin-input"
-                  value={ticketFormData.ticketPrice}
-                  onChange={(e) => setTicketFormData({ ...ticketFormData, ticketPrice: e.target.value })}
-                  style={{ width: '100%' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label className="text-muted" style={{ fontSize: '11px', textTransform: 'uppercase' }}>Số lượng vé phát hành (Vé)</label>
                 <input
                   required
                   type="number"
+                  min="1"
                   className="admin-input"
                   value={ticketFormData.totalTickets}
                   onChange={(e) => setTicketFormData({ ...ticketFormData, totalTickets: e.target.value })}
