@@ -9,7 +9,7 @@ export default function PaymentResult() {
   const orderCode = searchParams.get('orderCode') || searchParams.get('orderId') || searchParams.get('id') || searchParams.get('paymentId')
   const code = searchParams.get('code')
   const cancel = searchParams.get('cancel')
-  const queryStatus = searchParams.get('status')
+  const queryStatus = (searchParams.get('status') || '').toUpperCase()
   const amountFromUrl = searchParams.get('amount')
   const urlUserKey = searchParams.get('userKey')
 
@@ -85,23 +85,39 @@ export default function PaymentResult() {
       }
     }
 
-    if (cancel === 'true') {
-      updateTxAndWallet('FAILED')
-      alert('⚠️ Giao dịch nạp tiền PayOS đã bị hủy.')
-      navigate('/spectator/profile', { replace: true })
+    const isCancelledOrFailed =
+      cancel === 'true' ||
+      queryStatus === 'CANCELLED' ||
+      queryStatus === 'FAILED' ||
+      queryStatus === 'CANCEL' ||
+      (code && code !== '00')
+
+    const isSuccess =
+      code === '00' ||
+      queryStatus === 'PAID' ||
+      queryStatus === 'SUCCESS' ||
+      queryStatus === 'COMPLETED'
+
+    if (isCancelledOrFailed) {
+      updateTxAndWallet('CANCELLED')
+      navigate('/spectator/profile', {
+        replace: true,
+        state: { toast: { message: '⚠️ Giao dịch nạp tiền PayOS đã bị hủy hoặc chưa hoàn thành.', type: 'warning' } }
+      })
       return
     }
 
-    if (code === '00' || queryStatus === 'PAID' || queryStatus === 'SUCCESS' || !code) {
+    if (isSuccess) {
       updateTxAndWallet('SUCCESS')
-      alert(`✅ Nạp tiền thành công!\n\nĐã cộng ${depositAmount > 0 ? formatCurrency(depositAmount) : ''} vào ví tài khoản của bạn.`)
-      navigate('/spectator/profile', { replace: true })
+      const msg = `✅ Nạp tiền thành công! ${depositAmount > 0 ? 'Đã cộng ' + formatCurrency(depositAmount) + ' vào ví tài khoản của bạn.' : ''}`
+      navigate('/spectator/profile', {
+        replace: true,
+        state: { toast: { message: msg, type: 'success' } }
+      })
       return
     }
 
     // Default fallback redirect
-    updateTxAndWallet('SUCCESS')
-    alert(`✅ Giao dịch đã được xử lý!\n\nSố dư ví tài khoản của bạn đã được cập nhật.`)
     navigate('/spectator/profile', { replace: true })
   }, [orderCode, code, cancel, queryStatus, amountFromUrl, urlUserKey, navigate, searchParams])
 

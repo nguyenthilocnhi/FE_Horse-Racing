@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { mockUserPredictions as initialUserPreds } from '../../../data/adminMockData'
 import { formatCurrency } from '../../../utils/adminHelpers'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -28,10 +29,23 @@ function normalizeProfile(data) {
 
 export default function SpectatorProfile() {
   const { user } = useAuth()
+  const location = useLocation()
 
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [apiError, setApiError] = useState(null)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  useEffect(() => {
+    if (location.state?.toast) {
+      showToast(location.state.toast.message, location.state.toast.type)
+    }
+  }, [location.state])
 
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({})
@@ -185,11 +199,11 @@ export default function SpectatorProfile() {
       const userKey = user?.id || user?.username || user?.email || 'guest'
       localStorage.setItem(`spectator_profile_${userKey}`, JSON.stringify(normalized))
       localStorage.setItem('spectator_profile', JSON.stringify(normalized))
-      alert('Cập nhật thông tin thành công!')
+      showToast('Cập nhật thông tin thành công!', 'success')
       setIsEditing(false)
     } catch (err) {
       console.error(err)
-      alert('Không thể lưu thay đổi!')
+      showToast('Không thể lưu thay đổi!', 'danger')
     } finally {
       setSaving(false)
     }
@@ -199,7 +213,7 @@ export default function SpectatorProfile() {
     e.preventDefault()
     const amount = Number(depositAmount)
     if (isNaN(amount) || amount <= 0) {
-      alert('Vui lòng nhập số tiền nạp hợp lệ!')
+      showToast('Vui lòng nhập số tiền nạp hợp lệ!', 'warning')
       return
     }
 
@@ -215,12 +229,12 @@ export default function SpectatorProfile() {
         // Chuyển hướng trực tiếp sang payOS Hosted Checkout
         window.location.href = checkoutUrl
       } else {
-        alert('❌ Không nhận được đường dẫn thanh toán từ payOS!')
+        showToast('❌ Không nhận được đường dẫn thanh toán từ payOS!', 'danger')
       }
     } catch (err) {
       console.error('Khởi tạo giao dịch thất bại:', err)
       const errorMsg = err?.response?.data?.message || (typeof err?.response?.data === 'string' ? err.response.data : null) || err?.message || 'Lỗi kết nối cổng thanh toán PayOS'
-      alert('❌ Khởi tạo giao dịch thất bại: ' + errorMsg)
+      showToast('❌ Khởi tạo giao dịch thất bại: ' + errorMsg, 'danger')
     } finally {
       setSaving(false)
     }
@@ -292,6 +306,42 @@ export default function SpectatorProfile() {
 
   return (
     <>
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          right: '24px',
+          zIndex: 9999,
+          padding: '14px 20px',
+          borderRadius: '10px',
+          background: toast.type === 'success' ? 'rgba(22, 101, 52, 0.95)' : toast.type === 'warning' ? 'rgba(146, 64, 14, 0.95)' : 'rgba(153, 27, 27, 0.95)',
+          border: `1px solid ${toast.type === 'success' ? '#4ade80' : toast.type === 'warning' ? '#fbbf24' : '#f87171'}`,
+          color: '#fff',
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          fontSize: '14px',
+          fontWeight: '500',
+          maxWidth: '450px'
+        }}>
+          <span style={{ flex: 1 }}>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '16px',
+              opacity: 0.8
+            }}
+          >✕</button>
+        </div>
+      )}
+
       <div className="spectator-profile-page">
         <div className="admin-page-head">
           <div>
@@ -426,7 +476,7 @@ export default function SpectatorProfile() {
 
                 {/* Nạp tiền */}
                 <form onSubmit={handleDeposit} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', marginBottom: '16px' }}>
-                  <label className="admin-form-label" style={{ marginBottom: '6px', display: 'block' }}>Nạp thêm tiền (Demo)</label>
+                  <label className="admin-form-label" style={{ marginBottom: '6px', display: 'block' }}>Nạp tiền qua Cổng thanh toán PayOS</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <input
                       type="number"
