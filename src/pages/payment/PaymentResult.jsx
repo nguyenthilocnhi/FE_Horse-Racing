@@ -36,106 +36,106 @@ export default function PaymentResult() {
           console.warn('GET /v1/payment/status/{orderCode} error:', e?.message)
         }
       }
-    if (!depositAmount && activePendingCode) {
-      try {
-        const txs = JSON.parse(localStorage.getItem(userTxKey) || localStorage.getItem('spectator_transactions') || '[]')
-        const found = txs.find(t => String(t.id) === String(activePendingCode) || String(t.orderId) === String(activePendingCode))
-        if (found && found.amount) depositAmount = Number(found.amount)
-      } catch (e) { }
-    }
-
-    const updateTxAndWallet = (statusStr) => {
-      if (activePendingCode || orderCode) {
-        const targetCode = activePendingCode || orderCode
+      if (!depositAmount && activePendingCode) {
         try {
-          // Update user-scoped transaction list
-          const updateListInKey = (keyName) => {
-            const stored = localStorage.getItem(keyName)
-            if (stored) {
-              const list = JSON.parse(stored)
-              const updated = list.map(tx => {
-                if (String(tx.id) === String(targetCode) || String(tx.orderId) === String(targetCode)) {
-                  if (tx.amount && !depositAmount) depositAmount = Number(tx.amount)
-                  return { ...tx, status: statusStr }
-                }
-                return tx
-              })
-              localStorage.setItem(keyName, JSON.stringify(updated))
-            }
-          }
+          const txs = JSON.parse(localStorage.getItem(userTxKey) || localStorage.getItem('spectator_transactions') || '[]')
+          const found = txs.find(t => String(t.id) === String(activePendingCode) || String(t.orderId) === String(activePendingCode))
+          if (found && found.amount) depositAmount = Number(found.amount)
+        } catch (e) { }
+      }
 
-          updateListInKey(userTxKey)
-          updateListInKey('spectator_transactions')
-
-          if (statusStr === 'SUCCESS') {
-            const specProfile = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || '{}')
-            const curBal = Number(specProfile.balance ?? specProfile.walletBalance ?? 0)
-            const addVal = depositAmount > 0 ? depositAmount : 0
-            const newBal = curBal + addVal
-
-            specProfile.balance = newBal
-            specProfile.walletBalance = newBal
-            specProfile.payosLinked = true
-
-            localStorage.setItem(userProfileKey, JSON.stringify(specProfile))
-            localStorage.setItem('spectator_profile', JSON.stringify(specProfile))
-
-            try {
-              const pendingProf = JSON.parse(localStorage.getItem('pending_profile') || 'null')
-              if (pendingProf) {
-                pendingProf.balance = newBal
-                pendingProf.walletBalance = newBal
-                pendingProf.payosLinked = true
-                localStorage.setItem('pending_profile', JSON.stringify(pendingProf))
+      const updateTxAndWallet = (statusStr) => {
+        if (activePendingCode || orderCode) {
+          const targetCode = activePendingCode || orderCode
+          try {
+            // Update user-scoped transaction list
+            const updateListInKey = (keyName) => {
+              const stored = localStorage.getItem(keyName)
+              if (stored) {
+                const list = JSON.parse(stored)
+                const updated = list.map(tx => {
+                  if (String(tx.id) === String(targetCode) || String(tx.orderId) === String(targetCode)) {
+                    if (tx.amount && !depositAmount) depositAmount = Number(tx.amount)
+                    return { ...tx, status: statusStr }
+                  }
+                  return tx
+                })
+                localStorage.setItem(keyName, JSON.stringify(updated))
               }
-            } catch (pErr) { }
-          }
+            }
 
-          localStorage.removeItem('active_pending_order_code')
-          localStorage.removeItem('active_pending_user_key')
-        } catch (e) {
-          console.warn('LocalStorage error:', e)
+            updateListInKey(userTxKey)
+            updateListInKey('spectator_transactions')
+
+            if (statusStr === 'SUCCESS') {
+              const specProfile = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || '{}')
+              const curBal = Number(specProfile.balance ?? specProfile.walletBalance ?? 0)
+              const addVal = depositAmount > 0 ? depositAmount : 0
+              const newBal = curBal + addVal
+
+              specProfile.balance = newBal
+              specProfile.walletBalance = newBal
+              specProfile.payosLinked = true
+
+              localStorage.setItem(userProfileKey, JSON.stringify(specProfile))
+              localStorage.setItem('spectator_profile', JSON.stringify(specProfile))
+
+              try {
+                const pendingProf = JSON.parse(localStorage.getItem('pending_profile') || 'null')
+                if (pendingProf) {
+                  pendingProf.balance = newBal
+                  pendingProf.walletBalance = newBal
+                  pendingProf.payosLinked = true
+                  localStorage.setItem('pending_profile', JSON.stringify(pendingProf))
+                }
+              } catch (pErr) { }
+            }
+
+            localStorage.removeItem('active_pending_order_code')
+            localStorage.removeItem('active_pending_user_key')
+          } catch (e) {
+            console.warn('LocalStorage error:', e)
+          }
         }
       }
-    }
 
-    const isCancelledOrFailed =
-      apiStatus === 'CANCELLED' ||
-      apiStatus === 'FAILED' ||
-      cancel === 'true' ||
-      queryStatus === 'CANCELLED' ||
-      queryStatus === 'FAILED' ||
-      queryStatus === 'CANCEL' ||
-      (code && code !== '00')
+      const isCancelledOrFailed =
+        apiStatus === 'CANCELLED' ||
+        apiStatus === 'FAILED' ||
+        cancel === 'true' ||
+        queryStatus === 'CANCELLED' ||
+        queryStatus === 'FAILED' ||
+        queryStatus === 'CANCEL' ||
+        (code && code !== '00')
 
-    const isSuccess =
-      apiStatus === 'SUCCESS' ||
-      code === '00' ||
-      queryStatus === 'PAID' ||
-      queryStatus === 'SUCCESS' ||
-      queryStatus === 'COMPLETED'
+      const isSuccess =
+        apiStatus === 'SUCCESS' ||
+        code === '00' ||
+        queryStatus === 'PAID' ||
+        queryStatus === 'SUCCESS' ||
+        queryStatus === 'COMPLETED'
 
-    if (isCancelledOrFailed) {
-      updateTxAndWallet('CANCELLED')
-      navigate('/spectator/profile', {
-        replace: true,
-        state: { toast: { message: '⚠️ Giao dịch nạp tiền PayOS đã bị hủy hoặc chưa hoàn thành.', type: 'warning' } }
-      })
-      return
-    }
+      if (isCancelledOrFailed) {
+        updateTxAndWallet('CANCELLED')
+        navigate('/spectator/profile', {
+          replace: true,
+          state: { toast: { message: '⚠️ Giao dịch nạp tiền PayOS đã bị hủy hoặc chưa hoàn thành.', type: 'warning' } }
+        })
+        return
+      }
 
-    if (isSuccess) {
-      updateTxAndWallet('SUCCESS')
-      const msg = `✅ Nạp tiền thành công! ${depositAmount > 0 ? 'Đã cộng ' + formatCurrency(depositAmount) + ' vào ví tài khoản của bạn.' : ''}`
-      navigate('/spectator/profile', {
-        replace: true,
-        state: { toast: { message: msg, type: 'success' } }
-      })
-      return
-    }
+      if (isSuccess) {
+        updateTxAndWallet('SUCCESS')
+        const msg = `✅ Nạp tiền thành công! ${depositAmount > 0 ? 'Đã cộng ' + formatCurrency(depositAmount) + ' vào ví tài khoản của bạn.' : ''}`
+        navigate('/spectator/profile', {
+          replace: true,
+          state: { toast: { message: msg, type: 'success' } }
+        })
+        return
+      }
 
-    // Default fallback redirect
-    navigate('/spectator/profile', { replace: true })
+      // Default fallback redirect
+      navigate('/spectator/profile', { replace: true })
     }
 
     checkPaymentStatusFromApi()

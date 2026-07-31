@@ -38,6 +38,19 @@ export default function RefereeTracking() {
         }
       }
       const relevantRaces = allSchedules.filter(r => r.status === 'RUNNING' || r.status === 'COMPLETED')
+      relevantRaces.sort((a, b) => {
+        const statusPriorityA = a.status === 'RUNNING' ? 1 : 0
+        const statusPriorityB = b.status === 'RUNNING' ? 1 : 0
+        if (statusPriorityB !== statusPriorityA) return statusPriorityB - statusPriorityA
+
+        const idA = Number(String(a.originalId || a.id).replace(/\D/g, '')) || 0
+        const idB = Number(String(b.originalId || b.id).replace(/\D/g, '')) || 0
+        if (idB !== idA) return idB - idA
+
+        const timeA = a.startTime ? new Date(a.startTime).getTime() : 0
+        const timeB = b.startTime ? new Date(b.startTime).getTime() : 0
+        return timeB - timeA
+      })
       setRaces(relevantRaces)
     } catch (err) {
       console.error(err)
@@ -53,21 +66,28 @@ export default function RefereeTracking() {
     setNotes('')
     setErrorDetails('')
 
+    if (race.status === 'DELAYED' || race.status === 'delayed') {
+      alert(`⛔ Cuộc đua "${race.name}" đã bị hoãn!`)
+      return
+    }
+
     if (!runners[race.id]) {
       try {
         setLoadingDetails(true)
         const pRes = await getRaceParticipations(race.id)
-        if (pRes.data) {
-          // Chỉ lấy những ngựa đã được chuẩn y tham gia (CONFIRMED)
-          const validParticipants = pRes.data.filter(p => p.status === 'CONFIRMED')
-          const mapped = validParticipants.map(p => ({
+        const rawList = Array.isArray(pRes) ? pRes : (pRes?.data || [])
+        if (rawList) {
+          const validParticipants = rawList.filter(p => p.status === 'CONFIRMED' || p.status === 'confirmed' || !p.status)
+          const finalParticipants = validParticipants.length > 0 ? validParticipants : rawList
+
+          const mapped = finalParticipants.map((p, idx) => ({
             participationId: p.id,
-            lane: p.laneNumber || 1,
-            horse: p.horseName || 'Chưa có',
-            jockey: p.jockeyName || 'Chưa có',
+            lane: p.laneNumber != null ? p.laneNumber : (p.lane != null ? p.lane : (p.laneNo != null ? p.laneNo : (idx + 1))),
+            horse: p.horseName || (p.horse ? (p.horse.name || p.horse) : 'Chưa có'),
+            jockey: p.jockeyName || (p.jockey ? (p.jockey.fullName || p.jockey.userName || p.jockey) : 'Chưa có'),
             progress: 0,
-            rank: '',
-            time: ''
+            rank: p.rankPosition != null ? String(p.rankPosition) : (p.rank != null ? String(p.rank) : ''),
+            time: p.finishTime || p.time || ''
           }))
           setRunners(prev => ({ ...prev, [race.id]: mapped }))
         }
@@ -84,52 +104,58 @@ export default function RefereeTracking() {
   useEffect(() => {
     let interval = null
     if (isSimulating && selectedRace) {
+      const finishOrder = []
+
       interval = setInterval(() => {
         setRunners(prev => {
           const currentList = prev[selectedRace.id] || []
-          let finishedCount = 0
+          let allFinished = true
 
           const updated = currentList.map(r => {
             if (r.progress >= 100) {
-              finishedCount++
               return r
             }
-            const increment = Math.floor(Math.random() * 15) + 5
+            const increment = Math.floor(Math.random() * 14) + 6
             const nextProgress = Math.min(r.progress + increment, 100)
+            if (nextProgress >= 100) {
+              const key = r.participationId || r.lane
+              if (!finishOrder.includes(key)) {
+                finishOrder.push(key)
+              }
+            } else {
+              allFinished = false
+            }
             return { ...r, progress: nextProgress }
           })
 
-          if (finishedCount === updated.length) {
+          if (allFinished) {
             setIsSimulating(false)
             clearInterval(interval)
 
-            const withRanks = updated.map((r, i) => {
-              const rnk = i + 1
-              const mockSec = (90 + rnk * 1.5 + Math.random()).toFixed(1)
-              const minutes = Math.floor(mockSec / 60)
-              const seconds = (mockSec % 60).toFixed(1)
+            const finalRunners = updated.map(r => {
+              const key = r.participationId || r.lane
+              let rnkIndex = finishOrder.indexOf(key)
+              if (rnkIndex === -1) rnkIndex = finishOrder.length
+              const rankNum = rnkIndex + 1
+
+              const totalSec = 88 + rankNum * 2 + (Math.random() * 0.5)
+              const min = Math.floor(totalSec / 60)
+              const sec = Math.floor(totalSec % 60)
+              const timeStr = `00:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
+
               return {
                 ...r,
-                rank: rnk.toString(),
-                time: `00:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(4, '0')}` // Format HH:mm:ss.S for LocalTime mapping if possible. Just let user type or provide valid format like HH:mm:ss
+                rank: rankNum.toString(),
+                time: timeStr
               }
             })
-            // Quick format fix for HH:mm:ss
-            return {
-              ...prev, [selectedRace.id]: updated.map((r, i) => {
-                const mockSec = 90 + (i + 1) * 2
-                return {
-                  ...r,
-                  rank: (i + 1).toString(),
-                  time: `00:01:${(mockSec % 60).toString().padStart(2, '0')}`
-                }
-              })
-            }
+
+            return { ...prev, [selectedRace.id]: finalRunners }
           }
 
           return { ...prev, [selectedRace.id]: updated }
         })
-      }, 300)
+      }, 250)
     }
 
     return () => clearInterval(interval)
@@ -242,7 +268,6 @@ export default function RefereeTracking() {
           <h1 className="admin-page-title">Giám Sát & Ghi Nhận Kết Quả</h1>
           <p className="admin-page-sub">Theo dõi trực tiếp cuộc đua đang chạy, ghi nhận kết quả xếp hạng thi đấu và lập biên bản chính thức gửi Ban tổ chức</p>
         </div>
-        <button onClick={fetchRaces} className="admin-btn admin-btn--primary">Làm mới</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '24px', alignItems: 'start' }}>

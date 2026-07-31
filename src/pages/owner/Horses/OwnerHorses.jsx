@@ -11,14 +11,14 @@ export default function OwnerHorses() {
   const [horseHistory, setHorseHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [selectedHorse, setSelectedHorse] = useState(null)
-  
+
   // Form fields
   const [name, setName] = useState('')
   const [age, setAge] = useState('')
   const [breed, setBreed] = useState('Thoroughbred')
   const [healthStatus, setHealthStatus] = useState('ELIGIBLE')
   const [image, setImage] = useState('')
-  
+
   // Registration Form fields
   const [selectedRaceId, setSelectedRaceId] = useState('')
 
@@ -46,18 +46,18 @@ export default function OwnerHorses() {
         const apiList = Array.isArray(apiRes) ? apiRes : (apiRes?.data ?? apiRes?.content ?? [])
 
         const formatted = apiList.map(h => ({
-          id:            h.id,
-          name:          h.name ?? 'Chưa đặt tên',
-          breed:         h.breed ?? 'Thoroughbred',
-          age:           h.age ?? 3,
-          wins:          h.wins ?? 0,
-          races:         h.racesCount ?? h.races ?? 0,
-          earnings:      h.earnings ?? '0 VND',
-          healthStatus:  h.healthStatus || 'ELIGIBLE',
-          status:        (h.healthStatus === 'ELIGIBLE' || !h.healthStatus) ? 'ready' : 'gray',
+          id: h.id,
+          name: h.name ?? 'Chưa đặt tên',
+          breed: h.breed ?? 'Thoroughbred',
+          age: h.age ?? 3,
+          wins: h.wins ?? 0,
+          races: h.racesCount ?? h.races ?? 0,
+          earnings: h.earnings ?? '0 VND',
+          healthStatus: h.healthStatus || 'ELIGIBLE',
+          status: (h.healthStatus === 'ELIGIBLE' || !h.healthStatus) ? 'ready' : 'gray',
           currentJockey: h.jockeyName ?? null,
-          image:         h.image ?? '',
-          horseOwner:    h.horseOwner ?? null
+          image: h.image ?? '',
+          horseOwner: h.horseOwner ?? null
         }))
         setHorses(formatted)
       } catch (err) {
@@ -73,7 +73,7 @@ export default function OwnerHorses() {
   const handleAddHorse = async (e) => {
     e.preventDefault()
     if (!name || !age) return
-    
+
     const ownerKey = getCurrentOwnerKey()
     const payload = {
       name,
@@ -89,17 +89,17 @@ export default function OwnerHorses() {
       const res = await ownerService.createOwnerHorse(payload)
       const data = res?.data || res || {}
       const newHorse = {
-        id:            data?.id ?? Date.now(),
-        name:          data?.name ?? name,
-        age:           data?.age ?? parseInt(age, 10),
-        breed:         data?.breed ?? breed,
-        healthStatus:  data?.healthStatus ?? healthStatus,
-        wins:          0,
-        races:         0,
-        earnings:      '0 VND',
-        status:        'ready',
+        id: data?.id ?? Date.now(),
+        name: data?.name ?? name,
+        age: data?.age ?? parseInt(age, 10),
+        breed: data?.breed ?? breed,
+        healthStatus: data?.healthStatus ?? healthStatus,
+        wins: 0,
+        races: 0,
+        earnings: '0 VND',
+        status: 'ready',
         currentJockey: null,
-        image:         image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
+        image: image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'
       }
 
       const stored = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
@@ -114,17 +114,17 @@ export default function OwnerHorses() {
     } catch (err) {
       // Local fallback for offline / mock user
       const newHorse = {
-        id:            Date.now(),
+        id: Date.now(),
         name,
-        age:           parseInt(age, 10),
-        breed:         breed || 'Thoroughbred',
-        healthStatus:  healthStatus || 'ELIGIBLE',
-        wins:          0,
-        races:         0,
-        earnings:      '0 VND',
-        status:        'ready',
+        age: parseInt(age, 10),
+        breed: breed || 'Thoroughbred',
+        healthStatus: healthStatus || 'ELIGIBLE',
+        wins: 0,
+        races: 0,
+        earnings: '0 VND',
+        status: 'ready',
         currentJockey: null,
-        image:         image || ''
+        image: image || ''
       }
       const stored = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
       const updated = [newHorse, ...stored]
@@ -175,7 +175,7 @@ export default function OwnerHorses() {
   const handleEditHorse = async (e) => {
     e.preventDefault()
     if (!selectedHorse || !name || !age) return
-    
+
     const payload = {
       name,
       age: parseInt(age, 10),
@@ -200,8 +200,8 @@ export default function OwnerHorses() {
       }))
       alert('✅ Cập nhật thông tin ngựa thành công!')
     } catch (err) {
-      const errorMessage = typeof err.response?.data === 'string' 
-        ? err.response.data 
+      const errorMessage = typeof err.response?.data === 'string'
+        ? err.response.data
         : (err.response?.data?.message || err.message)
       alert('❌ Lỗi khi cập nhật thông tin ngựa: ' + errorMessage)
     }
@@ -220,8 +220,8 @@ export default function OwnerHorses() {
           setSelectedHorse(null)
         }
       } catch (err) {
-        const errorMessage = typeof err.response?.data === 'string' 
-          ? err.response.data 
+        const errorMessage = typeof err.response?.data === 'string'
+          ? err.response.data
           : (err.response?.data?.message || err.message)
         alert('❌ Lỗi khi xóa ngựa: ' + errorMessage)
       }
@@ -240,13 +240,13 @@ export default function OwnerHorses() {
   const handleRegisterToRace = async (e) => {
     e.preventDefault()
     if (!selectedHorse || !selectedRaceId) return
-    
+
     try {
       await ownerService.registerHorseToRace({
         horseId: selectedHorse.id,
         raceScheduleId: selectedRaceId
       })
-      
+
       setHorses(horses.map(h => {
         if (h.id === selectedHorse.id) {
           return { ...h, status: 'registered' }
@@ -265,7 +265,7 @@ export default function OwnerHorses() {
       }))
       alert(`⚠️ Đăng ký thành công ngựa "${selectedHorse.name}" vào giải đấu (Lưu tạm thời)`)
     }
-    
+
     setRegisterModal(false)
   }
 
@@ -320,9 +320,9 @@ export default function OwnerHorses() {
             setCurrentPage(1)
           }}
         />
-        <select 
-          className="owner-select" 
-          value={statusFilter} 
+        <select
+          className="owner-select"
+          value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value)
             setCurrentPage(1)
@@ -359,34 +359,33 @@ export default function OwnerHorses() {
                       <td>{horse.breed}</td>
                       <td>{horse.wins} Thắng / {horse.races} Đua</td>
                       <td>
-                        {horse.healthStatus === 'ELIGIBLE' ? 'Khỏe mạnh' : 
-                         horse.healthStatus === 'SUSPENDED' ? 'Bị đình chỉ' : 
-                         horse.healthStatus === 'INJURED' ? 'Bị chấn thương' : 
-                         horse.healthStatus === 'SICK' ? 'Bị ốm' : (horse.healthStatus || 'N/A')}
+                        {horse.healthStatus === 'ELIGIBLE' ? 'Khỏe mạnh' :
+                          horse.healthStatus === 'SUSPENDED' ? 'Bị đình chỉ' :
+                            horse.healthStatus === 'INJURED' ? 'Bị chấn thương' :
+                              horse.healthStatus === 'SICK' ? 'Bị ốm' : (horse.healthStatus || 'N/A')}
                       </td>
                       <td>
-                        <span className={`owner-badge owner-badge--${
-                          horse.status === 'ready' ? 'green' : horse.status === 'registered' ? 'gold' : 'gray'
-                        }`}>
+                        <span className={`owner-badge owner-badge--${horse.status === 'ready' ? 'green' : horse.status === 'registered' ? 'gold' : 'gray'
+                          }`}>
                           {horse.status === 'ready' ? 'Sẵn sàng' : horse.status === 'registered' ? 'Đã đăng ký' : 'Đang nghỉ dưỡng'}
                         </span>
                       </td>
                       <td>
                         <div className="owner-table-actions" style={{ justifyContent: 'flex-end' }}>
-                          <button 
+                          <button
                             className="owner-btn owner-btn--ghost owner-btn--sm"
                             onClick={() => openHistoryModal(horse)}
                           >
                             Chi tiết
                           </button>
-                          <button 
+                          <button
                             className="owner-btn owner-btn--ghost owner-btn--sm"
                             disabled={horse.status === 'registered'}
                             onClick={() => openEditModal(horse)}
                           >
                             Chỉnh sửa
                           </button>
-                          <button 
+                          <button
                             className="owner-btn owner-btn--danger owner-btn--sm"
                             onClick={() => handleDeleteHorse(horse.id)}
                           >
@@ -406,7 +405,7 @@ export default function OwnerHorses() {
               </tbody>
             </table>
           </div>
-          
+
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 22px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', flexWrap: 'wrap', gap: '12px' }}>
               <span style={{ fontSize: '12px', color: '#aaa' }}>
@@ -431,15 +430,15 @@ export default function OwnerHorses() {
             </div>
             <div style={{ padding: '20px' }}>
               <div style={{ width: '100%', height: '160px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px', border: '1px solid rgba(212, 175, 55, 0.2)' }}>
-                <img 
-                  src={selectedHorse.image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'} 
+                <img
+                  src={selectedHorse.image || 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?auto=format&fit=crop&w=600&q=80'}
                   alt={selectedHorse.name}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>
               <h4 style={{ fontSize: '1.2rem', marginBottom: '2px', color: '#fff' }}>{selectedHorse.name}</h4>
               <p style={{ margin: '0 0 20px', color: '#d4af37', fontSize: '13px', letterSpacing: '0.05em' }}>{selectedHorse.breed}</p>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: '10px', fontSize: '13px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '12px', color: '#ccc' }}>
                 <div style={{ color: '#888' }}>Tuổi:</div><div>{selectedHorse.age} tuổi</div>
                 <div style={{ color: '#888' }}>Sức khỏe:</div><div>{selectedHorse.healthStatus === 'ELIGIBLE' ? 'Khỏe mạnh' : selectedHorse.healthStatus === 'SUSPENDED' ? 'Bị đình chỉ' : selectedHorse.healthStatus === 'INJURED' ? 'Bị chấn thương' : selectedHorse.healthStatus === 'SICK' ? 'Bị ốm' : (selectedHorse.healthStatus || 'Khỏe mạnh')}</div>
@@ -607,7 +606,7 @@ export default function OwnerHorses() {
                       onChange={(e) => setBreed(e.target.value)}
                     />
                   </div>
-                  
+
                   <div className="owner-form-group full">
                     <label className="owner-label">Link ảnh ngựa (Tùy chọn)</label>
                     <input
@@ -660,8 +659,8 @@ export default function OwnerHorses() {
               <div className="owner-modal-body">
                 <div className="owner-form-group full" style={{ marginBottom: 16 }}>
                   <label className="owner-label">Chọn Giải Đấu đang mở</label>
-                  <select 
-                    className="owner-select" 
+                  <select
+                    className="owner-select"
                     style={{ width: '100%', marginTop: 8 }}
                     value={selectedRaceId}
                     onChange={(e) => setSelectedRaceId(e.target.value)}

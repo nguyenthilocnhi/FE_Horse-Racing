@@ -171,47 +171,23 @@ export default function OwnerRaces() {
       const rawH = hRes.status === 'fulfilled' ? (hRes.value?.data || hRes.value || []) : []
       const apiHList = Array.isArray(rawH) ? rawH : []
 
-      let localHList = []
-      try {
-        localHList = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
-      } catch (e) {}
-
-      let combinedH = [...apiHList]
-      localHList.forEach(lh => {
-        if (!combinedH.some(c => String(c.id) === String(lh.id) || c.name === lh.name)) {
-          combinedH.push(lh)
-        }
-      })
-
-      if (combinedH.length === 0) {
-        const ownerPrefix = ownerKey.split('@')[0].toUpperCase()
-        combinedH = [
-          { id: Date.now(), name: `Xích Thố (${ownerPrefix})`, breed: 'Thoroughbred' },
-          { id: Date.now() + 1, name: `Bạch Long (${ownerPrefix})`, breed: 'Arabian' }
-        ]
-        localStorage.setItem('owner_horses_' + ownerKey, JSON.stringify(combinedH))
+      // Xóa toàn bộ dữ liệu ngoài/mock, chỉ giữ dữ liệu từ API getOwnerHorses
+      setOwnerHorses(apiHList)
+      if (apiHList.length > 0) {
+        setSelectedHorseId(apiHList[0].id)
+      } else {
+        setSelectedHorseId('')
       }
-
-      setOwnerHorses(combinedH)
-      if (combinedH.length > 0) setSelectedHorseId(combinedH[0].id)
 
       if (jRes.status === 'fulfilled') {
         const rawJ = jRes.value?.data || jRes.value || []
         const jList = Array.isArray(rawJ) ? rawJ : []
-        setJockeys(jList.length > 0 ? jList : [
-          { id: 1, fullName: 'L. Anderson' },
-          { id: 2, fullName: 'M. Rodriguez' },
-          { id: 3, fullName: 'S. Nakamura' }
-        ])
+        setJockeys(jList)
         if (jList.length > 0) setSelectedJockeyId(jList[0].id)
-        else setSelectedJockeyId(1)
+        else setSelectedJockeyId('')
       } else {
-        setJockeys([
-          { id: 1, fullName: 'L. Anderson' },
-          { id: 2, fullName: 'M. Rodriguez' },
-          { id: 3, fullName: 'S. Nakamura' }
-        ])
-        setSelectedJockeyId(1)
+        setJockeys([])
+        setSelectedJockeyId('')
       }
     } catch (e) {
       console.warn('Error loading horses/jockeys for registration modal:', e)
@@ -533,9 +509,13 @@ export default function OwnerRaces() {
                   onChange={(e) => setSelectedHorseId(e.target.value)}
                   style={{ width: '100%', padding: '10px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '6px' }}
                 >
-                  {ownerHorses.map(h => (
-                    <option key={h.id} value={h.id}>🏇 {h.name} ({h.breed || 'Thoroughbred'})</option>
-                  ))}
+                  {ownerHorses.length === 0 ? (
+                    <option value="">-- Chưa có chiến mã nào từ API --</option>
+                  ) : (
+                    ownerHorses.map(h => (
+                      <option key={h.id} value={h.id}>🏇 {h.name} ({h.breed || 'Thoroughbred'})</option>
+                    ))
+                  )}
                 </select>
               </div>
 

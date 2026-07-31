@@ -5,7 +5,7 @@ import './SpectatorDashboard.css'
 
 export default function SpectatorDashboard() {
   const [activeTab, setActiveTab] = useState('TOURNAMENTS') // 'TOURNAMENTS' or 'RACES'
-  
+
   // Data
   const [tournaments, setTournaments] = useState([])
   const [races, setRaces] = useState([])
@@ -26,7 +26,7 @@ export default function SpectatorDashboard() {
       setLoading(true)
       const tourRes = await getAllTournaments()
       const fetchedTournaments = tourRes.data || tourRes || []
-      
+
       const formattedTournaments = fetchedTournaments.map(t => ({
         id: t.id,
         name: t.name,
@@ -35,9 +35,9 @@ export default function SpectatorDashboard() {
         endDate: t.endDate,
         races: t.racesCount || 0,
         prize: 'Chưa cập nhật',
-        status: t.status === 'ONGOING' ? 'ongoing' : 
-                t.status === 'COMPLETED' ? 'completed' : 
-                t.status === 'CANCELLED' ? 'cancelled' : 'upcoming'
+        status: t.status === 'ONGOING' ? 'ongoing' :
+          t.status === 'COMPLETED' ? 'completed' :
+            t.status === 'CANCELLED' ? 'cancelled' : 'upcoming'
       }))
       setTournaments(formattedTournaments)
 
@@ -129,15 +129,15 @@ export default function SpectatorDashboard() {
       </div>
 
       <div className="admin-filters" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <input 
-          type="text" 
-          className="admin-input" 
-          placeholder="Tìm theo tên hoặc địa điểm..." 
+        <input
+          type="text"
+          className="admin-input"
+          placeholder="Tìm theo tên hoặc địa điểm..."
           value={localSearchQuery}
           onChange={(e) => setLocalSearchQuery(e.target.value)}
           style={{ minWidth: '220px', flex: 1, maxWidth: '300px' }}
         />
-        <select 
+        <select
           className="admin-select"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -148,7 +148,7 @@ export default function SpectatorDashboard() {
           <option value="ongoing">Đang diễn ra</option>
           <option value="completed">Đã hoàn thành</option>
         </select>
-        <select 
+        <select
           className="admin-select"
           value={sortOrder}
           onChange={(e) => setSortOrder(e.target.value)}
@@ -179,8 +179,8 @@ export default function SpectatorDashboard() {
               <tbody>
                 {filteredTournaments.length > 0 ? (
                   filteredTournaments.map((t) => (
-                    <tr 
-                      key={t.id} 
+                    <tr
+                      key={t.id}
                       onClick={() => setSelectedTournament(t)}
                       style={{ cursor: 'pointer' }}
                       className="race-item-hover"
@@ -251,14 +251,14 @@ export default function SpectatorDashboard() {
             <div className="admin-card-body">
               <h3 style={{ color: '#fff', fontSize: '18px', margin: '0 0 4px 0' }}>{selectedTournament.name}</h3>
               <span style={{ fontSize: '12px', color: '#888', display: 'block', marginBottom: '16px' }}>Mã sự kiện: {selectedTournament.id}</span>
-              
+
               <dl className="user-detail-dl" style={{ fontSize: '13px', marginBottom: '20px' }}>
                 <dt>Địa điểm tổ chức</dt>
                 <dd>{selectedTournament.venue}</dd>
-                
+
                 <dt>Thời gian giải chạy</dt>
                 <dd>{selectedTournament.startDate} đến {selectedTournament.endDate}</dd>
-                
+
                 <dt>Tổng cơ cấu giải thưởng</dt>
                 <dd style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '16px' }}>{selectedTournament.prize}</dd>
 
@@ -269,7 +269,7 @@ export default function SpectatorDashboard() {
               <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', marginTop: '20px', letterSpacing: '0.05em' }}>Danh sách cuộc đua thuộc giải</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', marginBottom: '20px' }}>
                 {races.filter(r => r.tournamentId === selectedTournament.id).map(r => (
-                  <div 
+                  <div
                     key={r.id}
                     onClick={() => {
                       setSelectedRace(r)

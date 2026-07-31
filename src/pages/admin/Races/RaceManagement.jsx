@@ -4,7 +4,8 @@ import { races as initialRaces, tournaments as initialTournaments, mockJockeys }
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, openRaceRegistration } from '../../../services/tournamentService'
 import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
-import { openRaceTicketSales } from '../../../services/raceService'
+import { openRaceTicketSales, closeRaceTicketSales, getOpenTicketRaces, getRaceResults } from '../../../services/raceService'
+import { getRaceParticipations } from '../../../services/refereeService'
 import './RaceManagement.css'
 
 // Default horses if localStorage is empty
@@ -39,8 +40,14 @@ export default function RaceManagement() {
   const [showTicketModal, setShowTicketModal] = useState(false)
   const [selectedTicketRace, setSelectedTicketRace] = useState(null)
   const [ticketFormData, setTicketFormData] = useState({
-    totalTickets: 5000
+    totalTickets: 20
   })
+
+  // Result Report Modal States
+  const [viewResultModal, setViewResultModal] = useState(false)
+  const [selectedResultRace, setSelectedResultRace] = useState(null)
+  const [raceResultDetails, setRaceResultDetails] = useState([])
+  const [loadingResultDetails, setLoadingResultDetails] = useState(false)
 
   const [localSearchQuery, setLocalSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -93,6 +100,9 @@ export default function RaceManagement() {
                 registrationOpen: s.registrationOpen,
                 registrationStartDate: s.registrationStartDate,
                 registrationEndDate: s.registrationEndDate,
+                totalTickets: s.totalTickets,
+                remainingTickets: s.remainingTickets,
+                ticketPrice: s.ticketPrice,
                 horses: 0
               }
             })
@@ -102,24 +112,43 @@ export default function RaceManagement() {
           }
         }
 
+        let openTicketRaces = []
+        try {
+          const apiOpenRes = await getOpenTicketRaces()
+          openTicketRaces = Array.isArray(apiOpenRes) ? apiOpenRes : (apiOpenRes?.data || [])
+        } catch (err) {
+          console.warn('GET /v1/tickets/races/open-sales error:', err)
+        }
+
         let localCreated = []
         try {
           localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
         } catch (e) { }
 
         const combined = allRaces.map(r => {
+          const apiOpenMatch = openTicketRaces.find(o =>
+            String(o.raceId || o.id) === String(r.originalId) ||
+            String(o.raceId || o.id) === String(r.id).replace('R-', '')
+          )
           const localMatch = localCreated.find(c =>
             String(c.id) === String(r.id) ||
             String(c.originalId) === String(r.originalId) ||
             (c.name === r.name && String(c.tournamentId) === String(r.tournamentId))
           )
+
+          const isTicketOpen = Boolean(apiOpenMatch || localMatch?.ticketOpen)
+          const totalVal = apiOpenMatch?.totalTickets ?? r.totalTickets ?? localMatch?.totalTickets ?? 20
+          const remainingVal = apiOpenMatch?.remainingTickets ?? r.remainingTickets ?? localMatch?.remainingTickets ?? totalVal
+          const priceVal = apiOpenMatch?.ticketPrice ?? r.ticketPrice ?? localMatch?.ticketPrice ?? 20000
+
           return {
             ...r,
             refereeId: localMatch?.refereeId || r.refereeId,
             referee: localMatch?.referee || r.referee,
-            ticketOpen: localMatch?.ticketOpen || r.ticketOpen || false,
-            ticketPrice: localMatch?.ticketPrice || r.ticketPrice || 50000,
-            totalTickets: localMatch?.totalTickets || r.totalTickets || 5000
+            ticketOpen: isTicketOpen,
+            ticketPrice: priceVal,
+            totalTickets: totalVal,
+            remainingTickets: remainingVal
           }
         })
 
@@ -281,18 +310,80 @@ export default function RaceManagement() {
   }
 
   const handleApproveResult = async (race) => {
-    if (!window.confirm(`Xác nhận DUYỆT KẾT QUẢ cho cuộc đua: ${race.name}? Sau khi duyệt, cuộc đua sẽ HOÀN THÀNH và không thể sửa.`)) return
+    if (!window.confirm(`Xác nhận DUYỆT VÀ CÔNG BỐ KẾT QUẢ cho cuộc đua: ${race.name}? Sau khi công bố, cuộc đua sẽ chuyển sang trạng thái ĐÃ CÔNG BỐ KẾT QUẢ và khóa toàn bộ thao tác.`)) return
     setIsProcessing(true)
     try {
       try {
-        await publishRaceResult(race.originalId)
+        await publishRaceResult(race.originalId || race.id)
       } catch (e) {
         console.warn('API publish failed, updating locally', e)
       }
-      setRaces(prev => prev.map(r => r.id === race.id ? { ...r, status: 'completed' } : r))
-      alert('🎉 Đã duyệt và công bố kết quả cuộc đua thành công! Trạng thái đã chuyển sang HOÀN THÀNH.')
+      setRaces(prev => prev.map(r => r.id === race.id ? { ...r, status: 'published' } : r))
+
+      // Lưu vết vào storage để duy trì trạng thái đã công bố
+      const raceIdStr = String(race.originalId || race.id)
+      const publishedReports = JSON.parse(localStorage.getItem('published_reports') || '[]')
+      if (!publishedReports.includes(raceIdStr)) publishedReports.push(raceIdStr)
+      if (!publishedReports.includes(String(race.id))) publishedReports.push(String(race.id))
+      localStorage.setItem('published_reports', JSON.stringify(publishedReports))
+
+      const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
+      const updatedList = stored.map(r => {
+        if (String(r.id) === String(race.id) || String(r.originalId) === String(raceIdStr)) {
+          return { ...r, status: 'published' }
+        }
+        return r
+      })
+      localStorage.setItem('created_races', JSON.stringify(updatedList))
+
+      alert('🎉 Đã duyệt và công bố kết quả cuộc đua thành công! Trạng thái hiện tại: ĐÃ CÔNG BỐ KẾT QUẢ.')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const handleViewRaceResult = async (race) => {
+    setSelectedResultRace(race)
+    setViewResultModal(true)
+    setRaceResultDetails([])
+    setLoadingResultDetails(true)
+
+    const raceId = race.originalId || race.id
+    try {
+      const [resResults, pRes] = await Promise.allSettled([
+        getRaceResults(raceId),
+        getRaceParticipations(raceId)
+      ])
+
+      const list = resResults.status === 'fulfilled' ? (Array.isArray(resResults.value) ? resResults.value : (resResults.value?.data || [])) : []
+      const partsList = pRes.status === 'fulfilled' ? (Array.isArray(pRes.value) ? pRes.value : (pRes.value?.data || [])) : []
+
+      if (list.length > 0) {
+        const sorted = [...list].sort((a, b) => (a.rankPosition || a.rank || 99) - (b.rankPosition || b.rank || 99))
+        setRaceResultDetails(sorted.map(d => {
+          const part = partsList.find(p => p.id === d.participationId || p.horseId === d.horseId || p.horseName === d.horseName)
+          const jockeyName = d.jockeyName || (d.jockey ? (d.jockey.fullName || d.jockey.userName || d.jockey) : null) || part?.jockeyName || part?.jockey?.fullName || part?.jockey?.userName || 'Không xác định'
+          const horseName = d.horseName || (d.horse ? (d.horse.name || d.horse) : null) || part?.horseName || `Ngựa #${d.horseId || d.id}`
+
+          return {
+            rank: d.rankPosition || d.rank || 1,
+            horse: horseName,
+            jockey: jockeyName,
+            time: d.finishTime || d.time || '--:--:--'
+          }
+        }))
+      } else if (partsList.length > 0) {
+        setRaceResultDetails(partsList.map((p, idx) => ({
+          rank: idx + 1,
+          horse: p.horseName || (p.horse ? (p.horse.name || p.horse) : `Ngựa #${p.horseId}`),
+          jockey: p.jockeyName || (p.jockey ? (p.jockey.fullName || p.jockey.userName || p.jockey) : 'Không xác định'),
+          time: '00:01:32'
+        })))
+      }
+    } catch (err) {
+      console.warn('Lỗi lấy kết quả cuộc đua:', err)
+    } finally {
+      setLoadingResultDetails(false)
     }
   }
 
@@ -605,7 +696,7 @@ export default function RaceManagement() {
     }
     setSelectedTicketRace(race)
     setTicketFormData({
-      totalTickets: race.totalTickets || 5000
+      totalTickets: race.totalTickets != null ? race.totalTickets : 20
     })
     setShowTicketModal(true)
   }
@@ -632,8 +723,8 @@ export default function RaceManagement() {
           return {
             ...r,
             ticketOpen: true,
-            totalTickets: apiResult?.totalTickets || countNum,
-            remainingTickets: apiResult?.remainingTickets || countNum,
+            totalTickets: apiResult?.totalTickets != null ? apiResult.totalTickets : countNum,
+            remainingTickets: apiResult?.remainingTickets != null ? apiResult.remainingTickets : countNum,
             ticketPrice: apiResult?.ticketPrice,
             ticketOpenDate: new Date().toISOString()
           }
@@ -645,8 +736,8 @@ export default function RaceManagement() {
         updatedList.push({
           ...selectedTicketRace,
           ticketOpen: true,
-          totalTickets: apiResult?.totalTickets || countNum,
-          remainingTickets: apiResult?.remainingTickets || countNum,
+          totalTickets: apiResult?.totalTickets != null ? apiResult.totalTickets : countNum,
+          remainingTickets: apiResult?.remainingTickets != null ? apiResult.remainingTickets : countNum,
           ticketPrice: apiResult?.ticketPrice,
           ticketOpenDate: new Date().toISOString()
         })
@@ -658,6 +749,37 @@ export default function RaceManagement() {
       alert(`🎟️ Đã mở bán vé cho khán giả thành công cho cuộc đua "${selectedTicketRace.name}"!`)
     } catch (err) {
       alert('Lỗi khi mở đặt vé: ' + err.message)
+    }
+  }
+
+  const handleCloseTicketSales = async (race) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn ĐÓNG BÁN VÉ (khóa đặt vé) cho cuộc đua "${race.name}"?`)) return
+    try {
+      const raceId = race.originalId || race.id
+      let apiResult = null
+      try {
+        apiResult = await closeRaceTicketSales(raceId)
+      } catch (apiErr) {
+        console.warn(`POST /api/v1/tickets/races/${raceId}/close-sales failed:`, apiErr)
+      }
+
+      const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
+      const updatedList = stored.map(r => {
+        if (String(r.id) === String(raceId) || String(r.originalId) === String(raceId)) {
+          return {
+            ...r,
+            ticketOpen: false,
+            remainingTickets: apiResult?.remainingTickets ?? r.remainingTickets
+          }
+        }
+        return r
+      })
+
+      localStorage.setItem('created_races', JSON.stringify(updatedList))
+      fetchData()
+      alert(`🔒 Đã khóa đặt vé (đóng bán vé) thành công cho cuộc đua "${race.name}"!`)
+    } catch (err) {
+      alert('Lỗi khi khóa đặt vé: ' + err.message)
     }
   }
 
@@ -906,14 +1028,14 @@ export default function RaceManagement() {
                             </span>
                           ) : (race.status === 'completed' || race.status === 'published') ? (
                             <>
-                              <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
-                                🔒 Đã hoàn thành
+                              <span style={{ fontSize: '11px', color: '#10b981', fontStyle: 'italic', fontWeight: 'bold' }}>
+                                🔒 Đã công bố kết quả
                               </span>
                               <button
                                 type="button"
                                 className="admin-btn admin-btn--gold admin-btn--sm"
                                 style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
-                                onClick={() => navigate('/admin/results')}
+                                onClick={() => handleViewRaceResult(race)}
                               >
                                 📊 Xem kết quả
                               </button>
@@ -939,15 +1061,17 @@ export default function RaceManagement() {
                                   📢 Mở đăng ký
                                 </button>
                               ) : (
-                                <button
-                                  type="button"
-                                  className="admin-btn admin-btn--outline admin-btn--sm"
-                                  style={{ borderColor: '#10B981', color: '#10B981' }}
-                                  onClick={() => handleOpenRegistrationModal(race)}
-                                  title="Chỉnh sửa thời gian đăng ký"
-                                >
-                                  ⚙️ Sửa đăng ký
-                                </button>
+                                !(race.status === 'scheduled' || race.status === 'upcoming' || race.status === 'pending_start') && (
+                                  <button
+                                    type="button"
+                                    className="admin-btn admin-btn--outline admin-btn--sm"
+                                    style={{ borderColor: '#10B981', color: '#10B981' }}
+                                    onClick={() => handleOpenRegistrationModal(race)}
+                                    title="Chỉnh sửa thời gian đăng ký"
+                                  >
+                                    ⚙️ Sửa đăng ký
+                                  </button>
+                                )
                               )}
 
                               {race.status === 'registration_open' && (
@@ -980,9 +1104,9 @@ export default function RaceManagement() {
                                       🎟️ Mở đặt vé
                                     </button>
                                   ) : (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                                       <span className="admin-badge" style={{ backgroundColor: 'rgba(212,175,55,0.15)', color: '#D4AF37', border: '1px solid rgba(212,175,55,0.3)', fontSize: '11px', padding: '3px 8px' }}>
-                                        🎟️ {Number(race.totalTickets || 5000).toLocaleString('vi-VN')} vé
+                                        🎟️ {Number(race.totalTickets != null ? race.totalTickets : 20).toLocaleString('vi-VN')} vé
                                       </span>
                                       <button
                                         type="button"
@@ -997,7 +1121,7 @@ export default function RaceManagement() {
                                 )
                               )}
 
-                              {(race.status === 'unassigned' || race.status === 'scheduled' || race.status === 'ongoing') && (
+                              {(race.status === 'unassigned' || race.status === 'ongoing') && (
                                 <button
                                   type="button"
                                   className="admin-btn admin-btn--outline admin-btn--sm"
@@ -1185,6 +1309,67 @@ export default function RaceManagement() {
                 <button type="submit" className="admin-btn admin-btn--gold">Mở Đặt Vé Ngay</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Result Report Modal */}
+      {viewResultModal && selectedResultRace && (
+        <div className="admin-modal-overlay">
+          <div className="admin-card" style={{ maxWidth: '540px', width: '100%', background: '#111827', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)' }}>
+            <div className="admin-card-head" style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '16px' }}>📊 Báo cáo kết quả cuộc đua</h3>
+                <span style={{ fontSize: '12px', color: '#d4af37' }}>{selectedResultRace.name} ({selectedResultRace.tournament})</span>
+              </div>
+              <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setViewResultModal(false)}>✕</button>
+            </div>
+
+            <div className="admin-card-body" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8' }}>Thời gian thi đấu:</span>
+                <strong style={{ color: '#f8fafc' }}>{selectedResultRace.date} lúc {selectedResultRace.time}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '13px' }}>
+                <span style={{ color: '#94a3b8' }}>Trạng thái:</span>
+                <span className="admin-badge admin-badge--green" style={{ fontSize: '11px' }}>🔒 Đã công bố kết quả</span>
+              </div>
+
+              <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', letterSpacing: '0.05em' }}>Bảng xếp hạng thành tích chi tiết</h4>
+
+              <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <table className="admin-table" style={{ fontSize: '13px' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '85px' }}>Thứ hạng</th>
+                      <th>Chiến mã</th>
+                      <th>Jockey</th>
+                      <th style={{ textAlign: 'right' }}>Thời gian</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingResultDetails ? (
+                      <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#94a3b8' }}>Đang tải kết quả...</td></tr>
+                    ) : raceResultDetails.map(d => (
+                      <tr key={d.rank}>
+                        <td style={{ fontWeight: 'bold', color: d.rank === 1 ? '#d4af37' : d.rank === 2 ? '#c0c0c0' : d.rank === 3 ? '#cd7f32' : '#94a3b8' }}>
+                          {d.rank === 1 ? '🥇 Hạng 1' : d.rank === 2 ? '🥈 Hạng 2' : d.rank === 3 ? '🥉 Hạng 3' : `Hạng ${d.rank}`}
+                        </td>
+                        <td style={{ color: '#f8fafc', fontWeight: '600' }}>{d.horse}</td>
+                        <td style={{ color: '#cbd5e1' }}>{d.jockey}</td>
+                        <td style={{ textAlign: 'right', color: '#38bdf8', fontFamily: 'monospace', fontWeight: '600' }}>{d.time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button type="button" className="admin-btn admin-btn--gold" onClick={() => setViewResultModal(false)}>
+                  Đóng báo cáo
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -61,6 +61,17 @@ export default function SpectatorPredictions() {
     return []
   })
 
+  const getRaceTicket = (raceId, raceName) => {
+    if (!userPreds || userPreds.length === 0) return null
+    return userPreds.find(p => {
+      if (p.raceId && raceId && Number(p.raceId) === Number(raceId)) return true
+      const pName = (p.raceName || p.race || '').toLowerCase()
+      const rName = (raceName || '').toLowerCase()
+      if (pName && rName && (pName.includes(rName) || rName.includes(pName))) return true
+      return false
+    })
+  }
+
   const handleCancelPredictionTicket = async (predId) => {
     if (!window.confirm('Bạn có chắc chắn muốn HỦY cược dự đoán này và HOÀN TIỀN cọc về ví tài khoản?')) return
     try {
@@ -148,7 +159,7 @@ export default function SpectatorPredictions() {
         try {
           const apiHistoryRes = await getSpectatorTicketHistory(targetSpectatorId)
           const apiHistoryList = Array.isArray(apiHistoryRes) ? apiHistoryRes : (apiHistoryRes?.data || [])
-          
+
           const formattedHistory = apiHistoryList.map(item => ({
             id: item.ticketId || item.id,
             ticketCode: item.ticketCode || `TKT-${item.ticketId || item.id}`,
@@ -210,7 +221,12 @@ export default function SpectatorPredictions() {
 
   const handleSelectPool = (pool) => {
     setSelectedPool(pool)
-    setPredictedHorse('')
+    const existingTicket = getRaceTicket(pool.id, pool.raceName)
+    if (existingTicket) {
+      setPredictedHorse(existingTicket.horseName || existingTicket.horse || '')
+    } else {
+      setPredictedHorse('')
+    }
     setTicketType('standard')
   }
 
@@ -291,11 +307,11 @@ export default function SpectatorPredictions() {
       setPools(pools.map(p =>
         p.id === selectedPool.id
           ? {
-              ...p,
-              totalPool: p.totalPool + ticketPriceVal,
-              participants: p.participants + 1,
-              remainingTickets: newRemainingTickets
-            }
+            ...p,
+            totalPool: p.totalPool + ticketPriceVal,
+            participants: p.participants + 1,
+            remainingTickets: newRemainingTickets
+          }
           : p
       ))
 
@@ -334,175 +350,242 @@ export default function SpectatorPredictions() {
               <h3>Các cuộc đua đang mở cổng dự đoán</h3>
             </div>
             <div className="admin-card-body" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {pools.map(p => (
-                <div
-                  key={p.id}
-                  onClick={() => handleSelectPool(p)}
-                  style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: selectedPool?.id === p.id ? '1px solid #d4af37' : '1px solid rgba(255, 255, 255, 0.05)',
-                    background: selectedPool?.id === p.id ? 'rgba(212, 175, 55, 0.05)' : 'rgba(18, 18, 18, 0.5)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  className="pool-item-card"
-                >
-                  <div>
-                    <strong style={{ color: '#fff', fontSize: '15px', display: 'block' }}>{p.raceName}</strong>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
-                      <span>💰 Quỹ cược: <strong style={{ color: '#d4af37' }}>{formatCurrency(p.totalPool)}</strong></span>
-                      <span style={{ marginLeft: '12px' }}>🎟️ <strong style={{ color: '#4ade80' }}>{p.remainingTickets != null ? p.remainingTickets : 20}</strong> vé còn lại</span>
+              {pools.map(p => {
+                const boughtTicket = getRaceTicket(p.id, p.raceName)
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => handleSelectPool(p)}
+                    style={{
+                      padding: '16px',
+                      borderRadius: '12px',
+                      border: selectedPool?.id === p.id ? '1px solid #d4af37' : (boughtTicket ? '1px solid rgba(74, 222, 128, 0.4)' : '1px solid rgba(255, 255, 255, 0.05)'),
+                      background: selectedPool?.id === p.id ? 'rgba(212, 175, 55, 0.05)' : (boughtTicket ? 'rgba(34, 197, 94, 0.06)' : 'rgba(18, 18, 18, 0.5)'),
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    className="pool-item-card"
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <strong style={{ color: '#fff', fontSize: '15px' }}>{p.raceName}</strong>
+                        {boughtTicket && (
+                          <span style={{
+                            background: 'rgba(34, 197, 94, 0.2)',
+                            color: '#4ade80',
+                            border: '1px solid rgba(74, 222, 128, 0.4)',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 'bold'
+                          }}>
+                            🎟️ Đã mua vé
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                        <span>🎟️ <strong style={{ color: '#4ade80' }}>{p.remainingTickets != null ? p.remainingTickets : 20}</strong> vé còn lại</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                      <StatusBadge status={p.status} />
+                      <span style={{ fontSize: '10px', color: '#666' }}>Hạn: {p.endDate.split(' ')[0]}</span>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                    <StatusBadge status={p.status} />
-                    <span style={{ fontSize: '10px', color: '#666' }}>Hạn: {p.endDate.split(' ')[0]}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
 
         {/* Right Column: Detailed Race & Prediction Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {selectedPool ? (
-            <div className="admin-card" style={{ border: '1px solid rgba(212, 175, 55, 0.25)' }}>
-              <div className="admin-card-head">
-                <h3>Chi tiết cuộc đua & Đặt mua vé</h3>
-                <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedPool(null)}>✕</button>
-              </div>
-
-              <div className="admin-card-body" style={{ padding: '20px' }}>
-                {/* Race summary details */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
-                  <div><span style={{ color: '#888' }}>Cuộc đua:</span> <strong style={{ color: '#fff' }}>{selectedPool.raceName}</strong></div>
-                  <div><span style={{ color: '#888' }}>Quỹ cược:</span> <strong style={{ color: '#d4af37' }}>{formatCurrency(selectedPool.totalPool)}</strong></div>
-                  <div><span style={{ color: '#888' }}>Hạn đóng vé:</span> <strong style={{ color: '#fff' }}>{selectedPool.endDate}</strong></div>
-                  <div><span style={{ color: '#888' }}>Số vé còn lại:</span> <strong style={{ color: '#4ade80' }}>{selectedPool.remainingTickets != null ? selectedPool.remainingTickets : 20} vé</strong></div>
+          {selectedPool ? (() => {
+            const currentBoughtTicket = getRaceTicket(selectedPool.id, selectedPool.raceName)
+            return (
+              <div className="admin-card" style={{ border: '1px solid rgba(212, 175, 55, 0.25)' }}>
+                <div className="admin-card-head">
+                  <h3>Chi tiết cuộc đua & Đặt mua vé</h3>
+                  <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedPool(null)}>✕</button>
                 </div>
 
-                {/* Sơ đồ làn chạy (Runners) */}
-                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', letterSpacing: '0.05em' }}>
-                  Sơ đồ làn chạy & Thông tin ngựa/jockey
-                </h4>
+                <div className="admin-card-body" style={{ padding: '20px' }}>
+                  {/* Banner nếu khán giả đã mua vé cuộc đua này */}
+                  {currentBoughtTicket && (
+                    <div style={{
+                      background: 'rgba(34, 197, 94, 0.12)',
+                      border: '1px solid rgba(74, 222, 128, 0.4)',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      marginBottom: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '10px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '24px' }}>🎟️</span>
+                        <div>
+                          <strong style={{ color: '#4ade80', fontSize: '14px', display: 'block' }}>Bạn đã mua vé cho cuộc đua này!</strong>
+                          <span style={{ color: '#ccc', fontSize: '12px' }}>
+                            Mã vé: <code style={{ color: '#d4af37', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{currentBoughtTicket.ticketCode || `#${currentBoughtTicket.id}`}</code>
+                            {' | '}Ngựa dự đoán: <strong style={{ color: '#4ade80' }}>{currentBoughtTicket.horseName || currentBoughtTicket.horse}</strong>
+                          </span>
+                        </div>
+                      </div>
+                      <span style={{ background: '#166534', color: '#86efac', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                        Đã Mua Vé
+                      </span>
+                    </div>
+                  )}
 
-                <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '20px' }}>
-                  <table className="admin-table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '50px' }}>Làn</th>
-                        <th>Ngựa Đua</th>
-                        <th>Jockey (Nài)</th>
-                        <th style={{ width: '100px', textAlign: 'center' }}>Chọn dự đoán</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loadingRunners ? (
+                  {/* Race summary details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px' }}>
+                    <div><span style={{ color: '#888' }}>Cuộc đua:</span> <strong style={{ color: '#fff' }}>{selectedPool.raceName}</strong></div>
+                    <div><span style={{ color: '#888' }}>Hạn đóng vé:</span> <strong style={{ color: '#fff' }}>{selectedPool.endDate}</strong></div>
+                    <div><span style={{ color: '#888' }}>Số vé còn lại:</span> <strong style={{ color: '#4ade80' }}>{selectedPool.remainingTickets != null ? selectedPool.remainingTickets : 20} vé</strong></div>
+                  </div>
+
+                  {/* Sơ đồ làn chạy (Runners) */}
+                  <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#d4af37', marginBottom: '10px', letterSpacing: '0.05em' }}>
+                    Sơ đồ làn chạy & Thông tin ngựa/jockey
+                  </h4>
+
+                  <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '20px' }}>
+                    <table className="admin-table" style={{ fontSize: '13px' }}>
+                      <thead>
                         <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
-                            ⏳ Đang tải sơ đồ làn chạy...
-                          </td>
+                          <th style={{ width: '50px' }}>Làn</th>
+                          <th>Ngựa Đua</th>
+                          <th>Jockey (Nài)</th>
+                          <th style={{ width: '100px', textAlign: 'center' }}>Chọn dự đoán</th>
                         </tr>
-                      ) : (selectedPool?.runners && selectedPool.runners.length > 0) ? (
-                        selectedPool.runners.map(r => (
-                          <tr
-                            key={r.lane || r.horse}
-                            onClick={() => setPredictedHorse(r.horse)}
-                            style={{ cursor: 'pointer', background: predictedHorse === r.horse ? 'rgba(212, 175, 55, 0.04)' : 'transparent' }}
-                          >
-                            <td style={{ fontWeight: 'bold', color: '#d4af37' }}>#{r.lane}</td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <strong style={{ color: '#fff' }}>{r.horse}</strong>
-                                <button
-                                  type="button"
-                                  className="info-icon-btn"
-                                  onClick={(e) => handleOpenHorseInfo(r.horse, e)}
-                                  title="Xem thông tin ngựa"
-                                >
-                                  ℹ
-                                </button>
-                              </div>
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span>{r.jockey}</span>
-                                <button
-                                  type="button"
-                                  className="info-icon-btn"
-                                  onClick={(e) => handleOpenJockeyInfo(r.jockey, e)}
-                                  title="Xem thông tin Jockey"
-                                >
-                                  ℹ
-                                </button>
-                              </div>
-                            </td>
-                            <td style={{ textAlign: 'center' }}>
-                              <input
-                                type="radio"
-                                name="predictedHorse"
-                                checked={predictedHorse === r.horse}
-                                onChange={() => setPredictedHorse(r.horse)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
+                      </thead>
+                      <tbody>
+                        {loadingRunners ? (
+                          <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                              ⏳ Đang tải sơ đồ làn chạy...
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
-                            Chưa có danh sách ngựa đua cho lượt thi này.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (selectedPool?.runners && selectedPool.runners.length > 0) ? (
+                          selectedPool.runners.map(r => {
+                            const isSelectedInTicket = currentBoughtTicket && ((currentBoughtTicket.horseName || currentBoughtTicket.horse) === r.horse)
+                            return (
+                              <tr
+                                key={r.lane || r.horse}
+                                onClick={() => !currentBoughtTicket && setPredictedHorse(r.horse)}
+                                style={{
+                                  cursor: currentBoughtTicket ? 'default' : 'pointer',
+                                  background: (predictedHorse === r.horse || isSelectedInTicket) ? 'rgba(212, 175, 55, 0.04)' : 'transparent'
+                                }}
+                              >
+                                <td style={{ fontWeight: 'bold', color: '#d4af37' }}>#{r.lane}</td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <strong style={{ color: '#fff' }}>{r.horse}</strong>
+                                    {isSelectedInTicket && (
+                                      <span style={{ background: 'rgba(74,222,128,0.2)', color: '#4ade80', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(74,222,128,0.3)', fontWeight: 'bold' }}>
+                                        ⭐ Vé đã chọn
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="info-icon-btn"
+                                      onClick={(e) => handleOpenHorseInfo(r.horse, e)}
+                                      title="Xem thông tin ngựa"
+                                    >
+                                      ℹ
+                                    </button>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>{r.jockey}</span>
+                                    <button
+                                      type="button"
+                                      className="info-icon-btn"
+                                      onClick={(e) => handleOpenJockeyInfo(r.jockey, e)}
+                                      title="Xem thông tin Jockey"
+                                    >
+                                      ℹ
+                                    </button>
+                                  </div>
+                                </td>
+                                <td style={{ textAlign: 'center' }}>
+                                  <input
+                                    type="radio"
+                                    name="predictedHorse"
+                                    checked={predictedHorse === r.horse || isSelectedInTicket}
+                                    disabled={Boolean(currentBoughtTicket)}
+                                    onChange={() => !currentBoughtTicket && setPredictedHorse(r.horse)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{ cursor: currentBoughtTicket ? 'not-allowed' : 'pointer' }}
+                                  />
+                                </td>
+                              </tr>
+                            )
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                              Chưa có danh sách ngựa đua cho lượt thi này.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Ticket and Prediction Booking Form */}
+                  <form onSubmit={handlePlaceBet} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', gap: '16px' }}>
+                      <div>
+                        <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Ngựa dự đoán:</span>
+                        <strong style={{ color: predictedHorse ? '#4ade80' : '#f87171', fontSize: '14px' }}>
+                          {predictedHorse || 'Chưa chọn ngựa'}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Số dư ví:</span>
+                        <strong style={{ color: '#fff', fontSize: '14px' }}>
+                          {formatCurrency(profile.balance)}
+                        </strong>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Giá vé cuộc đua:</span>
+                        <strong style={{ color: '#d4af37', fontSize: '16px' }}>
+                          {formatCurrency(selectedPool?.ticketPrice || 20000)}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div style={{ background: 'rgba(212,175,55,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.1)', fontSize: '12px', color: '#ccc' }}>
+                      <strong style={{ color: '#d4af37', display: 'block', marginBottom: '2px' }}>ℹ️ Luật chia thưởng:</strong>
+                      Khi ngựa bạn dự đoán vô địch, bạn sẽ được nhận thưởng phân chia tương ứng theo tỷ trọng giá trị vé của những người dự đoán thắng cược.
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                      <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedPool(null)}>Đóng</button>
+                      <button
+                        type="submit"
+                        className="admin-btn admin-btn--gold"
+                        disabled={!predictedHorse || Boolean(currentBoughtTicket)}
+                        style={currentBoughtTicket ? { opacity: 0.65, cursor: 'not-allowed', background: '#334155', color: '#94a3b8', border: '1px solid #475569' } : undefined}
+                      >
+                        {currentBoughtTicket ? '🔒 Đã Mua Vé (Đã Khóa Thao Tác)' : 'Thanh toán & Đặt cược'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-
-                {/* Ticket and Prediction Booking Form */}
-                <form onSubmit={handlePlaceBet} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', gap: '16px' }}>
-                    <div>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Ngựa dự đoán:</span>
-                      <strong style={{ color: predictedHorse ? '#4ade80' : '#f87171', fontSize: '14px' }}>
-                        {predictedHorse || 'Chưa chọn ngựa'}
-                      </strong>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Số dư ví:</span>
-                      <strong style={{ color: '#fff', fontSize: '14px' }}>
-                        {formatCurrency(profile.balance)}
-                      </strong>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Giá vé cuộc đua:</span>
-                      <strong style={{ color: '#d4af37', fontSize: '16px' }}>
-                        {formatCurrency(selectedPool?.ticketPrice || 20000)}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div style={{ background: 'rgba(212,175,55,0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(212,175,55,0.1)', fontSize: '12px', color: '#ccc' }}>
-                    <strong style={{ color: '#d4af37', display: 'block', marginBottom: '2px' }}>ℹ️ Luật chia quỹ thưởng 10%:</strong>
-                    Khi ngựa bạn dự đoán vô địch, bạn sẽ được nhận thưởng từ 10% tổng quỹ cược** của cuộc đua, được chia đều tương ứng theo tỷ trọng giá trị vé của những người thắng cược.
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                    <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedPool(null)}>Hủy bỏ</button>
-                    <button type="submit" className="admin-btn admin-btn--gold" disabled={!predictedHorse}>
-                      Thanh toán & Đặt cược
-                    </button>
-                  </div>
-                </form>
               </div>
-            </div>
-          ) : (
+            )
+          })() : (
             <div className="admin-card" style={{ border: '1px dashed rgba(255,255,255,0.1)', background: 'transparent', height: '100%', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <div style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
                 <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>⚖</span>

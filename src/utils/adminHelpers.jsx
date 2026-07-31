@@ -29,12 +29,13 @@ const STATUS_MAP = {
   low: 'gray',
   vip: 'purple',
   standard: 'gray',
-  premium: 'gold',
+  published: 'green',
   retired: 'gray',
   injured: 'red',
 }
 
 const STATUS_LABELS = {
+  published: 'Đã công bố kết quả',
   active: 'Đang hoạt động',
   locked: 'Bị khóa',
   pending: 'Chờ duyệt',

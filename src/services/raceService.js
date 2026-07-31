@@ -71,6 +71,17 @@ export async function openRaceTicketSales(raceId, payload) {
 }
 
 /**
+ * Đóng bán vé cuộc đua cho khán giả từ Swagger API.
+ * Endpoint: POST /v1/tickets/races/{raceId}/close-sales
+ * Header: Authorization: Bearer <token>
+ * @param {string|number} raceId
+ */
+export async function closeRaceTicketSales(raceId) {
+  const res = await apiClient.post(`/v1/tickets/races/${raceId}/close-sales`)
+  return res.data
+}
+
+/**
  * Lấy danh sách các cuộc đua đang MỞ BÁN VÉ cho khán giả từ Swagger API.
  * Endpoint: GET /v1/tickets/races/open-sales
  */

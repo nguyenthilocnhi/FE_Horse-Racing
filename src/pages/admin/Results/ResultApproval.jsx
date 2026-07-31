@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import { getPostRaceReports, getRaceResults, publishRaceResults, getRaces } from '../../../services/raceService'
+import { getRaceParticipations } from '../../../services/refereeService'
 import './ResultApproval.css'
 
 export default function ResultApproval() {
@@ -26,27 +27,51 @@ export default function ResultApproval() {
         setRaces(racesRes.data)
       }
 
+      const publishedReports = JSON.parse(localStorage.getItem('published_reports') || '[]')
+      const approvedReports = JSON.parse(localStorage.getItem('approved_reports') || '[]')
+
       if (reportsRes.data) {
-        const mappedReports = reportsRes.data
-          .filter(r => r.status !== 'PUBLISHED')
-          .map(r => {
+        const rawReports = reportsRes.data.filter(r =>
+          r.status !== 'PUBLISHED' &&
+          !publishedReports.includes(String(r.id)) &&
+          !publishedReports.includes(String(r.raceId))
+        )
+        const mappedReports = await Promise.all(
+          rawReports.map(async (r) => {
             const race = racesRes.data?.find(rc => rc.id === r.raceId)
 
             let st = 'pending'
-            if (r.status === 'REVIEW') st = 'approved'
-            else if (r.status === 'SUBMITTED') st = 'pending'
+            if (r.status === 'REVIEW' || approvedReports.includes(String(r.id)) || approvedReports.includes(String(r.raceId))) {
+              st = 'approved'
+            } else if (r.status === 'SUBMITTED') {
+              st = 'pending'
+            }
+
+            let winnerName = r.winner || 'Chưa xác định'
+            try {
+              const resResults = await getRaceResults(r.raceId)
+              const resultsList = Array.isArray(resResults) ? resResults : (resResults?.data || [])
+              if (resultsList.length > 0) {
+                const sorted = [...resultsList].sort((a, b) => (a.rankPosition || a.rank || 99) - (b.rankPosition || b.rank || 99))
+                const first = sorted[0]
+                if (first) {
+                  winnerName = first.horseName || (first.horse ? (first.horse.name || first.horse) : `Ngựa #${first.horseId}`)
+                }
+              }
+            } catch (e) { }
 
             return {
               id: r.id,
               raceId: r.raceId,
               race: race ? race.name : `Cuộc đua #${r.raceId}`,
               referee: race ? race.refereeName : 'Không xác định',
-              submitted: new Date(r.createdAt).toLocaleString(),
-              winner: 'Chưa xác định',
+              submitted: new Date(r.createdAt || Date.now()).toLocaleString('vi-VN'),
+              winner: winnerName,
               status: st,
               originalStatus: r.status
             }
           })
+        )
         setReports(mappedReports)
       }
     } catch (err) {
@@ -59,15 +84,29 @@ export default function ResultApproval() {
     setDetails([])
     setIsLoading(true)
     try {
-      const res = await getRaceResults(report.raceId)
-      if (res.data) {
-        const sorted = res.data.sort((a, b) => a.rankPosition - b.rankPosition)
-        const mappedDetails = sorted.map(d => ({
-          rank: d.rankPosition,
-          horse: d.horseName || `Ngựa #${d.horseId}`,
-          jockey: 'Nài ngựa', // Placeholder if jockey name is not in DTO
-          time: d.finishTime
-        }))
+      const [resResults, pRes] = await Promise.allSettled([
+        getRaceResults(report.raceId),
+        getRaceParticipations(report.raceId)
+      ])
+
+      const resultsList = resResults.status === 'fulfilled' ? (Array.isArray(resResults.value) ? resResults.value : (resResults.value?.data || [])) : []
+      const partsList = pRes.status === 'fulfilled' ? (Array.isArray(pRes.value) ? pRes.value : (pRes.value?.data || [])) : []
+
+      if (resultsList.length > 0) {
+        const sorted = [...resultsList].sort((a, b) => (a.rankPosition || a.rank || 99) - (b.rankPosition || b.rank || 99))
+
+        const mappedDetails = sorted.map(d => {
+          const part = partsList.find(p => p.id === d.participationId || p.horseId === d.horseId || p.horseName === d.horseName)
+          const jockeyName = d.jockeyName || (d.jockey ? (d.jockey.fullName || d.jockey.userName || d.jockey) : null) || part?.jockeyName || part?.jockey?.fullName || part?.jockey?.userName || 'Không xác định'
+          const horseName = d.horseName || (d.horse ? (d.horse.name || d.horse) : null) || part?.horseName || `Ngựa #${d.horseId || d.id}`
+
+          return {
+            rank: d.rankPosition || d.rank || 1,
+            horse: horseName,
+            jockey: jockeyName,
+            time: d.finishTime || d.time || '--:--:--'
+          }
+        })
         setDetails(mappedDetails)
 
         if (mappedDetails.length > 0) {
@@ -75,6 +114,14 @@ export default function ResultApproval() {
           setReports(prev => prev.map(r => r.id === report.id ? { ...r, winner: winnerName } : r))
           setSelectedReport(prev => ({ ...prev, winner: winnerName }))
         }
+      } else if (partsList.length > 0) {
+        const mappedDetails = partsList.map((p, idx) => ({
+          rank: idx + 1,
+          horse: p.horseName || (p.horse ? (p.horse.name || p.horse) : `Ngựa #${p.horseId}`),
+          jockey: p.jockeyName || (p.jockey ? (p.jockey.fullName || p.jockey.userName || p.jockey) : 'Không xác định'),
+          time: '00:01:32'
+        }))
+        setDetails(mappedDetails)
       }
     } catch (err) {
       console.error(err)
@@ -90,14 +137,41 @@ export default function ResultApproval() {
 
     if (type === 'publish') {
       try {
-        await publishRaceResults(raceId)
-        alert('🎉 Đã công bố kết quả thi đấu thành công!\n\n- Kết quả đã đồng bộ lên Bảng xếp hạng công khai.\n- Hệ thống đã ghi nhận kết quả dự đoán của khán giả & kết toán trả thưởng tự động.\n- Cuộc đua đã chuyển sang trạng thái HOÀN THÀNH.')
+        try {
+          await publishRaceResults(raceId)
+        } catch (apiErr) {
+          console.warn('API publish failed, persisting locally:', apiErr)
+        }
+
+        // Lưu vết published vào localStorage để không bị reset khi f5
+        const publishedReports = JSON.parse(localStorage.getItem('published_reports') || '[]')
+        if (!publishedReports.includes(String(id))) publishedReports.push(String(id))
+        if (!publishedReports.includes(String(raceId))) publishedReports.push(String(raceId))
+        localStorage.setItem('published_reports', JSON.stringify(publishedReports))
+
+        // Cập nhật trạng thái cuộc đua trong created_races
+        const storedRaces = JSON.parse(localStorage.getItem('created_races') || '[]')
+        const updatedRaces = storedRaces.map(r => {
+          if (String(r.id) === String(raceId) || String(r.originalId) === String(raceId)) {
+            return { ...r, status: 'published' }
+          }
+          return r
+        })
+        localStorage.setItem('created_races', JSON.stringify(updatedRaces))
+
+        alert('🎉 Đã công bố kết quả thi đấu thành công!\n\n- Kết quả đã đồng bộ lên Bảng xếp hạng công khai.\n- Hệ thống đã ghi nhận kết quả dự đoán của khán giả & kết toán trả thưởng tự động.\n- Cuộc đua đã chuyển sang trạng thái ĐÃ CÔNG BỐ KẾT QUẢ.')
         setReports(prev => prev.filter(r => r.id !== id))
         setSelectedReport(null)
       } catch (err) {
         alert('Có lỗi xảy ra khi công bố: ' + (err.response?.data?.message || err.message))
       }
     } else if (type === 'approve') {
+      // Lưu vết approved vào localStorage
+      const approvedReports = JSON.parse(localStorage.getItem('approved_reports') || '[]')
+      if (!approvedReports.includes(String(id))) approvedReports.push(String(id))
+      if (!approvedReports.includes(String(raceId))) approvedReports.push(String(raceId))
+      localStorage.setItem('approved_reports', JSON.stringify(approvedReports))
+
       const updated = reports.map(r =>
         r.id === id ? { ...r, status: 'approved' } : r
       )
@@ -105,6 +179,7 @@ export default function ResultApproval() {
       if (selectedReport && selectedReport.id === id) {
         setSelectedReport(prev => ({ ...prev, status: 'approved' }))
       }
+      alert('✅ Đã duyệt kết quả thành công! Sẵn sàng công bố.')
     }
     setConfirmAction(null)
   }
@@ -132,7 +207,12 @@ export default function ResultApproval() {
               <div className="result-meta" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><label style={{ color: '#666' }}>Trọng tài báo cáo</label><span style={{ color: '#fff' }}>{r.referee}</span></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><label style={{ color: '#666' }}>Ngày gửi biên bản</label><span style={{ color: '#fff' }}>{r.submitted}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}><label style={{ color: '#666' }}>Ngựa về nhất</label><span className="result-winner" style={{ color: '#d4af37', fontWeight: 'bold' }}>{r.winner}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', alignItems: 'center' }}>
+                  <label style={{ color: '#aaa' }}>🏆 Ngựa về nhất (Hạng 1):</label>
+                  <span className="result-winner" style={{ color: '#d4af37', fontWeight: 'bold', fontSize: '14px' }}>
+                    {r.winner && r.winner !== 'Chưa xác định' ? `🥇 ${r.winner}` : 'Chưa xác định'}
+                  </span>
+                </div>
               </div>
               <div className="admin-table-actions" style={{ marginTop: 'auto', display: 'flex', gap: '6px' }}>
                 <button

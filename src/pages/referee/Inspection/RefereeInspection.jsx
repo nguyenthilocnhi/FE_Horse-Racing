@@ -30,10 +30,19 @@ export default function RefereeInspection() {
       for (const t of tList) {
         const sRes = await getTournamentSchedule(t.id)
         if (sRes?.data) {
-          allSchedules = [...allSchedules, ...sRes.data.map(r => ({...r, tournamentName: t.name}))]
+          allSchedules = [...allSchedules, ...sRes.data.map(r => ({ ...r, tournamentName: t.name }))]
         }
       }
       const relevantRaces = allSchedules.filter(r => (r.status === 'SCHEDULED' || r.status === 'DELAYED'))
+      relevantRaces.sort((a, b) => {
+        const idA = Number(String(a.originalId || a.id).replace(/\D/g, '')) || 0
+        const idB = Number(String(b.originalId || b.id).replace(/\D/g, '')) || 0
+        if (idB !== idA) return idB - idA
+
+        const timeA = a.startTime ? new Date(a.startTime).getTime() : 0
+        const timeB = b.startTime ? new Date(b.startTime).getTime() : 0
+        return timeB - timeA
+      })
       setRaces(relevantRaces)
     } catch (err) {
       console.error(err)
@@ -47,7 +56,12 @@ export default function RefereeInspection() {
     setSelectedRace(race)
     setErrorDetails('')
     setPreRaceReport('Đường đua và trang thiết bị đạt chuẩn.')
-    
+
+    if (race.status === 'DELAYED' || race.status === 'delayed') {
+      alert(`⛔ Cuộc đua "${race.name}" đã bị hoãn!`)
+      return
+    }
+
     if (!vettingData[race.id]) {
       try {
         setLoadingDetails(true)
@@ -80,7 +94,7 @@ export default function RefereeInspection() {
   const handleToggleCheck = (raceId, horseId, field) => {
     setVettingData(prev => ({
       ...prev,
-      [raceId]: prev[raceId].map(h => 
+      [raceId]: prev[raceId].map(h =>
         h.id === horseId ? { ...h, [field]: !h[field] } : h
       )
     }))
@@ -89,7 +103,7 @@ export default function RefereeInspection() {
   const handleNoteChange = (raceId, horseId, val) => {
     setVettingData(prev => ({
       ...prev,
-      [raceId]: prev[raceId].map(h => 
+      [raceId]: prev[raceId].map(h =>
         h.id === horseId ? { ...h, note: val } : h
       )
     }))
@@ -100,7 +114,7 @@ export default function RefereeInspection() {
 
   const handleApproveRaceStart = async (raceId) => {
     const list = vettingData[raceId] || []
-    
+
     const passedCount = list.filter(h => h.medical && h.gear && h.weight).length
     if (passedCount < 2) {
       alert('Cần ít nhất 2 ngựa vượt qua kiểm tra để đủ điều kiện xuất phát!')
@@ -127,13 +141,13 @@ export default function RefereeInspection() {
           note: h.note || (ready ? 'Passed' : 'Failed')
         }
       })
-      
+
       const payload = {
         items: inspectionItems
       }
 
       await inspectRaceParticipants(raceId, payload)
-      
+
       const reportPayload = {
         content: preRaceReport || 'Sẵn sàng xuất phát.',
         hasComplaint: false,
@@ -161,7 +175,6 @@ export default function RefereeInspection() {
           <h1 className="admin-page-title">Kiểm Tra Trước Cuộc Đua</h1>
           <p className="admin-page-sub">Kiểm tra tư cách tham gia, y tế, doping và trang bị của ngựa/nài trước khi xuất phát</p>
         </div>
-        <button onClick={fetchRaces} className="admin-btn admin-btn--primary">Làm mới</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.3fr', gap: '24px', alignItems: 'start' }}>
@@ -180,7 +193,7 @@ export default function RefereeInspection() {
                 <div style={{ textAlign: 'center', padding: '30px', color: '#666' }}>Không có cuộc đua nào đang chờ thanh tra.</div>
               ) : (
                 races.map(r => (
-                  <div 
+                  <div
                     key={r.id}
                     onClick={() => handleSelectRace(r)}
                     style={{
@@ -201,9 +214,9 @@ export default function RefereeInspection() {
                       <span style={{ fontSize: '12px', color: '#888', display: 'block', marginTop: '4px' }}>🏆 {r.tournamentName || `Giải #${r.tournamentId}`}</span>
                       <span style={{ fontSize: '11px', color: '#666' }}>Bắt đầu: {new Date(r.startTime).toLocaleString('vi-VN')}</span>
                     </div>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end'}}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
                       <StatusBadge status={r.status} />
-                      {inspectedRaces[r.id] && <span className="admin-badge admin-badge--green" style={{fontSize: '10px'}}>Đã Thanh Tra</span>}
+                      {inspectedRaces[r.id] && <span className="admin-badge admin-badge--green" style={{ fontSize: '10px' }}>Đã Thanh Tra</span>}
                     </div>
                   </div>
                 ))
@@ -221,8 +234,13 @@ export default function RefereeInspection() {
                 <button type="button" className="admin-btn admin-btn--ghost admin-btn--sm" onClick={() => setSelectedRace(null)}>✕</button>
               </div>
               <div className="admin-card-body" style={{ padding: '20px' }}>
-                
-                {loadingDetails ? (
+                {(selectedRace.status === 'DELAYED' || selectedRace.status === 'delayed') ? (
+                  <div style={{ textAlign: 'center', padding: '30px 20px', color: '#ef4444', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                    <span style={{ fontSize: '48px', display: 'block', marginBottom: '12px' }}>⛔</span>
+                    <h3 style={{ margin: '0 0 8px', color: '#ef4444', fontSize: '18px', fontWeight: '700' }}>Cuộc đua đã bị hoãn</h3>
+                    <p style={{ margin: 0, color: '#aaa', fontSize: '13px' }}>Cuộc đua này đang trong trạng thái bị hoãn. Không thể thực hiện kiểm tra thanh tra trước đua.</p>
+                  </div>
+                ) : loadingDetails ? (
                   <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
                     <div className="spinner" style={{ margin: '0 auto 16px', width: '30px', height: '30px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                     <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
@@ -244,7 +262,7 @@ export default function RefereeInspection() {
                 ) : (
                   <>
                     <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#3b82f6', marginBottom: '12px', letterSpacing: '0.05em' }}>Đánh giá thể trạng & Trang bị</h4>
-                    
+
                     <div className="admin-table-wrap" style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', marginBottom: '20px' }}>
                       <table className="admin-table" style={{ fontSize: '13px' }}>
                         <thead>
@@ -264,7 +282,7 @@ export default function RefereeInspection() {
                                 <span style={{ fontSize: '11px', color: '#888' }}>👤 {h.jockey}</span>
                               </td>
                               <td style={{ textAlign: 'center' }}>
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={h.medical}
                                   onChange={() => handleToggleCheck(selectedRace.id, h.id, 'medical')}
@@ -272,7 +290,7 @@ export default function RefereeInspection() {
                                 />
                               </td>
                               <td style={{ textAlign: 'center' }}>
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={h.gear}
                                   onChange={() => handleToggleCheck(selectedRace.id, h.id, 'gear')}
@@ -280,7 +298,7 @@ export default function RefereeInspection() {
                                 />
                               </td>
                               <td style={{ textAlign: 'center' }}>
-                                <input 
+                                <input
                                   type="checkbox"
                                   checked={h.weight}
                                   onChange={() => handleToggleCheck(selectedRace.id, h.id, 'weight')}
@@ -288,9 +306,9 @@ export default function RefereeInspection() {
                                 />
                               </td>
                               <td>
-                                <input 
-                                  type="text" 
-                                  value={h.note} 
+                                <input
+                                  type="text"
+                                  value={h.note}
                                   onChange={(e) => handleNoteChange(selectedRace.id, h.id, e.target.value)}
                                   placeholder="Tùy chọn"
                                   className="admin-input"
@@ -331,8 +349,8 @@ export default function RefereeInspection() {
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <button type="button" className="admin-btn admin-btn--ghost" onClick={() => setSelectedRace(null)} disabled={submitting}>Đóng</button>
                         {!inspectedRaces[selectedRace.id] && (
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             className="admin-btn admin-btn--gold"
                             onClick={() => handleApproveRaceStart(selectedRace.id)}
                             disabled={submitting || !vettingData[selectedRace.id] || vettingData[selectedRace.id].length === 0}
@@ -403,17 +421,17 @@ export default function RefereeInspection() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-                <button 
-                  type="button" 
-                  className="admin-btn admin-btn--ghost" 
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--ghost"
                   onClick={() => setShowConfirmModal(false)}
                   disabled={submitting}
                   style={{ minWidth: '100px' }}
                 >
                   Hủy bỏ
                 </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="admin-btn admin-btn--danger"
                   onClick={executeApproveRaceStart}
                   disabled={submitting}
