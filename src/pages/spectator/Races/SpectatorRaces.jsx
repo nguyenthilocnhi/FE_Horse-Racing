@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
-import { getRaceResults } from '../../../services/raceService'
+import { getRaces, getRaceResults } from '../../../services/raceService'
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
 import '../../admin/Races/RaceManagement.css'
 
@@ -26,12 +26,56 @@ export default function SpectatorRaces() {
       const fetchedTournaments = tourRes.data || tourRes || []
       setTournaments(fetchedTournaments)
 
+      let fetchedRaces = []
+      try {
+        const raceRes = await getRaces()
+        fetchedRaces = raceRes?.data || raceRes || []
+      } catch (err) {
+        console.warn('GET /races failed:', err)
+      }
+
+      if (Array.isArray(fetchedRaces) && fetchedRaces.length > 0) {
+        const formatted = fetchedRaces.map(s => {
+          const dateStr = s.raceDate || (s.startTime ? s.startTime.split('T')[0] : '')
+          const timeStr = s.startTime ? (s.startTime.includes('T') ? s.startTime.split('T')[1].substring(0, 5) : s.startTime.substring(0, 5)) : '00:00'
+          const endTimeStr = s.endTime ? (s.endTime.includes('T') ? s.endTime.split('T')[1].substring(0, 5) : s.endTime.substring(0, 5)) : ''
+
+          const computedSt = computeRaceStatus({
+            status: s.status,
+            refereeId: s.refereeId,
+            referee: s.refereeName,
+            date: dateStr,
+            time: timeStr,
+            endTime: endTimeStr,
+            registrationStartDate: s.registrationStartDate,
+            registrationEndDate: s.registrationEndDate
+          })
+
+          return {
+            id: `R-${s.id}`,
+            originalId: s.id,
+            name: s.name || s.raceName || 'Cuộc đua',
+            tournament: s.tournamentName || s.tournament?.name || 'Giải Đấu',
+            tournamentId: s.tournamentId || s.tournament?.id || 1,
+            date: dateStr,
+            time: timeStr,
+            endTime: endTimeStr,
+            distance: s.distance ? `${s.distance}m` : '1600m',
+            status: computedSt,
+            refereeId: s.refereeId,
+            referee: s.refereeName
+          }
+        })
+        setRaces(formatted)
+        return
+      }
+
       if (fetchedTournaments && fetchedTournaments.length > 0) {
         const allRaces = []
         for (const t of fetchedTournaments) {
           try {
             const scheduleRes = await getTournamentSchedule(t.id)
-            const schedules = scheduleRes.data || []
+            const schedules = scheduleRes.data || scheduleRes || []
             const formattedSchedules = schedules.map(s => {
               const dateStr = s.raceDate || (s.startTime ? s.startTime.split('T')[0] : '')
               const timeStr = s.startTime ? (s.startTime.includes('T') ? s.startTime.split('T')[1].substring(0, 5) : s.startTime.substring(0, 5)) : '00:00'
@@ -63,9 +107,7 @@ export default function SpectatorRaces() {
                 referee: s.refereeName
               }
             })
-            // Only keep COMPLETED or PUBLISHED
-            const finishedRaces = formattedSchedules.filter(r => r.status === 'completed' || r.status === 'published')
-            allRaces.push(...finishedRaces)
+            allRaces.push(...formattedSchedules)
           } catch (e) {
             console.error(e)
           }

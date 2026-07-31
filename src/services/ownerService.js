@@ -18,25 +18,10 @@ import apiClient from './apiClient'
 // NGỰA
 // ─────────────────────────────────────────
 
-/** Lấy danh sách ngựa của owner đang đăng nhập */
+/** Lấy danh sách ngựa của owner đang đăng nhập từ Swagger API (GET /api/owner/horses) */
 export async function getOwnerHorses() {
-  try {
-    const res = await apiClient.get('/owner/horses')
-    return res.data
-  } catch (err) {
-    console.warn('GET /owner/horses failed, trying fallback endpoints:', err)
-    try {
-      const altRes = await apiClient.get('/horses/my-horses')
-      return altRes.data
-    } catch (e2) {
-      try {
-        const altRes2 = await apiClient.get('/horses')
-        return altRes2.data
-      } catch (e3) {
-        return []
-      }
-    }
-  }
+  const res = await apiClient.get('/owner/horses')
+  return res.data
 }
 
 /**

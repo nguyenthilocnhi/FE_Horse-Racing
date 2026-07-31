@@ -1,36 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { mockPredictions as initialPools, mockUserPredictions as initialUserPreds } from '../../../data/adminMockData'
 import { StatusBadge, formatCurrency } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
+import { getRaceParticipations, getOpenTicketRaces, purchaseRaceTicket } from '../../../services/raceService'
 import { createPrediction, cancelPrediction } from '../../../services/predictionService'
+import { getSpectatorProfile, getSpectatorTicketHistory } from '../../../services/spectatorService'
 import { useAuth } from '../../../contexts/AuthContext'
 import './SpectatorPredictions.css'
-
-const MOCK_HORSES_DETAILS = [
-  { id: 1, name: 'Aurelius', age: 4, gender: 'Ngựa đực (Stallion)', breed: 'Thoroughbred', owner: 'Stable Alpha', wins: 12, races: 18, points: 2450 },
-  { id: 2, name: 'Midnight Star', age: 5, gender: 'Ngựa cái (Mare)', breed: 'Arabian', owner: 'Blue Ridge Farm', wins: 9, races: 16, points: 2280 },
-  { id: 3, name: 'Velvet Thunder', age: 3, gender: 'Ngựa thiến (Gelding)', breed: 'Quarter Horse', owner: 'Golden Hooves', wins: 15, races: 22, points: 2150 },
-  { id: 4, name: 'Storm Rider', age: 4, gender: 'Ngựa đực (Stallion)', breed: 'Thoroughbred', owner: 'Wind Valley', wins: 6, races: 14, points: 1540 },
-]
-
-const MOCK_JOCKEYS_DETAILS = [
-  { id: 1, name: 'L. Anderson', age: 28, experience: '12 năm', license: 'JOC-2024-001', wins: 320, races: 450, points: 3200 },
-  { id: 2, name: 'M. Rodriguez', age: 24, experience: '8 năm', license: 'JOC-2023-089', wins: 289, races: 410, points: 2890 },
-  { id: 3, name: 'S. Nakamura', age: 31, experience: '10 năm', license: 'JOC-2022-114', wins: 270, races: 395, points: 2700 },
-  { id: 4, name: 'K. McEvoy', age: 22, experience: '5 năm', license: 'JOC-2025-023', wins: 120, races: 250, points: 1850 },
-]
-
-// Simulate runners for a selected race
-const MOCK_RUNNERS = [
-  { lane: 1, horse: 'Aurelius', jockey: 'L. Anderson' },
-  { lane: 2, horse: 'Midnight Star', jockey: 'M. Rodriguez' },
-  { lane: 3, horse: 'Velvet Thunder', jockey: 'S. Nakamura' },
-  { lane: 4, horse: 'Storm Rider', jockey: 'K. McEvoy' }
-]
 
 export default function SpectatorPredictions() {
   const [pools, setPools] = useState([])
   const [selectedPool, setSelectedPool] = useState(null)
+  const [loadingRunners, setLoadingRunners] = useState(false)
 
   // Selection states
   const [predictedHorse, setPredictedHorse] = useState('')
@@ -108,67 +88,121 @@ export default function SpectatorPredictions() {
     }
   }
 
-  // Tải danh sách cuộc đua MỞ BÁN VÉ từ LocalStorage & API
+  // Đồng bộ số dư ví của Khán giả từ API & LocalStorage
+  useEffect(() => {
+    async function syncWalletBalance() {
+      const userTxKey = `spectator_transactions_${userKey}`
+      let specProf = null
+      let pendProf = null
+      let localTxs = []
+
+      try { specProf = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || 'null') } catch (e) { }
+      try { pendProf = JSON.parse(localStorage.getItem('pending_profile') || 'null') } catch (e) { }
+      try { localTxs = JSON.parse(localStorage.getItem(userTxKey) || '[]') } catch (e) { }
+
+      let depositSum = 0
+      localTxs.forEach(t => {
+        const st = (t.status || '').toUpperCase()
+        if ((st === 'SUCCESS' || st === 'PAID') && t.amount) {
+          depositSum += Number(t.amount)
+        }
+      })
+
+      const isMatch = (specProf?.userName === user?.username) || (specProf?.email === user?.email) || (specProf?.id === user?.id)
+      const b1 = isMatch ? (specProf?.balance ?? specProf?.walletBalance) : undefined
+      const b2 = pendProf?.balance ?? pendProf?.walletBalance
+
+      let latestBalance = Math.max(
+        b1 !== undefined && b1 !== null ? Number(b1) : 0,
+        b2 !== undefined && b2 !== null && (pendProf?.email === user?.email || pendProf?.userName === user?.username) ? Number(b2) : 0,
+        depositSum
+      )
+
+      try {
+        const apiData = await getSpectatorProfile(user?.id)
+        if (apiData) {
+          const apiBal = apiData.walletBalance ?? apiData.balance ?? apiData.wallet?.balance
+          if (apiBal != null && Number(apiBal) > latestBalance) {
+            latestBalance = Number(apiBal)
+          }
+        }
+      } catch (err) {
+        console.warn('GET spectator profile balance offline:', err?.message)
+      }
+
+      setProfile(prev => {
+        const updated = {
+          ...prev,
+          name: user?.fullName || user?.name || prev.name || 'Khán giả',
+          email: user?.email || prev.email || '',
+          balance: latestBalance
+        }
+        localStorage.setItem(userProfileKey, JSON.stringify(updated))
+        localStorage.setItem('spectator_profile', JSON.stringify(updated))
+        return updated
+      })
+
+      // Fetch Ticket History from Backend API (GET /api/v1/tickets/spectators/{spectatorId}/history)
+      const targetSpectatorId = user?.id || 11
+      if (targetSpectatorId) {
+        try {
+          const apiHistoryRes = await getSpectatorTicketHistory(targetSpectatorId)
+          const apiHistoryList = Array.isArray(apiHistoryRes) ? apiHistoryRes : (apiHistoryRes?.data || [])
+          
+          const formattedHistory = apiHistoryList.map(item => ({
+            id: item.ticketId || item.id,
+            ticketCode: item.ticketCode || `TKT-${item.ticketId || item.id}`,
+            predictionId: item.ticketId || item.id,
+            race: item.raceName || item.race?.name || 'Cuộc đua',
+            raceName: item.raceName || item.race?.name || 'Cuộc đua',
+            horse: item.selectedHorseName || item.horseName || item.horse?.name || 'Ngựa đua',
+            horseName: item.selectedHorseName || item.horseName || item.horse?.name || 'Ngựa đua',
+            amount: item.price || item.ticketPrice || 20000,
+            ticketType: item.ticketType || 'Standard',
+            status: item.status || 'SOLD',
+            purchaseDate: item.purchaseDate || ''
+          }))
+
+          setUserPreds(formattedHistory)
+        } catch (histErr) {
+          console.warn('GET /v1/tickets/spectators/{id}/history offline:', histErr?.message)
+          setUserPreds([])
+        }
+      }
+    }
+
+    syncWalletBalance()
+  }, [userKey, user?.id, user?.email])
+
+  // Tải danh sách cuộc đua MỞ BÁN VÉ từ Backend API
   useEffect(() => {
     async function loadOpenRegistrationPools() {
       try {
-        const localRaces = JSON.parse(localStorage.getItem('created_races') || '[]')
-        const openLocal = localRaces.filter(r => r.ticketOpen)
+        const apiRes = await getOpenTicketRaces()
+        const openRaces = Array.isArray(apiRes) ? apiRes : (apiRes?.data || [])
 
-        let loadedPools = []
-
-        if (openLocal.length > 0) {
-          loadedPools = openLocal.map(r => ({
-            id: r.id,
-            raceName: `${r.name} - ${r.tournament || 'Giải Đấu'}`,
-            totalPool: 5000000,
-            participants: r.totalTickets ? Math.floor(Math.random() * 20) + 5 : 12,
-            status: 'open',
-            endDate: r.date ? `${r.date} ${r.time || '15:00'}` : '2026-12-31',
-            runners: MOCK_RUNNERS
+        const apiPools = openRaces.map(item => ({
+          id: item.raceId || item.id,
+          raceName: `${item.raceName || 'Cuộc đua'} - ${item.tournamentName || 'Giải Đấu'}`,
+          totalPool: (item.totalTickets || 20) * (item.ticketPrice || 20000),
+          participants: (item.totalTickets || 20) - (item.remainingTickets || 0),
+          totalTickets: item.totalTickets,
+          remainingTickets: item.remainingTickets,
+          ticketPrice: item.ticketPrice,
+          status: 'open',
+          endDate: item.endTime ? item.endTime.replace('T', ' ') : (item.raceDate || '2026-12-31'),
+          runners: (item.horses || []).map((h, idx) => ({
+            horseId: h.horseId || h.id || idx + 1,
+            lane: h.laneNumber != null ? Number(h.laneNumber) : idx + 1,
+            horse: h.horseName || 'Ngựa đua',
+            jockey: h.jockeyName || 'Nài ngựa'
           }))
-        }
+        }))
 
-        const res = await getAllTournaments()
-        const allTournaments = Array.isArray(res) ? res : (res?.data || [])
-        const openTournaments = allTournaments.filter(t => Boolean(t.registrationOpen) === true)
-
-        if (openTournaments.length > 0) {
-          for (const tour of openTournaments) {
-            try {
-              const schedRes = await getTournamentSchedule(tour.id)
-              const schedules = Array.isArray(schedRes) ? schedRes : (schedRes?.data || [])
-              schedules.forEach(s => {
-                if (!loadedPools.some(p => p.id === s.id || p.raceName.includes(s.name))) {
-                  loadedPools.push({
-                    id: s.id,
-                    tournamentId: tour.id,
-                    raceName: `${s.name || 'Vòng đua'} - ${tour.name}`,
-                    totalPool: 5000000,
-                    participants: 8,
-                    status: 'open',
-                    endDate: tour.endDate || '2026-12-31',
-                    runners: MOCK_RUNNERS
-                  })
-                }
-              })
-            } catch (_) { }
-          }
-        }
-
-        if (loadedPools.length > 0) {
-          setPools(loadedPools)
-        } else if (initialPools && initialPools.length > 0) {
-          setPools(initialPools)
-        } else {
-          setPools([
-            { id: 'P-1', raceName: 'Derby Một Dặm - Derby Quốc Gia', totalPool: 15000000, participants: 24, status: 'open', endDate: '2026-06-03 15:00', runners: MOCK_RUNNERS },
-            { id: 'P-2', raceName: 'Đua nước rút - Derby Quốc Gia', totalPool: 8000000, participants: 16, status: 'open', endDate: '2026-06-03 14:30', runners: MOCK_RUNNERS },
-            { id: 'P-3', raceName: 'Cúp Nhà Vô Địch - Cúp Vàng Hoàng Gia', totalPool: 22000000, participants: 32, status: 'open', endDate: '2026-09-12 16:00', runners: MOCK_RUNNERS }
-          ])
-        }
+        setPools(apiPools)
       } catch (err) {
-        console.warn('Lỗi tải cuộc đua mở vé:', err?.message)
+        console.warn('Lỗi tải cuộc đua mở vé từ API:', err?.message)
+        setPools([])
       }
     }
     loadOpenRegistrationPools()
@@ -182,68 +216,105 @@ export default function SpectatorPredictions() {
 
   const handleOpenHorseInfo = (horseName, e) => {
     e.stopPropagation()
-    const found = MOCK_HORSES_DETAILS.find(h => h.name.toLowerCase() === horseName.toLowerCase()) || {
-      name: horseName, age: 'Chưa cập nhật', gender: 'Chưa cập nhật', breed: 'Chưa rõ', owner: 'Không rõ', wins: 0, races: 0, points: 0
-    }
-    setSelectedHorseDetail(found)
+    setSelectedHorseDetail({
+      name: horseName,
+      age: 'Chưa cập nhật',
+      gender: 'Chưa cập nhật',
+      breed: 'Chưa rõ',
+      owner: 'Chưa rõ',
+      wins: 0,
+      races: 0,
+      points: 0
+    })
   }
 
   const handleOpenJockeyInfo = (jockeyName, e) => {
     e.stopPropagation()
-    const found = MOCK_JOCKEYS_DETAILS.find(j => j.name.toLowerCase() === jockeyName.toLowerCase()) || {
-      name: jockeyName, age: 'Chưa cập nhật', experience: 'Chưa rõ', license: 'Chưa cấp', wins: 0, races: 0, points: 0
-    }
-    setSelectedJockeyDetail(found)
+    setSelectedJockeyDetail({
+      name: jockeyName,
+      age: 'Chưa cập nhật',
+      experience: 'Chưa rõ',
+      license: 'Chưa cấp',
+      wins: 0,
+      races: 0,
+      points: 0
+    })
   }
 
-  const handlePlaceBet = (e) => {
+  const handlePlaceBet = async (e) => {
     e.preventDefault()
     if (!predictedHorse) {
       alert('Vui lòng chọn ngựa đua dự đoán thắng cuộc!')
       return
     }
 
-    const finalAmount = ticketType === 'vip' ? 300000 : 100000
-    const finalTypeName = ticketType === 'vip' ? 'VIP' : 'Standard'
+    const runner = selectedPool?.runners?.find(r => r.horse === predictedHorse)
+    const horseId = runner?.horseId || 11
+    const spectatorId = user?.id || profile?.id || 11
+    const raceId = selectedPool?.id || 14
+    const finalAmount = selectedPool?.ticketPrice || 20000
+    const finalTypeName = 'Vé xem đua'
 
-    if (profile.balance < finalAmount) {
-      alert(`⚠️ Số dư ví không đủ! Bạn cần ít nhất ${formatCurrency(finalAmount)} để mua vé này.`)
-      return
+    try {
+      // Gọi API Mua vé từ Swagger: POST /v1/tickets/races/{raceId}/purchase
+      const ticketRes = await purchaseRaceTicket(raceId, {
+        spectatorId: Number(spectatorId),
+        horseId: Number(horseId)
+      })
+
+      const ticketData = ticketRes?.data || ticketRes || {}
+      const ticketPriceVal = ticketData.price || finalAmount
+      const boughtHorseName = ticketData.selectedHorseName || predictedHorse
+      const newRemainingTickets = ticketData.remainingTickets != null ? ticketData.remainingTickets : Math.max(0, (selectedPool.remainingTickets != null ? selectedPool.remainingTickets : 20) - 1)
+
+      // Deduct balance and sync to localStorage
+      const updatedProfile = { ...profile, balance: Math.max(0, profile.balance - ticketPriceVal) }
+      setProfile(updatedProfile)
+      localStorage.setItem(userProfileKey, JSON.stringify(updatedProfile))
+      localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
+
+      // Add new prediction entry from API response and sync to localStorage
+      const newPred = {
+        id: ticketData.ticketId || ticketData.id || Date.now(),
+        ticketCode: ticketData.ticketCode || '',
+        race: ticketData.raceName || selectedPool.raceName,
+        amount: ticketPriceVal,
+        horse: boughtHorseName,
+        ticketType: finalTypeName,
+        status: ticketData.status || 'SOLD'
+      }
+      const updatedUserPreds = [newPred, ...userPreds]
+      setUserPreds(updatedUserPreds)
+      localStorage.setItem('spectator_user_preds', JSON.stringify(updatedUserPreds))
+
+      // Update pool state locally with actual remainingTickets from API response
+      setPools(pools.map(p =>
+        p.id === selectedPool.id
+          ? {
+              ...p,
+              totalPool: p.totalPool + ticketPriceVal,
+              participants: p.participants + 1,
+              remainingTickets: newRemainingTickets
+            }
+          : p
+      ))
+
+      setSuccessModal({
+        race: ticketData.raceName || selectedPool.raceName,
+        ticketType: finalTypeName,
+        horse: boughtHorseName,
+        amount: ticketPriceVal
+      })
+      setSelectedPool(null)
+    } catch (err) {
+      console.warn('POST /v1/tickets/races/{raceId}/purchase error:', err)
+      const errorMsg = err?.response?.data || err?.message || ''
+      if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('insufficient wallet balance')) {
+        alert(`⚠️ Số dư ví không đủ! Bạn cần ít nhất ${formatCurrency(finalAmount)} để mua vé này. Vui lòng nạp thêm tiền vào ví tài khoản.`)
+        return
+      }
+      alert('Lỗi mua vé: ' + (typeof errorMsg === 'string' ? errorMsg : 'Không thể thực hiện mua vé.'))
     }
-
-    // Deduct balance and sync to localStorage
-    const updatedProfile = { ...profile, balance: profile.balance - finalAmount }
-    setProfile(updatedProfile)
-    localStorage.setItem(userProfileKey, JSON.stringify(updatedProfile))
-    localStorage.setItem('spectator_profile', JSON.stringify(updatedProfile))
-
-    // Add new prediction entry and sync to localStorage
-    const newPred = {
-      id: Date.now(),
-      race: selectedPool.raceName,
-      amount: finalAmount,
-      horse: predictedHorse,
-      ticketType: finalTypeName,
-      status: 'pending'
-    }
-    const updatedUserPreds = [newPred, ...userPreds]
-    setUserPreds(updatedUserPreds)
-    localStorage.setItem('spectator_user_preds', JSON.stringify(updatedUserPreds))
-
-    // Update pool state locally
-    setPools(pools.map(p =>
-      p.id === selectedPool.id
-        ? { ...p, totalPool: p.totalPool + finalAmount, participants: p.participants + 1 }
-        : p
-    ))
-
-    setSuccessModal({
-      race: selectedPool.raceName,
-      ticketType: finalTypeName,
-      horse: predictedHorse,
-      amount: finalAmount
-    })
-    setSelectedPool(null)
   }
 
   return (
@@ -284,7 +355,7 @@ export default function SpectatorPredictions() {
                     <strong style={{ color: '#fff', fontSize: '15px', display: 'block' }}>{p.raceName}</strong>
                     <div style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
                       <span>💰 Quỹ cược: <strong style={{ color: '#d4af37' }}>{formatCurrency(p.totalPool)}</strong></span>
-                      <span style={{ marginLeft: '12px' }}>👥 {p.participants} vé</span>
+                      <span style={{ marginLeft: '12px' }}>🎟️ <strong style={{ color: '#4ade80' }}>{p.remainingTickets != null ? p.remainingTickets : 20}</strong> vé còn lại</span>
                     </div>
                   </div>
 
@@ -313,7 +384,7 @@ export default function SpectatorPredictions() {
                   <div><span style={{ color: '#888' }}>Cuộc đua:</span> <strong style={{ color: '#fff' }}>{selectedPool.raceName}</strong></div>
                   <div><span style={{ color: '#888' }}>Quỹ cược:</span> <strong style={{ color: '#d4af37' }}>{formatCurrency(selectedPool.totalPool)}</strong></div>
                   <div><span style={{ color: '#888' }}>Hạn đóng vé:</span> <strong style={{ color: '#fff' }}>{selectedPool.endDate}</strong></div>
-                  <div><span style={{ color: '#888' }}>Số vé đã bán:</span> <strong style={{ color: '#fff' }}>{selectedPool.participants} vé</strong></div>
+                  <div><span style={{ color: '#888' }}>Số vé còn lại:</span> <strong style={{ color: '#4ade80' }}>{selectedPool.remainingTickets != null ? selectedPool.remainingTickets : 20} vé</strong></div>
                 </div>
 
                 {/* Sơ đồ làn chạy (Runners) */}
@@ -332,75 +403,73 @@ export default function SpectatorPredictions() {
                       </tr>
                     </thead>
                     <tbody>
-                      {MOCK_RUNNERS.map(r => (
-                        <tr
-                          key={r.lane}
-                          onClick={() => setPredictedHorse(r.horse)}
-                          style={{ cursor: 'pointer', background: predictedHorse === r.horse ? 'rgba(212, 175, 55, 0.04)' : 'transparent' }}
-                        >
-                          <td style={{ fontWeight: 'bold', color: '#d4af37' }}>#{r.lane}</td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <strong style={{ color: '#fff' }}>{r.horse}</strong>
-                              <button
-                                type="button"
-                                className="info-icon-btn"
-                                onClick={(e) => handleOpenHorseInfo(r.horse, e)}
-                                title="Xem thông tin ngựa"
-                              >
-                                ℹ
-                              </button>
-                            </div>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>{r.jockey}</span>
-                              <button
-                                type="button"
-                                className="info-icon-btn"
-                                onClick={(e) => handleOpenJockeyInfo(r.jockey, e)}
-                                title="Xem thông tin Jockey"
-                              >
-                                ℹ
-                              </button>
-                            </div>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <input
-                              type="radio"
-                              name="predictedHorse"
-                              checked={predictedHorse === r.horse}
-                              onChange={() => setPredictedHorse(r.horse)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
+                      {loadingRunners ? (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                            ⏳ Đang tải sơ đồ làn chạy...
                           </td>
                         </tr>
-                      ))}
+                      ) : (selectedPool?.runners && selectedPool.runners.length > 0) ? (
+                        selectedPool.runners.map(r => (
+                          <tr
+                            key={r.lane || r.horse}
+                            onClick={() => setPredictedHorse(r.horse)}
+                            style={{ cursor: 'pointer', background: predictedHorse === r.horse ? 'rgba(212, 175, 55, 0.04)' : 'transparent' }}
+                          >
+                            <td style={{ fontWeight: 'bold', color: '#d4af37' }}>#{r.lane}</td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <strong style={{ color: '#fff' }}>{r.horse}</strong>
+                                <button
+                                  type="button"
+                                  className="info-icon-btn"
+                                  onClick={(e) => handleOpenHorseInfo(r.horse, e)}
+                                  title="Xem thông tin ngựa"
+                                >
+                                  ℹ
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>{r.jockey}</span>
+                                <button
+                                  type="button"
+                                  className="info-icon-btn"
+                                  onClick={(e) => handleOpenJockeyInfo(r.jockey, e)}
+                                  title="Xem thông tin Jockey"
+                                >
+                                  ℹ
+                                </button>
+                              </div>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input
+                                type="radio"
+                                name="predictedHorse"
+                                checked={predictedHorse === r.horse}
+                                onChange={() => setPredictedHorse(r.horse)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#888' }}>
+                            Chưa có danh sách ngựa đua cho lượt thi này.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
 
                 {/* Ticket and Prediction Booking Form */}
                 <form onSubmit={handlePlaceBet} style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div>
-                    <label className="admin-form-label">1. Chọn loại vé xem đua</label>
-                    <select
-                      className="admin-select"
-                      value={ticketType}
-                      onChange={(e) => setTicketType(e.target.value)}
-                      style={{ width: '100%' }}
-                    >
-                      <option value="standard">Vé Thường (100.000 VND)</option>
-                      <option value="vip">Vé VIP (300.000 VND)</option>
-                    </select>
-                    <span style={{ fontSize: '11px', color: '#888', display: 'block', marginTop: '4px' }}>
-                      * Giá trị vé mua sẽ chính là số tiền đặt dự đoán cho chú ngựa được chọn.
-                    </span>
-                  </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', gap: '16px' }}>
                     <div>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Ngựa cược:</span>
+                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Ngựa dự đoán:</span>
                       <strong style={{ color: predictedHorse ? '#4ade80' : '#f87171', fontSize: '14px' }}>
                         {predictedHorse || 'Chưa chọn ngựa'}
                       </strong>
@@ -412,9 +481,9 @@ export default function SpectatorPredictions() {
                       </strong>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Thanh toán:</span>
+                      <span style={{ fontSize: '11px', color: '#888', display: 'block' }}>Giá vé cuộc đua:</span>
                       <strong style={{ color: '#d4af37', fontSize: '16px' }}>
-                        {formatCurrency(ticketType === 'vip' ? 300000 : 100000)}
+                        {formatCurrency(selectedPool?.ticketPrice || 20000)}
                       </strong>
                     </div>
                   </div>
@@ -457,34 +526,38 @@ export default function SpectatorPredictions() {
               <tr>
                 <th>Mã vé</th>
                 <th>Cuộc đua</th>
-                <th>Ngựa cược</th>
-                <th style={{ textAlign: 'right' }}>Thao tác</th>
+                <th>Ngựa dự đoán</th>
+                <th>Giá vé</th>
+                <th>Trạng thái</th>
+                <th>Ngày mua</th>
               </tr>
             </thead>
             <tbody>
               {userPreds && userPreds.length > 0 ? (
-                userPreds.map((item) => (
-                  <tr key={item.id || item.predictionId}>
-                    <td><code>#{item.id || item.predictionId}</code></td>
-                    <td style={{ color: '#fff', fontWeight: '500' }}>{item.raceName || item.race}</td>
-                    <td style={{ color: '#4ade80', fontWeight: 'bold' }}>🏇 {item.horse || item.horseName}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {(item.status === 'open' || item.status === 'pending' || !item.status) && (
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn--danger admin-btn--sm"
-                          onClick={() => handleCancelPredictionTicket(item.id || item.predictionId)}
-                          title="Hủy cược & Hoàn tiền cọc về ví"
-                        >
-                          ❌ Hủy cược
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                userPreds.map((item) => {
+                  const displayCode = item.ticketCode ? item.ticketCode.substring(0, 8) + '...' : `#${item.id || item.ticketId}`
+                  const fullCode = item.ticketCode || `#${item.id || item.ticketId}`
+                  const formattedDate = item.purchaseDate ? item.purchaseDate.replace('T', ' ').substring(0, 16) : 'Hôm nay'
+                  return (
+                    <tr key={item.id || item.predictionId || item.ticketCode}>
+                      <td>
+                        <code title={fullCode} style={{ color: '#d4af37', background: 'rgba(212,175,55,0.1)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>
+                          {displayCode}
+                        </code>
+                      </td>
+                      <td style={{ color: '#fff', fontWeight: '500' }}>🏇 {item.raceName || item.race}</td>
+                      <td style={{ color: '#4ade80', fontWeight: 'bold' }}>⭐ {item.horseName || item.horse}</td>
+                      <td style={{ color: '#d4af37', fontWeight: 'bold' }}>{formatCurrency(item.amount || item.price || 20000)}</td>
+                      <td>
+                        <StatusBadge status={item.status === 'SOLD' ? 'confirmed' : item.status === 'USED' ? 'completed' : item.status} />
+                      </td>
+                      <td style={{ color: '#888', fontSize: '12px' }}>{formattedDate}</td>
+                    </tr>
+                  )
+                })
               ) : (
                 <tr>
-                  <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#888' }}>
                     Bạn chưa mua vé cược nào. Chọn một cuộc đua ở trên để tham gia dự đoán!
                   </td>
                 </tr>

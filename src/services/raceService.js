@@ -59,6 +59,50 @@ export async function startRace(raceId) {
   return res.data
 }
 
+/**
+ * Mở bán vé cuộc đua cho khán giả từ Swagger API.
+ * Endpoint: POST /v1/tickets/races/{raceId}/open-sales
+ * @param {string|number} raceId
+ * @param {{ totalTickets: number }} payload
+ */
+export async function openRaceTicketSales(raceId, payload) {
+  const res = await apiClient.post(`/v1/tickets/races/${raceId}/open-sales`, payload)
+  return res.data
+}
+
+/**
+ * Lấy danh sách các cuộc đua đang MỞ BÁN VÉ cho khán giả từ Swagger API.
+ * Endpoint: GET /v1/tickets/races/open-sales
+ */
+export async function getOpenTicketRaces() {
+  const res = await apiClient.get('/v1/tickets/races/open-sales')
+  return res.data
+}
+
+/**
+ * Lấy danh sách khán giả mua vé của một cuộc đua từ Swagger API.
+ * Endpoint: GET /v1/tickets/races/{raceId}/buyers
+ * Header: Authorization: Bearer <token>
+ * @param {string|number} raceId
+ * @returns {Promise<Array>}
+ */
+export async function getRaceTicketBuyers(raceId) {
+  const res = await apiClient.get(`/v1/tickets/races/${raceId}/buyers`)
+  return res.data
+}
+
+/**
+ * Mua vé dự đoán cuộc đua cho khán giả từ Swagger API.
+ * Endpoint: POST /v1/tickets/races/{raceId}/purchase
+ * Header: Authorization: Bearer <token>
+ * @param {string|number} raceId
+ * @param {{ spectatorId: number, horseId: number }} payload
+ */
+export async function purchaseRaceTicket(raceId, payload) {
+  const res = await apiClient.post(`/v1/tickets/races/${raceId}/purchase`, payload)
+  return res.data
+}
+
 // ─────────────────────────────────────────
 // KẾT QUẢ
 // ─────────────────────────────────────────

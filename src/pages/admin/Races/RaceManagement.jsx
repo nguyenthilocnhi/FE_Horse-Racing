@@ -4,6 +4,7 @@ import { races as initialRaces, tournaments as initialTournaments, mockJockeys }
 import { StatusBadge, computeRaceStatus } from '../../../utils/adminHelpers'
 import { getAllTournaments, getTournamentSchedule, createRaceSchedule, updateRaceSchedule, openRaceRegistration } from '../../../services/tournamentService'
 import { startRace, delayRace, reopenPrediction, publishRaceResult } from '../../../services/adminService'
+import { openRaceTicketSales } from '../../../services/raceService'
 import './RaceManagement.css'
 
 // Default horses if localStorage is empty
@@ -614,26 +615,39 @@ export default function RaceManagement() {
     if (!selectedTicketRace) return
 
     try {
+      const raceId = selectedTicketRace.id || selectedTicketRace.originalId
+      const countNum = Number(ticketFormData.totalTickets) || 20
+
+      let apiResult = null
+      try {
+        apiResult = await openRaceTicketSales(raceId, { totalTickets: countNum })
+      } catch (apiErr) {
+        console.warn(`POST /api/v1/tickets/races/${raceId}/open-sales failed:`, apiErr)
+      }
+
       const stored = JSON.parse(localStorage.getItem('created_races') || '[]')
-      const countNum = Number(ticketFormData.totalTickets) || 5000
 
       const updatedList = stored.map(r => {
-        if (String(r.id) === String(selectedTicketRace.id) || String(r.originalId) === String(selectedTicketRace.originalId)) {
+        if (String(r.id) === String(raceId) || String(r.originalId) === String(raceId)) {
           return {
             ...r,
             ticketOpen: true,
-            totalTickets: countNum,
+            totalTickets: apiResult?.totalTickets || countNum,
+            remainingTickets: apiResult?.remainingTickets || countNum,
+            ticketPrice: apiResult?.ticketPrice,
             ticketOpenDate: new Date().toISOString()
           }
         }
         return r
       })
 
-      if (!updatedList.some(r => String(r.id) === String(selectedTicketRace.id))) {
+      if (!updatedList.some(r => String(r.id) === String(raceId))) {
         updatedList.push({
           ...selectedTicketRace,
           ticketOpen: true,
-          totalTickets: countNum,
+          totalTickets: apiResult?.totalTickets || countNum,
+          remainingTickets: apiResult?.remainingTickets || countNum,
+          ticketPrice: apiResult?.ticketPrice,
           ticketOpenDate: new Date().toISOString()
         })
       }

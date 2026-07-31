@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getPaymentStatus } from '../../services/paymentService'
 import { formatCurrency } from '../../utils/adminHelpers'
 
 export default function PaymentResult() {
@@ -14,14 +15,27 @@ export default function PaymentResult() {
   const urlUserKey = searchParams.get('userKey')
 
   useEffect(() => {
-    const activePendingCode = localStorage.getItem('active_pending_order_code') || orderCode
-    const activeUserKey = localStorage.getItem('active_pending_user_key') || urlUserKey || 'guest'
+    async function checkPaymentStatusFromApi() {
+      const activePendingCode = localStorage.getItem('active_pending_order_code') || orderCode
+      const activeUserKey = localStorage.getItem('active_pending_user_key') || urlUserKey || 'guest'
 
-    const userTxKey = `spectator_transactions_${activeUserKey}`
-    const userProfileKey = `spectator_profile_${activeUserKey}`
+      const userTxKey = `spectator_transactions_${activeUserKey}`
+      const userProfileKey = `spectator_profile_${activeUserKey}`
 
-    // Extract exact deposit amount from URL or pending transaction in localStorage
-    let depositAmount = Number(amountFromUrl || 0)
+      let depositAmount = Number(amountFromUrl || 0)
+      let apiStatus = null
+
+      if (activePendingCode || orderCode) {
+        try {
+          const apiRes = await getPaymentStatus(activePendingCode || orderCode)
+          if (apiRes) {
+            apiStatus = apiRes.status ? String(apiRes.status).toUpperCase() : null
+            if (apiRes.amount) depositAmount = Number(apiRes.amount)
+          }
+        } catch (e) {
+          console.warn('GET /v1/payment/status/{orderCode} error:', e?.message)
+        }
+      }
     if (!depositAmount && activePendingCode) {
       try {
         const txs = JSON.parse(localStorage.getItem(userTxKey) || localStorage.getItem('spectator_transactions') || '[]')
@@ -86,6 +100,8 @@ export default function PaymentResult() {
     }
 
     const isCancelledOrFailed =
+      apiStatus === 'CANCELLED' ||
+      apiStatus === 'FAILED' ||
       cancel === 'true' ||
       queryStatus === 'CANCELLED' ||
       queryStatus === 'FAILED' ||
@@ -93,6 +109,7 @@ export default function PaymentResult() {
       (code && code !== '00')
 
     const isSuccess =
+      apiStatus === 'SUCCESS' ||
       code === '00' ||
       queryStatus === 'PAID' ||
       queryStatus === 'SUCCESS' ||
@@ -119,6 +136,9 @@ export default function PaymentResult() {
 
     // Default fallback redirect
     navigate('/spectator/profile', { replace: true })
+    }
+
+    checkPaymentStatusFromApi()
   }, [orderCode, code, cancel, queryStatus, amountFromUrl, urlUserKey, navigate, searchParams])
 
   return (

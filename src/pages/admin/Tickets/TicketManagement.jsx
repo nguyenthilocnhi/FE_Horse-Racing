@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { tickets as initialTickets, races as mockRaces } from '../../../data/adminMockData'
 import { getAllTournaments, getTournamentSchedule } from '../../../services/tournamentService'
+import { getRaceTicketBuyers, getOpenTicketRaces } from '../../../services/raceService'
 import { StatusBadge, formatCurrency } from '../../../utils/adminHelpers'
 import './TicketManagement.css'
 
@@ -13,21 +13,25 @@ export default function TicketManagement() {
   const [allTickets, setAllTickets] = useState([])
   const { searchQuery = '' } = useOutletContext() || {}
 
+  const [openRacesList, setOpenRacesList] = useState([])
+
   useEffect(() => {
-    // 1. Fetch available races for dropdown filter
-    const loadRaces = async () => {
+    // 1. Fetch available open races from Backend API for dropdown filter
+    const loadOpenRaces = async () => {
       const raceSet = new Set()
+      const openRacesArray = []
 
-      // Add mock races
-      mockRaces.forEach(r => r.name && raceSet.add(r.name))
-
-      // Add local created races
       try {
-        const localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
-        localCreated.forEach(r => r.name && raceSet.add(r.name))
+        const apiRes = await getOpenTicketRaces()
+        const openRaces = Array.isArray(apiRes) ? apiRes : (apiRes?.data || [])
+        openRaces.forEach(r => {
+          const rName = r.raceName || r.name
+          const rId = r.raceId || r.id
+          if (rName) raceSet.add(rName)
+          if (rId) openRacesArray.push({ raceId: rId, raceName: rName || `Cuộc đua ${rId}` })
+        })
       } catch (e) { }
 
-      // Add races from API
       try {
         const tourRes = await getAllTournaments()
         const fetchedTournaments = tourRes.data || tourRes || []
@@ -35,47 +39,75 @@ export default function TicketManagement() {
           try {
             const schedRes = await getTournamentSchedule(t.id)
             const schedules = schedRes.data || []
-            schedules.forEach(s => s.name && raceSet.add(s.name))
+            schedules.forEach(s => {
+              if (s.name) raceSet.add(s.name)
+              if (s.id && !openRacesArray.some(o => String(o.raceId) === String(s.id))) {
+                openRacesArray.push({ raceId: s.id, raceName: s.name || `Cuộc đua ${s.id}` })
+              }
+            })
           } catch (err) { }
         }
       } catch (err) { }
 
-      // Add races from tickets array
-      initialTickets.forEach(t => t.race && raceSet.add(t.race))
+      if (openRacesArray.length === 0) {
+        openRacesArray.push({ raceId: 14, raceName: 'Cuộc đua 14' })
+      }
 
+      setOpenRacesList(openRacesArray)
       setRacesList(Array.from(raceSet))
     }
 
-    // 2. Load tickets (combine mock tickets + spectator predictions from localStorage)
-    const loadTickets = () => {
-      let combined = [...initialTickets]
-
-      try {
-        const spectatorPreds = JSON.parse(localStorage.getItem('spectator_user_preds') || '[]')
-        const specProfile = JSON.parse(localStorage.getItem('spectator_profile') || '{}')
-
-        const specTickets = spectatorPreds.map((pred, index) => ({
-          id: `TKT-LIVE-${pred.id || index + 1}`,
-          buyer: specProfile.fullName || 'Khán giả (User)',
-          email: specProfile.email || 'khangia@gmail.com',
-          race: pred.race || 'Chưa xác định',
-          horse: pred.horse || '—',
-          type: pred.ticketType || 'Standard',
-          quantity: 1,
-          amount: pred.amount || 100000,
-          paymentStatus: 'paid',
-          date: pred.date || new Date().toISOString().split('T')[0]
-        }))
-
-        combined = [...specTickets, ...combined]
-      } catch (e) { }
-
-      setAllTickets(combined)
-    }
-
-    loadRaces()
-    loadTickets()
+    loadOpenRaces()
   }, [])
+
+  // Nạp danh sách người mua vé của cuộc đua từ Swagger API (GET /v1/tickets/races/{raceId}/buyers)
+  useEffect(() => {
+    async function fetchBuyersFromApi() {
+      let racesToFetch = []
+      if (selectedRace === 'ALL') {
+        racesToFetch = openRacesList.length > 0 ? openRacesList : [{ raceId: 14, raceName: 'Cuộc đua 14' }]
+      } else {
+        const found = openRacesList.find(r => String(r.raceId) === String(selectedRace) || r.raceName === selectedRace)
+        if (found) {
+          racesToFetch = [found]
+        } else {
+          racesToFetch = [{ raceId: selectedRace, raceName: selectedRace }]
+        }
+      }
+
+      let allFetchedBuyers = []
+      for (const rItem of racesToFetch) {
+        const rId = rItem.raceId || selectedRace
+        if (!rId) continue
+        try {
+          const apiBuyers = await getRaceTicketBuyers(rId)
+          const buyersList = Array.isArray(apiBuyers) ? apiBuyers : (apiBuyers?.data || [])
+          
+          const formattedApiTickets = buyersList.map(b => ({
+            id: b.ticketCode ? (b.ticketCode.length > 12 ? b.ticketCode.substring(0, 10) + '...' : b.ticketCode) : `TKT-${b.ticketId || b.id || 1}`,
+            ticketCode: b.ticketCode || '',
+            buyer: b.spectatorName || b.spectator?.fullName || b.buyerName || 'Khán giả',
+            email: b.spectatorEmail || b.spectator?.email || b.buyerEmail || 'khangia@gmail.com',
+            race: b.raceName || rItem.raceName || (typeof selectedRace === 'string' ? selectedRace : 'Cuộc đua'),
+            horse: b.selectedHorseName || b.horseName || b.horse?.name || '—',
+            type: b.ticketType || 'Standard',
+            quantity: 1,
+            amount: b.price || b.ticketPrice || b.amount || 20000,
+            paymentStatus: 'paid',
+            status: b.status || 'SOLD',
+            date: b.purchaseDate ? b.purchaseDate.replace('T', ' ').substring(0, 16) : (b.createdDate || 'Hôm nay')
+          }))
+
+          allFetchedBuyers = [...allFetchedBuyers, ...formattedApiTickets]
+        } catch (err) {
+          console.warn(`GET /v1/tickets/races/${rId}/buyers offline:`, err?.message)
+        }
+      }
+
+      setAllTickets(allFetchedBuyers)
+    }
+    fetchBuyersFromApi()
+  }, [selectedRace, openRacesList])
 
   const effectiveSearch = (searchQuery || localSearch).trim().toLowerCase()
 

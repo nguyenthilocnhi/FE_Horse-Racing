@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { ownerHorses as initialHorses, ownerRaces } from '../../../data/ownerMockData'
 import * as ownerService from '../../../services/ownerService'
 import * as horseService from '../../../services/horseService'
 export default function OwnerHorses() {
@@ -41,36 +40,13 @@ export default function OwnerHorses() {
   // ── Fetch horses from API on mount ──
   useEffect(() => {
     async function loadHorses() {
-      const ownerKey = getCurrentOwnerKey()
       try {
         setLoading(true)
         const apiRes = await ownerService.getOwnerHorses()
-        const apiList = Array.isArray(apiRes) ? apiRes : apiRes?.data ?? apiRes?.content ?? []
-        
-        let localList = []
-        try {
-          localList = JSON.parse(localStorage.getItem('owner_horses_' + ownerKey) || '[]')
-        } catch (e) {}
+        const apiList = Array.isArray(apiRes) ? apiRes : (apiRes?.data ?? apiRes?.content ?? [])
 
-        let combined = [...apiList]
-        localList.forEach(lh => {
-          if (!combined.some(c => String(c.id) === String(lh.id) || c.name === lh.name)) {
-            combined.push(lh)
-          }
-        })
-
-        // If no horses exist for this owner key yet, initialize account-specific horses
-        if (combined.length === 0) {
-          const ownerPrefix = ownerKey.split('@')[0].toUpperCase()
-          combined = [
-            { id: Date.now(), name: `Xích Thố (${ownerPrefix})`, breed: 'Thoroughbred', age: 5, wins: 10, races: 25, earnings: '300,000,000 VND', healthStatus: 'ELIGIBLE', status: 'ready' },
-            { id: Date.now() + 1, name: `Bạch Long (${ownerPrefix})`, breed: 'Arabian', age: 4, wins: 6, races: 18, earnings: '180,000,000 VND', healthStatus: 'ELIGIBLE', status: 'ready' }
-          ]
-          localStorage.setItem('owner_horses_' + ownerKey, JSON.stringify(combined))
-        }
-
-        const formatted = combined.map(h => ({
-          id:            h.id ?? `HRS-${Math.floor(Math.random() * 1000)}`,
+        const formatted = apiList.map(h => ({
+          id:            h.id,
           name:          h.name ?? 'Chưa đặt tên',
           breed:         h.breed ?? 'Thoroughbred',
           age:           h.age ?? 3,
@@ -80,7 +56,8 @@ export default function OwnerHorses() {
           healthStatus:  h.healthStatus || 'ELIGIBLE',
           status:        (h.healthStatus === 'ELIGIBLE' || !h.healthStatus) ? 'ready' : 'gray',
           currentJockey: h.jockeyName ?? null,
-          image:         h.image ?? ''
+          image:         h.image ?? '',
+          horseOwner:    h.horseOwner ?? null
         }))
         setHorses(formatted)
       } catch (err) {

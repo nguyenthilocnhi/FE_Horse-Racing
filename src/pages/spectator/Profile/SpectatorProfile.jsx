@@ -117,6 +117,28 @@ export default function SpectatorProfile() {
       try {
         localTx = JSON.parse(localStorage.getItem(userTxKey) || '[]')
       } catch (e) { }
+
+      // Fetch API transactions from Backend (GET /api/v1/tickets/spectators/{spectatorId}/transactions)
+      const targetSpectatorId = user?.id || 11
+      if (targetSpectatorId) {
+        try {
+          const apiTxData = await spectatorService.getSpectatorTransactions(targetSpectatorId)
+          const txList = Array.isArray(apiTxData) ? apiTxData : (apiTxData?.data || [])
+          if (txList.length > 0) {
+            // Combine with local transactions, avoiding duplicates
+            const combined = [...txList]
+            localTx.forEach(lt => {
+              if (!combined.some(c => String(c.id) === String(lt.id))) {
+                combined.push(lt)
+              }
+            })
+            localTx = combined
+          }
+        } catch (txErr) {
+          console.warn('GET /v1/tickets/spectators/{id}/transactions offline:', txErr?.message)
+        }
+      }
+
       if (!cancelled) {
         setApiTransactions(localTx)
       }

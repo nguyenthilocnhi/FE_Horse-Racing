@@ -74,22 +74,18 @@ export async function createPayment(amount, spectatorId, tournamentId = 1) {
 }
 
 /**
- * Lấy trạng thái giao dịch thực tế từ Backend theo orderCode.
+ * Lấy trạng thái giao dịch thực tế từ Backend theo orderCode từ Swagger API.
+ * Endpoint: GET /v1/payment/status/{orderCode}
+ * Header: Authorization: Bearer <token>
  * @param {string|number} orderCode
- * @returns {Promise<{ status: 'SUCCESS'|'PENDING'|'FAILED', amount: number, transactionCode: string, message: string }>}
+ * @returns {Promise<{ status: 'SUCCESS'|'PENDING'|'FAILED'|'CANCELLED', amount: number, transactionCode: string, message: string }>}
  */
 export async function getPaymentStatus(orderCode) {
   if (!orderCode) {
     throw new Error('Mã giao dịch orderCode không hợp lệ')
   }
-
-  try {
-    const res = await apiClient.get(`/v1/payment/status/${orderCode}`)
-    return res.data?.data || res.data
-  } catch (err) {
-    const serverMessage = err?.response?.data?.message || (typeof err?.response?.data === 'string' ? err.response.data : null) || err?.message || 'Lỗi lấy trạng thái giao dịch'
-    throw new Error(serverMessage)
-  }
+  const res = await apiClient.get(`/v1/payment/status/${orderCode}`)
+  return res.data
 }
 
 /**

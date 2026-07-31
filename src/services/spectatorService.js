@@ -60,15 +60,23 @@ export async function getSpectatorTransactions(spectatorId) {
   if (!spectatorId || isNaN(numId)) {
     throw new Error('spectatorId không hợp lệ')
   }
-  try {
-    const res = await apiClient.get(`/v1/tickets/spectators/${numId}/transactions`)
-    return res.data?.data || res.data
-  } catch (err) {
-    if (err?.response?.status === 404) {
-      const fallbackRes = await apiClient.get(`/tickets/spectators/${numId}/transactions`)
-      return fallbackRes.data?.data || fallbackRes.data
-    }
-    throw err
+  const res = await apiClient.get(`/v1/tickets/spectators/${numId}/transactions`)
+  return res.data
+}
+
+/**
+ * Lấy lịch sử mua vé của khán giả từ Swagger API.
+ * Endpoint: GET /v1/tickets/spectators/{spectatorId}/history
+ * Header: Authorization: Bearer <token>
+ * @param {string|number} spectatorId
+ * @returns {Promise<Array>}
+ */
+export async function getSpectatorTicketHistory(spectatorId) {
+  const numId = Number(spectatorId)
+  if (!spectatorId || isNaN(numId)) {
+    throw new Error('spectatorId không hợp lệ')
   }
+  const res = await apiClient.get(`/v1/tickets/spectators/${numId}/history`)
+  return res.data
 }
 
