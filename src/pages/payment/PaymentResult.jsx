@@ -27,7 +27,7 @@ export default function PaymentResult() {
         const txs = JSON.parse(localStorage.getItem(userTxKey) || localStorage.getItem('spectator_transactions') || '[]')
         const found = txs.find(t => String(t.id) === String(activePendingCode) || String(t.orderId) === String(activePendingCode))
         if (found && found.amount) depositAmount = Number(found.amount)
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const updateTxAndWallet = (statusStr) => {
@@ -74,7 +74,7 @@ export default function PaymentResult() {
                 pendingProf.payosLinked = true
                 localStorage.setItem('pending_profile', JSON.stringify(pendingProf))
               }
-            } catch (pErr) {}
+            } catch (pErr) { }
           }
 
           localStorage.removeItem('active_pending_order_code')

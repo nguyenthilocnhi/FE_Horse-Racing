@@ -32,10 +32,10 @@ export default function RefereeAssignment() {
         getAllReferees(),
         getAllTournaments()
       ])
-      
+
       const refsData = refs.data || refs || []
       const toursData = Array.isArray(tours) ? tours : (tours.data || tours.content || [])
-      
+
       setReferees(refsData)
       setTournaments(toursData)
 
@@ -57,7 +57,7 @@ export default function RefereeAssignment() {
                 time: r.startTime ? (r.startTime.includes('T') ? r.startTime.split('T')[1].substring(0, 5) : r.startTime.substring(0, 5)) : '',
                 refereeId: r.refereeId,
                 referee: r.refereeName || r.referee,
-                status: r.refereeId ? 'scheduled' : 'unassigned'
+                status: (r.status || '').toLowerCase() === 'delayed' ? 'delayed' : (r.refereeId ? 'scheduled' : 'unassigned')
               }))
               allMapped.push(...mapped)
             }
@@ -71,7 +71,7 @@ export default function RefereeAssignment() {
       let localCreated = []
       try {
         localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
-      } catch (e) {}
+      } catch (e) { }
 
       const localMapped = localCreated.map(r => ({
         raceId: r.id,
@@ -83,7 +83,7 @@ export default function RefereeAssignment() {
         time: r.time,
         refereeId: r.refereeId || null,
         referee: r.referee || null,
-        status: r.refereeId ? 'scheduled' : 'unassigned'
+        status: (r.status || '').toLowerCase() === 'delayed' ? 'delayed' : (r.refereeId ? 'scheduled' : 'unassigned')
       }))
 
       const combinedAssignments = [...localMapped]
@@ -131,7 +131,7 @@ export default function RefereeAssignment() {
       }
 
       const selectedRef = referees.find(r => String(r.id) === String(refereeId))
-      
+
       // Đồng bộ trạng thái vào created_races trong localStorage
       try {
         const localCreated = JSON.parse(localStorage.getItem('created_races') || '[]')
@@ -181,7 +181,7 @@ export default function RefereeAssignment() {
   // Filtered assignments list
   const displayedAssignments = assignments.filter(a => {
     // Tournament Filter
-    const matchesTournament = selectedTournament === 'all' || 
+    const matchesTournament = selectedTournament === 'all' ||
       String(a.tournamentId) === String(selectedTournament) ||
       a.tournament === selectedTournament
 
@@ -256,8 +256,8 @@ export default function RefereeAssignment() {
           <div className="admin-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <h3>Phân công theo Race</h3>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <select 
-                className="admin-select" 
+              <select
+                className="admin-select"
                 style={{ maxWidth: '190px', fontSize: '13px' }}
                 value={filterMode}
                 onChange={(e) => setFilterMode(e.target.value)}
@@ -267,8 +267,8 @@ export default function RefereeAssignment() {
                 <option value="all">Tất cả cuộc đua</option>
               </select>
 
-              <select 
-                className="admin-select" 
+              <select
+                className="admin-select"
                 style={{ maxWidth: '180px', fontSize: '13px' }}
                 value={selectedTournament}
                 onChange={(e) => setSelectedTournament(e.target.value)}
@@ -290,8 +290,8 @@ export default function RefereeAssignment() {
                   {filterMode === 'unassigned'
                     ? 'Không có cuộc đua nào đang chờ phân công trọng tài.'
                     : filterMode === 'assigned'
-                    ? 'Chưa có cuộc đua nào được phân công trọng tài.'
-                    : 'Không tìm thấy cuộc đua nào.'}
+                      ? 'Chưa có cuộc đua nào được phân công trọng tài.'
+                      : 'Không tìm thấy cuộc đua nào.'}
                 </p>
               </div>
             ) : (
@@ -333,7 +333,11 @@ export default function RefereeAssignment() {
                   </div>
 
                   {/* Action: Select or Button */}
-                  {assigningRaceId === a.raceId ? (
+                  {a.status === 'delayed' ? (
+                    <span style={{ fontSize: '11px', color: '#ef4444', fontStyle: 'italic', fontWeight: '600' }}>
+                      ⛔ Đã bị hoãn
+                    </span>
+                  ) : assigningRaceId === a.raceId ? (
                     <select
                       className="admin-select"
                       onChange={(e) => handleAssignReferee(a.raceId, e.target.value)}

@@ -237,37 +237,88 @@ export async function downloadTournamentExport(tournamentId) {
 // ─────────────────────────────────────────
 
 /**
- * Lấy bảng xếp hạng giải đấu.
+ * Lấy bảng xếp hạng giải đấu (Get Tournament Rankings).
+ * GET /api/tournaments/{tournamentId}/rankings
  * @param {string|number} tournamentId
  */
-export async function getTournamentRankings(tournamentId) {
+export async function getTournamentRankings(tournamentId = 8) {
   try {
     const res = await apiClient.get(`/tournaments/${tournamentId}/rankings`)
-    return res.data
+    const payload = res.data || {}
+    const list = payload?.data || (Array.isArray(payload) ? payload : [])
+
+    // Mapping Backend DTO to Frontend Data Structure
+    const mappedList = list.map(item => ({
+      id: item.id,
+      tournamentId: item.tournamentId ?? tournamentId,
+      horseId: item.horseId,
+      name: item.horseName || item.name || 'Ngựa đua',
+      horseName: item.horseName || item.name || 'Ngựa đua',
+      rank: item.rankPosition ?? item.rank ?? 1,
+      rankPosition: item.rankPosition ?? item.rank ?? 1,
+      points: item.points ?? 0,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      wins: item.wins ?? 0,
+      races: item.races ?? 0,
+      owner: item.owner || 'Chưa xác định'
+    }))
+
+    return {
+      success: payload.success ?? true,
+      message: payload.message || 'Tải bảng xếp hạng thành công',
+      data: mappedList
+    }
   } catch (err) {
     console.warn(`GET /tournaments/${tournamentId}/rankings failed:`, err)
-    return [
-      { rank: 1, horse: 'Aurelius', owner: 'Stable Alpha', points: 450, wins: 3 },
-      { rank: 2, horse: 'Midnight Star', owner: 'Blue Ridge Farm', points: 380, wins: 2 },
-      { rank: 3, horse: 'Velvet Thunder', owner: 'Golden Hooves', points: 310, wins: 1 },
-      { rank: 4, horse: 'Storm Rider', owner: 'Wind Valley', points: 260, wins: 1 }
-    ]
+    return {
+      success: false,
+      message: err?.response?.data?.message || err.message || 'Không thể tải bảng xếp hạng',
+      data: []
+    }
   }
 }
 
 /**
- * Tính lại bảng xếp hạng.
+ * Tính lại bảng xếp hạng (Recalculate Tournament Rankings).
+ * POST /api/tournaments/{tournamentId}/rankings/recalculate
  * @param {string|number} tournamentId
  */
-export async function recalculateRankings(tournamentId) {
+export async function recalculateRankings(tournamentId = 8) {
   try {
     const res = await apiClient.post(
       `/tournaments/${tournamentId}/rankings/recalculate`
     )
-    return res.data
+    const payload = res.data || {}
+    const list = payload?.data || (Array.isArray(payload) ? payload : [])
+
+    // Mapping Backend DTO to Frontend Data Structure
+    const mappedList = list.map(item => ({
+      id: item.id,
+      tournamentId: item.tournamentId ?? tournamentId,
+      horseId: item.horseId,
+      name: item.horseName || item.name || 'Ngựa đua',
+      horseName: item.horseName || item.name || 'Ngựa đua',
+      rank: item.rankPosition ?? item.rank ?? 1,
+      rankPosition: item.rankPosition ?? item.rank ?? 1,
+      points: item.points ?? 0,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      wins: item.wins ?? 0,
+      races: item.races ?? 0,
+      owner: item.owner || 'Chưa xác định'
+    }))
+
+    return {
+      success: payload.success ?? true,
+      message: payload.message || 'Cập nhật bảng xếp hạng thành công',
+      data: mappedList
+    }
   } catch (err) {
     console.warn(`POST /tournaments/${tournamentId}/rankings/recalculate failed:`, err)
-    return { success: true, localFallback: true }
+    return {
+      success: false,
+      message: err?.response?.data?.message || err.message || 'Không thể tính lại bảng xếp hạng',
+      data: []
+    }
   }
 }
 
@@ -276,16 +327,86 @@ export async function recalculateTournamentRankings(tournamentId) {
 }
 
 /**
- * Lấy bảng xếp hạng Jockey của giải đấu.
+ * Tính lại bảng xếp hạng Jockey (Recalculate Jockey Rankings).
+ * POST /api/tournaments/{tournamentId}/rankings/jockeys/recalculate
  * @param {string|number} tournamentId
  */
-export async function getJockeyRankings(tournamentId) {
+export async function recalculateJockeyRankings(tournamentId = 8) {
+  try {
+    const res = await apiClient.post(
+      `/tournaments/${tournamentId}/rankings/jockeys/recalculate`
+    )
+    const payload = res.data || {}
+    const list = payload?.data || (Array.isArray(payload) ? payload : [])
+
+    // Mapping Backend Jockey DTO to Frontend Data Structure
+    const mappedList = list.map(item => ({
+      id: item.id,
+      tournamentId: item.tournamentId ?? tournamentId,
+      jockeyId: item.jockeyId,
+      name: item.jockeyName || item.name || 'Jockey',
+      jockeyName: item.jockeyName || item.name || 'Jockey',
+      rank: item.rankPosition ?? item.rank ?? 1,
+      rankPosition: item.rankPosition ?? item.rank ?? 1,
+      points: item.points ?? 0,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      wins: item.wins ?? 0,
+      races: item.races ?? 0
+    }))
+
+    return {
+      success: payload.success ?? true,
+      message: payload.message || 'Cập nhật bảng xếp hạng Jockey thành công',
+      data: mappedList
+    }
+  } catch (err) {
+    console.warn(`POST /tournaments/${tournamentId}/rankings/jockeys/recalculate failed:`, err)
+    return {
+      success: false,
+      message: err?.response?.data?.message || err.message || 'Không thể tính lại bảng xếp hạng Jockey',
+      data: []
+    }
+  }
+}
+
+/**
+ * Lấy bảng xếp hạng Jockey của giải đấu.
+ * GET /api/tournaments/{tournamentId}/rankings/jockeys
+ * @param {string|number} tournamentId
+ */
+export async function getJockeyRankings(tournamentId = 8) {
   try {
     const res = await apiClient.get(`/tournaments/${tournamentId}/rankings/jockeys`)
-    return res.data
+    const payload = res.data || {}
+    const list = payload?.data || (Array.isArray(payload) ? payload : [])
+
+    // Mapping Backend Jockey DTO to Frontend Data Structure
+    const mappedList = list.map(item => ({
+      id: item.id,
+      tournamentId: item.tournamentId ?? tournamentId,
+      jockeyId: item.jockeyId,
+      name: item.jockeyName || item.name || 'Jockey',
+      jockeyName: item.jockeyName || item.name || 'Jockey',
+      rank: item.rankPosition ?? item.rank ?? 1,
+      rankPosition: item.rankPosition ?? item.rank ?? 1,
+      points: item.points ?? 0,
+      updatedAt: item.updatedAt || new Date().toISOString(),
+      wins: item.wins ?? 0,
+      races: item.races ?? 0
+    }))
+
+    return {
+      success: payload.success ?? true,
+      message: payload.message || 'Tải bảng xếp hạng Jockey thành công',
+      data: mappedList
+    }
   } catch (err) {
     console.warn(`GET /tournaments/${tournamentId}/rankings/jockeys failed:`, err)
-    return []
+    return {
+      success: false,
+      message: err?.response?.data?.message || err.message || 'Không thể tải bảng xếp hạng Jockey',
+      data: []
+    }
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { horseRankings as initialHorseRankings, jockeyRankings as initialJockeyRankings, tournaments as mockTournaments } from '../../../data/adminMockData'
-import { getAllTournaments } from '../../../services/tournamentService'
+import { getAllTournaments, recalculateRankings, recalculateJockeyRankings } from '../../../services/tournamentService'
 import './RankingManagement.css'
 
 export default function RankingManagement() {
@@ -9,6 +9,68 @@ export default function RankingManagement() {
   const [selectedTournament, setSelectedTournament] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
+
+  const handleRecalculate = async () => {
+    const tourId = selectedTournament !== 'all' ? selectedTournament : 8
+    setRecalculating(true)
+    try {
+      if (tab === 'jockeys') {
+        const res = await recalculateJockeyRankings(tourId)
+        if (res.success && res.data && res.data.length > 0) {
+          const foundTour = tournaments.find(t => String(t.id) === String(tourId))
+          const tourName = foundTour?.name || `Giải đấu #${tourId}`
+
+          const newJockeyRankings = res.data.map(item => ({
+            rank: item.rank || item.rankPosition || 1,
+            name: item.name || item.jockeyName || 'Jockey',
+            points: item.points || 0,
+            wins: item.wins || 0,
+            races: item.races || 0,
+            tournament: tourName,
+            tournamentId: String(tourId)
+          }))
+
+          setJockeyRankings(prev => [
+            ...newJockeyRankings,
+            ...prev.filter(p => String(p.tournamentId) !== String(tourId))
+          ])
+          alert(`✅ Cập nhật tính lại bảng xếp hạng Jockey thành công cho ${tourName}!`)
+        } else {
+          alert(res.message || 'Tính lại bảng xếp hạng Jockey thất bại!')
+        }
+      } else {
+        const res = await recalculateRankings(tourId)
+        if (res.success && res.data && res.data.length > 0) {
+          const foundTour = tournaments.find(t => String(t.id) === String(tourId))
+          const tourName = foundTour?.name || `Giải đấu #${tourId}`
+          
+          const newRankings = res.data.map(item => ({
+            rank: item.rank || item.rankPosition || 1,
+            name: item.name || item.horseName || 'Ngựa đua',
+            points: item.points || 0,
+            wins: item.wins || 0,
+            races: item.races || 0,
+            owner: item.owner || 'Chưa xác định',
+            tournament: tourName,
+            tournamentId: String(tourId)
+          }))
+
+          setHorseRankings(prev => [
+            ...newRankings,
+            ...prev.filter(p => String(p.tournamentId) !== String(tourId))
+          ])
+          alert(`✅ Cập nhật tính lại bảng xếp hạng Ngựa thành công cho ${tourName}!`)
+        } else {
+          alert(res.message || 'Tính lại bảng xếp hạng Ngựa thất bại!')
+        }
+      }
+    } catch (err) {
+      alert('Lỗi tính lại bảng xếp hạng: ' + (err.message || 'Lỗi hệ thống'))
+    } finally {
+      setRecalculating(false)
+    }
+  }
 
   // Expanded mock rankings with tournament associations
   const [horseRankings, setHorseRankings] = useState([
@@ -75,11 +137,19 @@ export default function RankingManagement() {
 
   return (
     <div className="ranking-page">
-      <div className="admin-page-head">
+      <div className="admin-page-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="admin-page-title">Quản lý Xếp hạng</h1>
           <p className="admin-page-sub">Bảng xếp hạng ngựa và jockey theo mùa giải & giải đấu</p>
         </div>
+        <button
+          type="button"
+          className="admin-btn admin-btn--primary"
+          onClick={handleRecalculate}
+          disabled={recalculating}
+        >
+          {recalculating ? 'Đang tính lại...' : '🔄 Tính lại BXH'}
+        </button>
       </div>
 
       {/* Filter and Tab Bar */}

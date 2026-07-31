@@ -11,7 +11,7 @@ export default function UserManagement() {
   const [roleFilter, setRoleFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedUser, setSelectedUser] = useState(null)
-  
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
@@ -84,7 +84,7 @@ export default function UserManagement() {
     const userToUpdate = users.find(u => u.id === userId && u.role === userRole)
     if (!userToUpdate) return
     const nextStatus = userToUpdate.status === 'LOCKED' ? 'APPROVED' : 'LOCKED'
-    
+
     try {
       const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
         ...userToUpdate,
@@ -103,7 +103,7 @@ export default function UserManagement() {
   const handleApproveUser = async (userId, userRole) => {
     const userToUpdate = users.find(u => u.id === userId && u.role === userRole)
     if (!userToUpdate) return
-    
+
     try {
       const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
         ...userToUpdate,
@@ -124,7 +124,7 @@ export default function UserManagement() {
     const userToUpdate = users.find(u => u.id === userId && u.role === userRole)
     if (!userToUpdate) return
     if (!window.confirm(`Bạn có chắc chắn muốn từ chối tài khoản "${userToUpdate.fullName || userToUpdate.name}" không?`)) return
-    
+
     try {
       const updated = await adminAccountService.updateAccount(userToUpdate.role, userId, {
         ...userToUpdate,
@@ -170,7 +170,7 @@ export default function UserManagement() {
     const userToDelete = users.find(u => u.id === userId && u.role === userRole)
     if (!userToDelete) return
     if (!window.confirm(`Bạn có chắc chắn muốn xóa tài khoản "${userToDelete.name || userToDelete.fullName}" không?`)) return
-    
+
     try {
       await adminAccountService.deleteAccount(userToDelete.role, userId)
       setUsers(users.filter(u => u.id !== userId))
@@ -351,7 +351,7 @@ export default function UserManagement() {
                   </tbody>
                 </table>
               </div>
-              
+
               {totalPages > 1 && (
                 <div style={{
                   display: 'flex',
@@ -402,7 +402,7 @@ export default function UserManagement() {
                 <dd>{selectedUser.phone || '—'}</dd>
                 <dt>Ngày sinh</dt>
                 <dd>{selectedUser.birthDate || selectedUser.dob || '—'}</dd>
-                
+
                 {selectedUser.role === 'HORSE_OWNER' && (
                   <>
                     <dt>Địa chỉ</dt>

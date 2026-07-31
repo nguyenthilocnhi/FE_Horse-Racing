@@ -66,9 +66,9 @@ export default function SpectatorProfile() {
       let pendProf = null
       let localTxs = []
 
-      try { specProf = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || 'null') } catch (e) {}
-      try { pendProf = JSON.parse(localStorage.getItem('pending_profile') || 'null') } catch (e) {}
-      try { localTxs = JSON.parse(localStorage.getItem(userTxKey) || '[]') } catch (e) {}
+      try { specProf = JSON.parse(localStorage.getItem(userProfileKey) || localStorage.getItem('spectator_profile') || 'null') } catch (e) { }
+      try { pendProf = JSON.parse(localStorage.getItem('pending_profile') || 'null') } catch (e) { }
+      try { localTxs = JSON.parse(localStorage.getItem(userTxKey) || '[]') } catch (e) { }
 
       let depositSum = 0
       localTxs.forEach(t => {
@@ -102,7 +102,7 @@ export default function SpectatorProfile() {
       let localTx = []
       try {
         localTx = JSON.parse(localStorage.getItem(userTxKey) || '[]')
-      } catch (e) {}
+      } catch (e) { }
       if (!cancelled) {
         setApiTransactions(localTx)
       }
@@ -121,13 +121,13 @@ export default function SpectatorProfile() {
           if (isMatch) {
             initialData = parsed
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (!initialData) {
         try {
           initialData = JSON.parse(localStorage.getItem(userProfileKey) || 'null')
-        } catch (_) {}
+        } catch (_) { }
       }
 
       try {

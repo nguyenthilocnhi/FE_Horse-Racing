@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
-import { resultReports, horseRankings, jockeyRankings } from '../../../data/adminMockData'
+import React, { useState, useEffect } from 'react'
+import { resultReports, horseRankings as initialHorseRankings, jockeyRankings as initialJockeyRankings } from '../../../data/adminMockData'
+import { getTournamentRankings, getJockeyRankings } from '../../../services/tournamentService'
 import { StatusBadge } from '../../../utils/adminHelpers'
 import './SpectatorRankings.css'
 
@@ -25,6 +26,46 @@ const MOCK_RESULTS = {
 export default function SpectatorRankings() {
   const [activeTab, setActiveTab] = useState('races') // 'races', 'horses', 'jockeys'
   const [selectedResult, setSelectedResult] = useState(null)
+  const [horseRankingsState, setHorseRankingsState] = useState(initialHorseRankings)
+  const [jockeyRankingsState, setJockeyRankingsState] = useState(initialJockeyRankings)
+  const [loadingRankings, setLoadingRankings] = useState(false)
+
+  useEffect(() => {
+    async function loadSpectatorRankings() {
+      setLoadingRankings(true)
+      try {
+        const resHorse = await getTournamentRankings(8)
+        if (resHorse.success && resHorse.data && resHorse.data.length > 0) {
+          const mappedHorses = resHorse.data.map(item => ({
+            rank: item.rank || item.rankPosition || 1,
+            name: item.name || item.horseName || 'Ngựa đua',
+            owner: item.owner || 'Chưa xác định',
+            races: item.races || 0,
+            wins: item.wins || 0,
+            points: item.points || 0
+          }))
+          setHorseRankingsState(mappedHorses)
+        }
+
+        const resJockey = await getJockeyRankings(8)
+        if (resJockey.success && resJockey.data && resJockey.data.length > 0) {
+          const mappedJockeys = resJockey.data.map(item => ({
+            rank: item.rank || item.rankPosition || 1,
+            name: item.name || item.jockeyName || 'Jockey',
+            races: item.races || 0,
+            wins: item.wins || 0,
+            points: item.points || 0
+          }))
+          setJockeyRankingsState(mappedJockeys)
+        }
+      } catch (err) {
+        console.warn('Failed to load spectator rankings API:', err)
+      } finally {
+        setLoadingRankings(false)
+      }
+    }
+    loadSpectatorRankings()
+  }, [])
 
   // Show only published or approved results for spectators to maintain realism
   const visibleResults = resultReports.filter(r => r.status === 'published' || r.status === 'approved')
@@ -116,8 +157,8 @@ export default function SpectatorRankings() {
                 </tr>
               </thead>
               <tbody>
-                {horseRankings.map((h) => (
-                  <tr key={h.rank}>
+                {horseRankingsState.map((h, idx) => (
+                  <tr key={`${h.rank}-${h.name}-${idx}`}>
                     <td style={{ fontWeight: 'bold', color: h.rank === 1 ? '#d4af37' : h.rank === 2 ? '#c0c0c0' : '#cd7f32' }}>
                       {h.rank === 1 ? '👑 1' : h.rank === 2 ? '🥈 2' : h.rank === 3 ? '🥉 3' : `#${h.rank}`}
                     </td>
@@ -148,8 +189,8 @@ export default function SpectatorRankings() {
                 </tr>
               </thead>
               <tbody>
-                {jockeyRankings.map((j) => (
-                  <tr key={j.rank}>
+                {jockeyRankingsState.map((j, idx) => (
+                  <tr key={`${j.rank}-${j.name}-${idx}`}>
                     <td style={{ fontWeight: 'bold', color: j.rank === 1 ? '#d4af37' : j.rank === 2 ? '#c0c0c0' : '#cd7f32' }}>
                       {j.rank === 1 ? '👑 1' : j.rank === 2 ? '🥈 2' : j.rank === 3 ? '🥉 3' : `#${j.rank}`}
                     </td>

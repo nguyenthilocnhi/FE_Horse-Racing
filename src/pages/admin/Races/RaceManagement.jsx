@@ -208,6 +208,10 @@ export default function RaceManagement() {
   const [activeRoundIndex, setActiveRoundIndex] = useState(0)
 
   const openArrangement = (race) => {
+    if (race.status === 'delayed') {
+      alert('Cuộc đua đã bị hoãn, không thể sắp xếp cuốc/vòng!')
+      return
+    }
     setArrangingRace(race)
     setActiveRoundIndex(0)
 
@@ -253,8 +257,8 @@ export default function RaceManagement() {
   }
 
   const handleOpenEdit = (race) => {
-    if (race.status === 'completed') {
-      alert('Cuộc đua đã hoàn thành và công bố kết quả, không thể chỉnh sửa!')
+    if (race.status === 'completed' || race.status === 'delayed') {
+      alert('Cuộc đua đã bị hoãn hoặc hoàn thành, không thể chỉnh sửa!')
       return
     }
     setEditingRace(race)
@@ -487,6 +491,10 @@ export default function RaceManagement() {
   }
 
   const handleOpenRegistrationModal = (race) => {
+    if (race.status === 'delayed') {
+      alert('Cuộc đua đã bị hoãn, không thể mở hoặc chỉnh sửa thời gian đăng ký!')
+      return
+    }
     setSelectedRegRace(race)
     const formatDt = (d) => {
       const pad = (n) => String(n).padStart(2, '0')
@@ -590,6 +598,10 @@ export default function RaceManagement() {
   }
 
   const handleOpenTicketModal = (race) => {
+    if (race.status === 'delayed') {
+      alert('Cuộc đua đã bị hoãn, không thể mở hoặc cấu hình bán vé!')
+      return
+    }
     setSelectedTicketRace(race)
     setTicketFormData({
       totalTickets: race.totalTickets || 5000
@@ -686,7 +698,6 @@ export default function RaceManagement() {
           <option value="reviewing">Chờ duyệt kết quả</option>
           <option value="completed">Hoàn thành</option>
           <option value="delayed">Bị hoãn</option>
-          <option value="cancelled">Đã hủy</option>
         </select>
         <select
           className="admin-select"
@@ -875,24 +886,34 @@ export default function RaceManagement() {
                           <span>📏 Cự ly: {race.distance}</span>
                         </div>
                         <div className="admin-table-actions">
-                          {/* Sửa button: CHỈ HIỂN THỊ KHI CHƯA HOÀN THÀNH */}
-                          {(race.status !== 'completed' && race.status !== 'published') ? (
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn--ghost admin-btn--sm"
-                              onClick={() => handleOpenEdit(race)}
-                            >
-                              Sửa
-                            </button>
-                          ) : (
-                            <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
-                              🔒 Đã hoàn thành
+                          {race.status === 'delayed' ? (
+                            <span style={{ fontSize: '12px', color: '#ef4444', fontStyle: 'italic', fontWeight: '600', padding: '4px 8px' }}>
+                              ⛔ Cuộc đua bị hoãn
                             </span>
-                          )}
-
-                          {/* Action Button theo Vòng Đời Trạng Thái */}
-                          {(race.status !== 'completed' && race.status !== 'published') ? (
+                          ) : (race.status === 'completed' || race.status === 'published') ? (
                             <>
+                              <span style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic' }}>
+                                🔒 Đã hoàn thành
+                              </span>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--gold admin-btn--sm"
+                                style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
+                                onClick={() => navigate('/admin/results')}
+                              >
+                                📊 Xem kết quả
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="admin-btn admin-btn--ghost admin-btn--sm"
+                                onClick={() => handleOpenEdit(race)}
+                              >
+                                Sửa
+                              </button>
+
                               {(!race.registrationStartDate) ? (
                                 <button
                                   type="button"
@@ -1016,29 +1037,6 @@ export default function RaceManagement() {
                                   disabled={isProcessing}
                                 >
                                   ✓ Duyệt & Công bố KQ
-                                </button>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {race.status === 'completed' && (
-                                <button
-                                  type="button"
-                                  className="admin-btn admin-btn--gold admin-btn--sm"
-                                  style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
-                                  onClick={() => navigate('/admin/results')}
-                                >
-                                  📊 Xem kết quả
-                                </button>
-                              )}
-                              {race.status === 'published' && (
-                                <button
-                                  type="button"
-                                  className="admin-btn admin-btn--gold admin-btn--sm"
-                                  style={{ backgroundColor: '#1e3a8a', color: '#fff', border: 'none', fontWeight: 'bold' }}
-                                  onClick={() => navigate('/admin/results')}
-                                >
-                                  📊 Xem kết quả
                                 </button>
                               )}
                             </>
